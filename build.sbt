@@ -19,6 +19,7 @@ lazy val microservice = Project(appName, file("."))
   .settings(scalacSettings)
   .settings(integrationTestSettings(): _*)
   .settings(resolvers += Resolver.jcenterRepo)
+  .settings(inThisBuild(buildSettings))
 
 // Scalac options
 lazy val scalacSettings = Def.settings(
@@ -68,4 +69,8 @@ lazy val itSettings = Seq(
   javaOptions ++= Seq(
     "-Dlogger.resource=it.logback.xml"
   )
+)
+
+lazy val buildSettings = Def.settings(
+  scalafmtOnCompile := true
 )
