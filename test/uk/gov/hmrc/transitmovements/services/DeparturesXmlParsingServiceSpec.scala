@@ -29,24 +29,44 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.nio.charset.StandardCharsets
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import scala.xml.NodeSeq
 
 class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Matchers with TestActorSystem with ScalaCheckPropertyChecks {
 
-  val testEnrolmentEORI: EORINumber = EORINumber("TEST")
+  private val testDate      = OffsetDateTime.now(ZoneOffset.UTC)
+  private val UTCDateString = testDate.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
 
   val validXml: NodeSeq =
     <CC015C>
       <messageSender>GB1234</messageSender>
+      <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
     </CC015C>
 
   val noSender: NodeSeq =
-    <CC015C></CC015C>
+    <CC015C>
+      <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
+    </CC015C>
 
   val twoSenders: NodeSeq =
     <CC015C>
       <messageSender>GB1234</messageSender>
       <messageSender>XI1234</messageSender>
+      <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
+    </CC015C>
+
+  val noDate: NodeSeq =
+    <CC015C>
+      <messageSender>GB1234</messageSender>
+    </CC015C>
+
+  val twoDates: NodeSeq =
+    <CC015C>
+      <messageSender>GB1234</messageSender>
+      <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
+      <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
     </CC015C>
 
   val incompleteXml: String =
@@ -72,17 +92,27 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
       val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        _ mustBe Right(DeclarationData(movementEoriNumber = EORINumber("GB1234")))
+        _ mustBe Right(DeclarationData(EORINumber("GB1234"), testDate))
       }
     }
 
-    "if it doesn't have a message sender, return ParseError.NoElementFound" in {
+    "if it doesn't have a message sender, return ParseError.NoElementFound for the message sender" in {
       val source = createStream(noSender)
 
       val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
         _ mustBe Left(ParseError.NoElementFound("messageSender"))
+      }
+    }
+
+    "if it doesn't have a preparation date, return ParseError.NoElementFound" in {
+      val source = createStream(noDate)
+
+      val result = service.extractDeclarationData(source)
+
+      whenReady(result.value) {
+        _ mustBe Left(ParseError.NoElementFound("preparationDateAndTime"))
       }
     }
 
@@ -93,6 +123,16 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
 
       whenReady(result.value) {
         _ mustBe Left(ParseError.TooManyElementsFound("messageSender"))
+      }
+    }
+
+    "if it has two preparation dates, return ParseError.TooManyElementsFound" in {
+      val source = createStream(twoDates)
+
+      val result = service.extractDeclarationData(source)
+
+      whenReady(result.value) {
+        _ mustBe Left(ParseError.TooManyElementsFound("preparationDateAndTime"))
       }
     }
 
