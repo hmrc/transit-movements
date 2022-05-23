@@ -16,11 +16,4 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-object DeclarationData {
-
-  def fromPartialDeclarationData(enrolmentEoriNumber: EORINumber, partialDeclarationData: PartialDeclarationData) =
-    DeclarationData(enrolmentEoriNumber, partialDeclarationData.movementEoriNumber)
-}
-case class DeclarationData(enrolmentEoriNumber: EORINumber, movementEoriNumber: EORINumber)
-
-case class PartialDeclarationData(movementEoriNumber: EORINumber)
+case class DeclarationData(movementEoriNumber: EORINumber)

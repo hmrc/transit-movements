@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.errors.parse
+package uk.gov.hmrc.transitmovements.services.errors
 
 sealed abstract class ParseError
 
 object ParseError {
-  case object NoElementFound                                    extends ParseError
-  case object TooManyElementsFound                              extends ParseError
+  case class NoElementFound(element: String)                    extends ParseError
+  case class TooManyElementsFound(element: String)              extends ParseError
   case class Unknown(caughtException: Option[Throwable] = None) extends ParseError
 }

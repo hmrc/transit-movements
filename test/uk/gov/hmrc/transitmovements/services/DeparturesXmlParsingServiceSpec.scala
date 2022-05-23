@@ -26,14 +26,14 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.errors.parse.ParseError
+import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.nio.charset.StandardCharsets
 import scala.xml.NodeSeq
 
 class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Matchers with TestActorSystem with ScalaCheckPropertyChecks {
 
-  val testEnrolmentEORI = EORINumber("TEST")
+  val testEnrolmentEORI: EORINumber = EORINumber("TEST")
 
   val validXml: NodeSeq =
     <CC015C>
@@ -69,37 +69,37 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
     "if it is valid, return an appropriate Declaration Data" in {
       val source = createStream(validXml)
 
-      val result = service.extractDeclarationData(testEnrolmentEORI, source)
+      val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        _ mustBe Right(DeclarationData(enrolmentEoriNumber = testEnrolmentEORI, movementEoriNumber = EORINumber("GB1234")))
+        _ mustBe Right(DeclarationData(movementEoriNumber = EORINumber("GB1234")))
       }
     }
 
     "if it doesn't have a message sender, return ParseError.NoElementFound" in {
       val source = createStream(noSender)
 
-      val result = service.extractDeclarationData(testEnrolmentEORI, source)
+      val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        _ mustBe Left(ParseError.NoElementFound)
+        _ mustBe Left(ParseError.NoElementFound("messageSender"))
       }
     }
 
     "if it has two senders, return ParseError.TooManyElementsFound" in {
       val source = createStream(twoSenders)
 
-      val result = service.extractDeclarationData(testEnrolmentEORI, source)
+      val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        _ mustBe Left(ParseError.TooManyElementsFound)
+        _ mustBe Left(ParseError.TooManyElementsFound("messageSender"))
       }
     }
 
     "if it is missing the end tag, return ParseError.Unknown" in {
       val source = createStream(incompleteXml)
 
-      val result = service.extractDeclarationData(testEnrolmentEORI, source)
+      val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
         either =>
@@ -112,7 +112,7 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
     "if it is missing the end of an inner tag, return ParseError.Unknown" in {
       val source = createStream(missingInnerTag)
 
-      val result = service.extractDeclarationData(testEnrolmentEORI, source)
+      val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
         either =>
@@ -125,7 +125,7 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
     "if it contains mismatched tags, return ParseError.Unknown" in {
       val source = createStream(mismatchedTags)
 
-      val result = service.extractDeclarationData(testEnrolmentEORI, source)
+      val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
         either =>

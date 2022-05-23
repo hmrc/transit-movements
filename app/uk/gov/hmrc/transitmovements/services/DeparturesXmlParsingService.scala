@@ -30,8 +30,7 @@ import com.google.inject.Inject
 import com.google.inject.Singleton
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.PartialDeclarationData
-import uk.gov.hmrc.transitmovements.models.errors.parse.ParseError
+import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
@@ -41,7 +40,7 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[DeparturesXmlParsingServiceImpl])
 trait DeparturesXmlParsingService {
 
-  def extractDeclarationData(enrolmentEoriNumber: EORINumber, source: Source[ByteString, _]): EitherT[Future, ParseError, DeclarationData]
+  def extractDeclarationData(source: Source[ByteString, _]): EitherT[Future, ParseError, DeclarationData]
 
 }
 
@@ -52,33 +51,28 @@ class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Material
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
   private val movementEORINumberExtractor: Flow[ParseEvent, EORINumber, NotUsed] = XmlParsing
-    .subtree("CC015C" :: "messageSender" :: Nil) // TODO: check this is the EORI
+    .subtree("CC015C" :: "messageSender" :: Nil) // TODO: see if we can get the EORI from the XSD in the future
     .collect {
       case element if element.getTextContent.nonEmpty => EORINumber(element.getTextContent)
     }
 
-  private def declarationFlow: Flow[ByteString, PartialDeclarationData, NotUsed] = XmlParsing.parser
+  private def declarationFlow: Flow[ByteString, DeclarationData, NotUsed] = XmlParsing.parser
     .via(movementEORINumberExtractor)
     .via(
       Flow.fromFunction(
-        in => PartialDeclarationData(in)
+        in => DeclarationData(in)
       )
     )
 
-  override def extractDeclarationData(enrolmentEoriNumber: EORINumber, source: Source[ByteString, _]): EitherT[Future, ParseError, DeclarationData] =
+  override def extractDeclarationData(source: Source[ByteString, _]): EitherT[Future, ParseError, DeclarationData] =
     EitherT(
       source
         .via(declarationFlow)
-        .via(
-          Flow.fromFunction(
-            partial => DeclarationData.fromPartialDeclarationData(enrolmentEoriNumber, partial)
-          )
-        )
-        .fold[Either[ParseError, DeclarationData]](Left(ParseError.NoElementFound))(
+        .fold[Either[ParseError, DeclarationData]](Left(ParseError.NoElementFound("messageSender")))(
           (current, next) =>
             current match {
-              case Left(ParseError.NoElementFound) => Right(next)
-              case _                               => Left(ParseError.TooManyElementsFound)
+              case Left(ParseError.NoElementFound(_)) => Right(next)
+              case _                                  => Left(ParseError.TooManyElementsFound("messageSender"))
             }
         )
         .recover {
@@ -86,7 +80,7 @@ class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Material
         }
         .runWith(Sink.headOption[Either[ParseError, DeclarationData]])
         .map(
-          result => result.getOrElse(Left(ParseError.NoElementFound))
+          result => result.getOrElse(Left(ParseError.NoElementFound("messageSender")))
         )
     )
 
