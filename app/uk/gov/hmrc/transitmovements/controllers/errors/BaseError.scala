@@ -32,12 +32,6 @@ object BaseError extends CommonFormats {
   def forbiddenError(message: String): BaseError =
     StandardError(message, ErrorCode.Forbidden)
 
-  def entityTooLargeError(message: String): BaseError =
-    StandardError(message, ErrorCode.EntityTooLarge)
-
-  def unsupportedMediaTypeError(message: String): BaseError =
-    StandardError(message, ErrorCode.UnsupportedMediaType)
-
   def badRequestError(message: String): BaseError =
     StandardError(message, ErrorCode.BadRequest)
 
