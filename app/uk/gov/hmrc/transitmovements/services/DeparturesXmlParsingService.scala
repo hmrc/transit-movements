@@ -56,7 +56,7 @@ class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Material
       case element if element.getTextContent.nonEmpty => EORINumber(element.getTextContent)
     }
 
-  private def declarationFlow: Flow[ByteString, DeclarationData, NotUsed] = XmlParsing.parser
+  private val declarationFlow: Flow[ByteString, DeclarationData, NotUsed] = XmlParsing.parser
     .via(movementEORINumberExtractor)
     .via(
       Flow.fromFunction(
