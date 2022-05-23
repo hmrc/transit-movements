@@ -16,25 +16,22 @@
 
 package uk.gov.hmrc.transitmovements.services
 
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
 import com.fasterxml.aalto.WFCException
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
-import java.nio.charset.StandardCharsets
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import scala.xml.NodeSeq
 
-class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Matchers with TestActorSystem with ScalaCheckPropertyChecks {
+class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Matchers with TestActorSystem with StreamTestHelpers {
 
   private val testDate      = OffsetDateTime.now(ZoneOffset.UTC)
   private val UTCDateString = testDate.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
@@ -77,11 +74,6 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
 
   val mismatchedTags: String =
     "<CC015C><messageSender>GB1234</messageReceiver></CC015C>"
-
-  private def createStream(node: NodeSeq): Source[ByteString, _] = createStream(node.mkString)
-
-  private def createStream(string: String): Source[ByteString, _] =
-    Source.single(ByteString(string, StandardCharsets.UTF_8))
 
   "When handed an XML stream" - {
     val service = new DeparturesXmlParsingServiceImpl

@@ -16,10 +16,13 @@
 
 package uk.gov.hmrc.transitmovements.services.errors
 
+import java.time.format.DateTimeParseException
+
 sealed abstract class ParseError
 
 object ParseError {
-  case class NoElementFound(element: String)                    extends ParseError
-  case class TooManyElementsFound(element: String)              extends ParseError
-  case class Unknown(caughtException: Option[Throwable] = None) extends ParseError
+  case class NoElementFound(element: String)                                 extends ParseError
+  case class TooManyElementsFound(element: String)                           extends ParseError
+  case class BadDateTime(element: String, exception: DateTimeParseException) extends ParseError
+  case class Unknown(caughtException: Option[Throwable] = None)              extends ParseError
 }

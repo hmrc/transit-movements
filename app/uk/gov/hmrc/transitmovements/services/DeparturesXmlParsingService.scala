@@ -36,9 +36,7 @@ import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
-import java.time.LocalDateTime
 import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -52,39 +50,10 @@ trait DeparturesXmlParsingService {
 }
 
 @Singleton
-class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Materializer) extends DeparturesXmlParsingService {
-
-  type ParseResult[A] = Either[ParseError, A]
-
-  implicit private class FlowOps[A](value: Flow[ParseEvent, A, NotUsed]) {
-
-    def single(element: String): Flow[ParseEvent, ParseResult[A], NotUsed] =
-      value.fold[Either[ParseError, A]](Left(ParseError.NoElementFound(element)))(
-        (current, next) =>
-          current match {
-            case Left(ParseError.NoElementFound(_)) => Right(next)
-            case _                                  => Left(ParseError.TooManyElementsFound(element))
-          }
-      )
-  }
+class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Materializer) extends DeparturesXmlParsingService with XmlParsingServiceHelpers {
 
   // we don't want to starve the Play pool
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
-
-  private val movementEORINumberExtractor: Flow[ParseEvent, ParseResult[EORINumber], NotUsed] = XmlParsing
-    .subtree("CC015C" :: "messageSender" :: Nil) // TODO: see if we can get the EORI from the XSD in the future
-    .collect {
-      case element if element.getTextContent.nonEmpty => EORINumber(element.getTextContent)
-    }
-    .single("messageSender")
-
-  private val preparationDateTimeExtractor: Flow[ParseEvent, ParseResult[OffsetDateTime], NotUsed] = XmlParsing
-    .subtree("CC015C" :: "preparationDateAndTime" :: Nil)
-    .collect {
-      case element if element.getTextContent.nonEmpty =>
-        LocalDateTime.parse(element.getTextContent).atOffset(ZoneOffset.UTC)
-    }
-    .single("preparationDateAndTime")
 
   private def buildDeclarationData(eoriMaybe: ParseResult[EORINumber], dateMaybe: ParseResult[OffsetDateTime]): ParseResult[DeclarationData] =
     for {
@@ -102,8 +71,8 @@ class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Material
           val combiner  = builder.add(ZipWith[ParseResult[EORINumber], ParseResult[OffsetDateTime], ParseResult[DeclarationData]](buildDeclarationData))
 
           val xmlParsing = builder.add(XmlParsing.parser)
-          val eoriFlow   = builder.add(movementEORINumberExtractor)
-          val dateFlow   = builder.add(preparationDateTimeExtractor)
+          val eoriFlow   = builder.add(XmlParsers.movementEORINumberExtractor)
+          val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor)
 
           xmlParsing.out ~> broadcast.in
           broadcast.out(0) ~> eoriFlow ~> combiner.in0
