@@ -16,4 +16,6 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-case class DeclarationData(movementEoriNumber: EORINumber)
+import java.time.OffsetDateTime
+
+case class DeclarationData(movementEoriNumber: EORINumber, generationDate: OffsetDateTime)
