@@ -50,7 +50,7 @@ class BaseErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar {
           val exception = new IllegalStateException("message")
 
           // when we create a error for this
-          val sut = BaseError.internalServiceError(cause = Some(exception))
+          val sut = InternalServiceError.causedBy(exception)
 
           // and when we turn it to Json
           val json = Json.toJson(sut)

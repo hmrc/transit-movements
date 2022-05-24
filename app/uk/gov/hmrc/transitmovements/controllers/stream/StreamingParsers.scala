@@ -53,17 +53,4 @@ trait StreamingParsers {
       Accumulator.source[ByteString].map(Right.apply)
   }
 
-  lazy val streamFromFile: BodyParser[Source[ByteString, _]] = parse.temporaryFile.map {
-    tempFile =>
-      FileIO.fromPath(tempFile.path)
-  }
-
-  lazy val streamIntelligently: BodyParser[Source[ByteString, _]] = streamIntelligently(100000)
-
-  def streamIntelligently(maxLengthInMemory: Long): BodyParser[Source[ByteString, _]] = parse.using {
-    headers =>
-      if (headers.headers.get(CONTENT_LENGTH).map(_.toLong).exists(_ < maxLengthInMemory)) streamFromMemory
-      else streamFromFile
-  }
-
 }

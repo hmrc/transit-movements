@@ -60,14 +60,6 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with GuiceOneAppPer
       request => result.apply(request).run(request.body)(materializer)
     }
 
-    def testFromFile: Action[Source[ByteString, _]] = Action.async(streamFromFile) {
-      request => result.apply(request).run(request.body)(materializer)
-    }
-
-    def testIntelligence: Action[Source[ByteString, _]] = Action.async(streamIntelligently(2000)) {
-      request => result.apply(request).run(request.body)(materializer)
-    }
-
     def result: Action[String] = Action.async(parse.text) {
       request =>
         Future.successful(Ok(request.body))
@@ -111,34 +103,6 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with GuiceOneAppPer
             val request    = FakeRequest("POST", "/", headers, generateSource(byteString))
             val sut        = new Harness(app.injector.instanceOf[ControllerComponents])(app.materializer)
             val result     = sut.testFromMemory()(request)
-            status(result) mustBe OK
-            contentAsString(result) mustBe byteString.decodeString(StandardCharsets.UTF_8)
-          }
-      }
-    }
-
-    "from a temporary file" - {
-      (1 to 5).foreach {
-        value =>
-          s"~$value kb string is created" in {
-            val byteString = generateByteString(value)
-            val request    = FakeRequest("POST", "/", headers, generateSource(byteString))
-            val sut        = new Harness(app.injector.instanceOf[ControllerComponents])(app.materializer)
-            val result     = sut.testFromFile()(request)
-            status(result) mustBe OK
-            contentAsString(result) mustBe byteString.decodeString(StandardCharsets.UTF_8)
-          }
-      }
-    }
-
-    "from an intelligent selection" - {
-      (1 to 5).foreach {
-        value =>
-          s"~$value kb string is created" in {
-            val byteString = generateByteString(value)
-            val request    = FakeRequest("POST", "/", headers, generateSource(byteString))
-            val sut        = new Harness(app.injector.instanceOf[ControllerComponents])(app.materializer)
-            val result     = sut.testIntelligence()(request)
             status(result) mustBe OK
             contentAsString(result) mustBe byteString.decodeString(StandardCharsets.UTF_8)
           }
