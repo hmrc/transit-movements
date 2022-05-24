@@ -144,7 +144,7 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
           val error = result.left.get
           error mustBe a[ParseError.BadDateTime]
           error.asInstanceOf[ParseError.BadDateTime].element mustBe "preparationDateAndTime"
-          error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'notadatetime' could not be parsed at index 0"
+          error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'notadate' could not be parsed at index 0"
       }
     }
 
