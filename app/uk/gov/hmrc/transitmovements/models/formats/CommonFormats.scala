@@ -14,20 +14,22 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.controllers
+package uk.gov.hmrc.transitmovements.models.formats
 
-import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
-import play.api.mvc.Action
-import play.api.mvc.AnyContent
-import play.api.mvc.ControllerComponents
-import javax.inject.Inject
-import javax.inject.Singleton
-import scala.concurrent.Future
+import cats.data.NonEmptyList
+import play.api.libs.functional.syntax.toInvariantFunctorOps
+import play.api.libs.json.Format
 
-@Singleton()
-class MicroserviceHelloWorldController @Inject() (cc: ControllerComponents) extends BackendController(cc) {
+object CommonFormats extends CommonFormats
 
-  def hello(): Action[AnyContent] = Action.async {
-    Future.successful(Ok("Hello world"))
-  }
+trait CommonFormats {
+
+  implicit def nonEmptyListFormat[A: Format]: Format[NonEmptyList[A]] =
+    Format
+      .of[List[A]]
+      .inmap(
+        NonEmptyList.fromListUnsafe,
+        _.toList
+      )
+
 }
