@@ -29,8 +29,9 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import play.api.Application
 import play.api.http.HeaderNames
-import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.ACCEPTED
+import play.api.http.Status.BAD_REQUEST
+import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
@@ -43,7 +44,6 @@ import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
 import play.api.test.Helpers.status
 import uk.gov.hmrc.http.HttpVerbs.POST
-import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
 
 import java.nio.charset.StandardCharsets
@@ -61,15 +61,6 @@ class DeparturesControllerSpec
   val validXml: NodeSeq =
     <CC015C>
       <messageSender>ABC123</messageSender>
-    </CC015C>
-
-  val elementNotFoundXml: NodeSeq =
-    <CC015C></CC015C>
-
-  val tooManyFoundXml: NodeSeq =
-    <CC015C>
-      <messageSender>GB1234</messageSender>
-      <messageSender>XI1234</messageSender>
     </CC015C>
 
   private def createStream(node: NodeSeq): Source[ByteString, _] = createStream(node.mkString)
@@ -109,6 +100,9 @@ class DeparturesControllerSpec
 
       "contains message to indicate element not found" in {
 
+        val elementNotFoundXml: NodeSeq =
+          <CC015C></CC015C>
+
         val request = fakeRequestDepartures(POST, elementNotFoundXml)
 
         val result = app.injector.instanceOf[DeparturesController].post()(request)
@@ -122,6 +116,12 @@ class DeparturesControllerSpec
 
       "contains message to indicate too many elements found" in {
 
+        val tooManyFoundXml: NodeSeq =
+          <CC015C>
+            <messageSender>GB1234</messageSender>
+            <messageSender>XI1234</messageSender>
+          </CC015C>
+
         val request = fakeRequestDepartures(POST, tooManyFoundXml)
 
         val result = app.injector.instanceOf[DeparturesController].post()(request)
@@ -134,25 +134,48 @@ class DeparturesControllerSpec
       }
     }
 
-    "must return internal server error when file creation fails" in {
+    "must return INTERNAL_SERVICE_ERROR" - {
 
-      val mockXmlParsingService    = mock[DeparturesXmlParsingService]
-      val mockTemporaryFileCreator = mock[TemporaryFileCreator]
+      "when an invalid xml causes an unknown ParseError to be thrown" in {
 
-      val sut = new DeparturesController(app.injector.instanceOf[ControllerComponents], mockXmlParsingService, mockTemporaryFileCreator)(app.materializer)
+        val unknownErrorXml: String =
+          "<CC015C><messageSender>GB1234</messageSender>"
 
-      when(mockTemporaryFileCreator.create()).thenThrow(new Exception)
+        val request = FakeRequest(
+          method = POST,
+          uri = routes.DeparturesController.post().url,
+          headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "application/xml")),
+          body = createStream(unknownErrorXml)
+        )
 
-      val request = fakeRequestDepartures(POST, validXml)
+        val result = app.injector.instanceOf[DeparturesController].post()(request)
 
-      val result = sut.post()(request)
+        status(result) mustBe INTERNAL_SERVER_ERROR
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "INTERNAL_SERVER_ERROR",
+          "message" -> "Internal server error"
+        )
+      }
 
-      status(result) mustBe ErrorCode.InternalServerError.statusCode
-      contentAsJson(result) mustBe Json.obj(
-        "code"    -> "INTERNAL_SERVER_ERROR",
-        "message" -> "Internal server error"
-      )
+      "when file creation fails" in {
+
+        val mockXmlParsingService    = mock[DeparturesXmlParsingService]
+        val mockTemporaryFileCreator = mock[TemporaryFileCreator]
+
+        val sut = new DeparturesController(app.injector.instanceOf[ControllerComponents], mockXmlParsingService, mockTemporaryFileCreator)(app.materializer)
+
+        when(mockTemporaryFileCreator.create()).thenThrow(new Exception("File creation failed"))
+
+        val request = fakeRequestDepartures(POST, validXml)
+
+        val result = sut.post()(request)
+
+        status(result) mustBe INTERNAL_SERVER_ERROR
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "INTERNAL_SERVER_ERROR",
+          "message" -> "Internal server error"
+        )
+      }
     }
-
   }
 }
