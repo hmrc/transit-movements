@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.services
 
+import akka.stream.scaladsl.Sink
 import com.fasterxml.aalto.WFCException
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
@@ -64,6 +65,12 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
       <messageSender>GB1234</messageSender>
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
+    </CC015C>
+
+  val badDate: NodeSeq =
+    <CC015C>
+      <messageSender>GB1234</messageSender>
+      <preparationDateAndTime>notadate</preparationDateAndTime>
     </CC015C>
 
   val incompleteXml: String =
@@ -125,6 +132,19 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
 
       whenReady(result.value) {
         _ mustBe Left(ParseError.TooManyElementsFound("preparationDateAndTime"))
+      }
+    }
+
+    "it it has a preparation date that is unparsable, return ParseError.BadDateTime" in {
+      val stream       = createParsingEventStream(badDate)
+      val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor).runWith(Sink.head)
+
+      whenReady(parsedResult) {
+        result =>
+          val error = result.left.get
+          error mustBe a[ParseError.BadDateTime]
+          error.asInstanceOf[ParseError.BadDateTime].element mustBe "preparationDateAndTime"
+          error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'notadatetime' could not be parsed at index 0"
       }
     }
 
