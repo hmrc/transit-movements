@@ -110,7 +110,7 @@ class DeparturesControllerSpec
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
           "code"    -> "BAD_REQUEST",
-          "message" -> "Element messageSender not found in departure declaration"
+          "message" -> "Element messageSender not found"
         )
       }
 
@@ -129,7 +129,7 @@ class DeparturesControllerSpec
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
           "code"    -> "BAD_REQUEST",
-          "message" -> "Found too many elements of type messageSender in departure declaration"
+          "message" -> "Found too many elements of type messageSender"
         )
       }
     }

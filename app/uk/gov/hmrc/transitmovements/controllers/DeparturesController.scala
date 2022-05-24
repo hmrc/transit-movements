@@ -71,8 +71,8 @@ class DeparturesController @Inject() (cc: ControllerComponents, xmlParsingServic
       }
 
   def translateParseError(parseError: ParseError): BaseError = parseError match {
-    case NoElementFound(element)       => BaseError.badRequestError(s"Element $element not found in departure declaration")
-    case TooManyElementsFound(element) => BaseError.badRequestError(s"Found too many elements of type $element in departure declaration")
+    case NoElementFound(element)       => BaseError.badRequestError(s"Element $element not found")
+    case TooManyElementsFound(element) => BaseError.badRequestError(s"Found too many elements of type $element")
     case Unknown(ex)                   => BaseError.internalServiceError(cause = ex)
   }
 

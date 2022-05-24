@@ -45,14 +45,7 @@ object ErrorCode {
   }
 
   implicit val errorCodeReads: Reads[ErrorCode] = Reads {
-    errorCode =>
-      errorCodes
-        .find(
-          value => value.code == errorCode.asInstanceOf[JsString].value
-        )
-        .map(
-          errorCode => JsSuccess(errorCode)
-        )
-        .getOrElse(JsError())
+    case JsString(errorCode) => errorCodes.find(_.code == errorCode).map(JsSuccess(_)).getOrElse(JsError())
+    case _                   => JsError()
   }
 }
