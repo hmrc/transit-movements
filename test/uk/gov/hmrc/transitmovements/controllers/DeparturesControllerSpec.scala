@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.controllers
 
+import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import akka.util.Timeout
@@ -31,15 +32,19 @@ import play.api.http.HeaderNames
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.ACCEPTED
 import play.api.inject.guice.GuiceApplicationBuilder
+import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 
 import scala.concurrent.duration.DurationInt
+import play.api.mvc.ControllerComponents
 import play.api.mvc.Request
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
 import play.api.test.Helpers.status
 import uk.gov.hmrc.http.HttpVerbs.POST
+import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode
+import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
 
 import java.nio.charset.StandardCharsets
 import scala.xml.NodeSeq
@@ -82,9 +87,12 @@ class DeparturesControllerSpec
       headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "application/xml")),
       body = createStream(body)
     )
+
   implicit val timeout: Timeout = 5.seconds
 
   override lazy val app: Application = GuiceApplicationBuilder().build()
+
+  implicit lazy val materializer: Materializer = app.materializer
 
   "/POST" - {
 
@@ -124,6 +132,26 @@ class DeparturesControllerSpec
           "message" -> "Found too many elements of type messageSender in departure declaration"
         )
       }
+    }
+
+    "must return internal server error when file creation fails" in {
+
+      val mockXmlParsingService    = mock[DeparturesXmlParsingService]
+      val mockTemporaryFileCreator = mock[TemporaryFileCreator]
+
+      val sut = new DeparturesController(app.injector.instanceOf[ControllerComponents], mockXmlParsingService, mockTemporaryFileCreator)(app.materializer)
+
+      when(mockTemporaryFileCreator.create()).thenThrow(new Exception)
+
+      val request = fakeRequestDepartures(POST, validXml)
+
+      val result = sut.post()(request)
+
+      status(result) mustBe ErrorCode.InternalServerError.statusCode
+      contentAsJson(result) mustBe Json.obj(
+        "code"    -> "INTERNAL_SERVER_ERROR",
+        "message" -> "Internal server error"
+      )
     }
 
   }
