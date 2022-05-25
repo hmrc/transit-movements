@@ -73,6 +73,7 @@ class DeparturesController @Inject() (cc: ControllerComponents, xmlParsingServic
   def translateParseError(parseError: ParseError): BaseError = parseError match {
     case NoElementFound(element)       => BaseError.badRequestError(s"Element $element not found")
     case TooManyElementsFound(element) => BaseError.badRequestError(s"Found too many elements of type $element")
+    case BadDateTime(element, ex)      => BaseError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
     case Unknown(ex)                   => BaseError.internalServiceError(cause = ex)
   }
 

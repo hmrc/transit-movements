@@ -61,6 +61,7 @@ class DeparturesControllerSpec
   val validXml: NodeSeq =
     <CC015C>
       <messageSender>ABC123</messageSender>
+      <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
     </CC015C>
 
   private def createStream(node: NodeSeq): Source[ByteString, _] = createStream(node.mkString)
@@ -130,6 +131,25 @@ class DeparturesControllerSpec
         contentAsJson(result) mustBe Json.obj(
           "code"    -> "BAD_REQUEST",
           "message" -> "Found too many elements of type messageSender"
+        )
+      }
+
+      "contains message to indicate date time failure" in {
+
+        val tooManyFoundXml: NodeSeq =
+          <CC015C>
+            <messageSender>GB1234</messageSender>
+            <preparationDateAndTime>no</preparationDateAndTime>
+          </CC015C>
+
+        val request = fakeRequestDepartures(POST, tooManyFoundXml)
+
+        val result = app.injector.instanceOf[DeparturesController].post()(request)
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Could not parse datetime for preparationDateAndTime: Text 'no' could not be parsed at index 0"
         )
       }
     }
