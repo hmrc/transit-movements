@@ -28,8 +28,13 @@ import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageType
+<<<<<<< Updated upstream
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
+=======
+import uk.gov.hmrc.transitmovements.models.Departure
+import uk.gov.hmrc.transitmovements.models.DepartureId
+>>>>>>> Stashed changes
 import uk.gov.hmrc.transitmovements.models.MovementMessage
 import uk.gov.hmrc.transitmovements.models.MovementMessageId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
@@ -42,7 +47,12 @@ trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
 
   implicit val eoriNumberFormat: Format[EORINumber]               = Json.valueFormat[EORINumber]
   implicit val movementMessageIdFormat: Format[MovementMessageId] = Json.valueFormat[MovementMessageId]
+<<<<<<< Updated upstream
   implicit val movementIdFormat: Format[MovementId]               = Json.valueFormat[MovementId]
+=======
+  implicit val movementIdFormat: Format[DepartureId]               = Json.valueFormat[DepartureId]
+  implicit val triggerIdFormat: Format[TriggerId]                 = Json.valueFormat[TriggerId]
+>>>>>>> Stashed changes
 
 //  val movementWrites: OWrites[Movement] = Json.writes[Movement]
 //  implicit val movementReads: Reads[Movement]    = Json.reads[Movement]
@@ -76,27 +86,45 @@ trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
       (JsPath \ "body").writeNullable[String]
   )(unlift(MovementMessage.unapply))
 
+<<<<<<< Updated upstream
   implicit val movementReads: Reads[Movement] = (
     (JsPath \ "_id").read[MovementId] and
+=======
+  implicit val movementReads: Reads[Departure] = (
+    (JsPath \ "_id").read[DepartureId] and
+>>>>>>> Stashed changes
       (JsPath \ "enrollmentEORINumber").read[EORINumber] and
       (JsPath \ "movementEORINumber").read[EORINumber] and
       (JsPath \ "movementReferenceNumber").readNullable[MovementReferenceNumber] and
       (JsPath \ "created").read[OffsetDateTime] and
       (JsPath \ "updated").read[OffsetDateTime] and
       (JsPath \ "messages").read[Seq[MovementMessage]]
+<<<<<<< Updated upstream
   )(Movement.apply _)
 
   implicit val movementWrites: Writes[Movement] = (
     (JsPath \ "_id").write[MovementId] and
+=======
+  )(Departure.apply _)
+
+  implicit val movementWrites: Writes[Departure] = (
+    (JsPath \ "_id").write[DepartureId] and
+>>>>>>> Stashed changes
       (JsPath \ "enrollmentEORINumber").write[EORINumber] and
       (JsPath \ "movementEORINumber").write[EORINumber] and
       (JsPath \ "movementReferenceNumber").writeNullable[MovementReferenceNumber] and
       (JsPath \ "created").write[OffsetDateTime] and
       (JsPath \ "updated").write[OffsetDateTime] and
       (JsPath \ "messages").write[Seq[MovementMessage]]
+<<<<<<< Updated upstream
   )(unlift(Movement.unapply))
 
   implicit val movementFormat: Format[Movement] = Format(movementReads, movementWrites)
+=======
+  )(unlift(Departure.unapply))
+
+  implicit val movementFormat: Format[Departure] = Format(movementReads, movementWrites)
+>>>>>>> Stashed changes
 
 }
 
