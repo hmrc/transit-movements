@@ -27,9 +27,10 @@ import play.api.test.DefaultAwaitTimeout
 import play.api.test.FutureAwaits
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
+import uk.gov.hmrc.transitmovements.models.DeclarationData
+import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.repositories.DepartureMovementRepositoryImpl
-import uk.gov.hmrc.transitmovements.repositories.repositories.Transactions
 
 import java.security.SecureRandom
 import java.time.Clock
@@ -42,7 +43,6 @@ class DepartureMovementRepositorySpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
-    with Transactions
     with FutureAwaits
     with DefaultAwaitTimeout
     with Logging
@@ -72,8 +72,10 @@ class DepartureMovementRepositorySpec
 
   it should "insert departures based on declaration data" in {
 
+    val declarationData = DeclarationData(EORINumber("321"), instant)
+
     val movementId = await(
-      repository.insert("")
+      repository.insert(declarationData)
     )
 
     val movement = await {

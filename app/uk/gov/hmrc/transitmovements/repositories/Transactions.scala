@@ -32,8 +32,6 @@ package uk.gov.hmrc.transitmovements.repositories
  * limitations under the License.
  */
 
-package repositories
-
 import cats.syntax.all._
 import com.mongodb.reactivestreams.client.ClientSession
 import org.mongodb.scala._

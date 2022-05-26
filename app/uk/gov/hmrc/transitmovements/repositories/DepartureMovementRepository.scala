@@ -18,12 +18,13 @@ package uk.gov.hmrc.transitmovements.repositories
 
 import akka.pattern.retry
 import com.google.inject.ImplementedBy
+import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.Movement
+import uk.gov.hmrc.transitmovements.models.MovementId
 import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
-import uk.gov.hmrc.transitmovements.models.Movement
-import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.values.BytesToHex
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
@@ -38,9 +39,7 @@ import scala.concurrent.Future
 
 @ImplementedBy(classOf[DepartureMovementRepositoryImpl])
 trait DepartureMovementRepository {
-  type DepartureData = String
-
-  def insert(request: DepartureData): Future[MovementId]
+  def insert(request: DeclarationData): Future[MovementId]
 }
 
 class DepartureMovementRepositoryImpl @Inject() (
@@ -57,7 +56,7 @@ class DepartureMovementRepositoryImpl @Inject() (
     with DepartureMovementRepository
     with Logging {
 
-  def insert(departureData: DepartureData): Future[MovementId] =
+  def insert(declarationData: DeclarationData): Future[MovementId] =
     retry(
       attempts = 0,
       attempt = {
@@ -66,7 +65,7 @@ class DepartureMovementRepositoryImpl @Inject() (
           val movementId = MovementId(BytesToHex.toHex(nextId))
 
           collection
-            .insertOne(createMovement(movementId, departureData))
+            .insertOne(createMovement(movementId, declarationData))
             .headOption()
             .map {
               result =>
@@ -75,12 +74,12 @@ class DepartureMovementRepositoryImpl @Inject() (
       }
     )
 
-  val createMovement: (MovementId, DepartureData) => Movement = {
-    (id, _) =>
+  val createMovement: (MovementId, DeclarationData) => Movement = {
+    (id, declarationData) =>
       Movement(
         id,
         enrollmentEORINumber = EORINumber("111"),
-        movementEORINumber = EORINumber("222"),
+        movementEORINumber = declarationData.movementEoriNumber,
         movementReferenceNumber = None,
         created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
         updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
