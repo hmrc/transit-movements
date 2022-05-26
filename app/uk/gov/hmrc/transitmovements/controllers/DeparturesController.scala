@@ -34,6 +34,9 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovements.controllers.errors.BaseError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.MovementMessageId
+import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError._
@@ -82,12 +85,12 @@ class DeparturesController @Inject() (cc: ControllerComponents, xmlParsingServic
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       withTemporaryFile {
         (temporaryFile, source) =>
-          xmlParsingService
-            .extractDeclarationData(source)
-            .leftMap(translateParseError)
+          for {
+            declarationData <- xmlParsingService.extractDeclarationData(source).leftMap(translateParseError)
+          } yield declarationData
       }.fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        _ => Accepted
+        _ => Ok(Json.toJson(DeclarationResponse(MovementId("ABC"), MovementMessageId("123"))))
       )
   }
 
