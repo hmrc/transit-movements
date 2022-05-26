@@ -33,13 +33,12 @@ import play.api.libs.Files.TemporaryFileCreator
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovements.controllers.errors.BaseError
+import uk.gov.hmrc.transitmovements.controllers.errors.ErrorTranslator
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementMessageId
 import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
-import uk.gov.hmrc.transitmovements.services.errors.ParseError
-import uk.gov.hmrc.transitmovements.services.errors.ParseError._
 
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -47,11 +46,16 @@ import scala.concurrent.Future
 import scala.util.Try
 
 @Singleton
-class DeparturesController @Inject() (cc: ControllerComponents, xmlParsingService: DeparturesXmlParsingService, temporaryFileCreator: TemporaryFileCreator)(
-  implicit val materializer: Materializer
+class DeparturesController @Inject() (
+  cc: ControllerComponents,
+  xmlParsingService: DeparturesXmlParsingService,
+  temporaryFileCreator: TemporaryFileCreator
+)(implicit
+  val materializer: Materializer
 ) extends BackendController(cc)
     with Logging
-    with StreamingParsers {
+    with StreamingParsers
+    with ErrorTranslator {
 
   private def deleteFile[A](temporaryFile: Files.TemporaryFile)(identity: A): A = {
     temporaryFile.delete()
@@ -73,24 +77,17 @@ class DeparturesController @Inject() (cc: ControllerComponents, xmlParsingServic
           onSucceed(temporaryFile, source).bimap(deleteFile(temporaryFile), deleteFile(temporaryFile))
       }
 
-  def translateParseError(parseError: ParseError): BaseError = parseError match {
-    case NoElementFound(element)       => BaseError.badRequestError(s"Element $element not found")
-    case TooManyElementsFound(element) => BaseError.badRequestError(s"Found too many elements of type $element")
-    case BadDateTime(element, ex)      => BaseError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
-    case Unknown(ex)                   => BaseError.internalServiceError(cause = ex)
-  }
-
   def post() = Action.async(streamFromMemory) {
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       withTemporaryFile {
         (temporaryFile, source) =>
           for {
-            declarationData <- xmlParsingService.extractDeclarationData(source).leftMap(translateParseError)
+            declarationData <- xmlParsingService.extractDeclarationData(source)
           } yield declarationData
       }.fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        _ => Ok(Json.toJson(DeclarationResponse(MovementId("ABC"), MovementMessageId("123"))))
+        _ => Ok
       )
   }
 
