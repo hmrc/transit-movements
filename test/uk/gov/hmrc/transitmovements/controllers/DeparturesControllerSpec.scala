@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.controllers
 
+import akka.http.scaladsl.model.HttpHeader.ParsingResult.Ok
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -29,9 +30,9 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import play.api.Application
 import play.api.http.HeaderNames
-import play.api.http.Status.ACCEPTED
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
+import play.api.http.Status.OK
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
@@ -88,13 +89,13 @@ class DeparturesControllerSpec
 
   "/POST" - {
 
-    "must return ACCEPTED if XML data extraction is successful" in {
+    "must return OK if XML data extraction is successful" in {
 
       val request = fakeRequestDepartures(POST, validXml)
 
       val result = app.injector.instanceOf[DeparturesController].post()(request)
 
-      status(result) mustBe ACCEPTED
+      status(result) mustBe OK
     }
 
     "must return BAD_REQUEST when XML data extraction fails" - {
