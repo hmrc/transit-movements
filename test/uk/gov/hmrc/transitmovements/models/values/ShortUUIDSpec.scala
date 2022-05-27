@@ -16,23 +16,21 @@
 
 package uk.gov.hmrc.transitmovements.models.values
 
-import akka.util.ByteString
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-import java.nio.ByteBuffer
+import java.security.SecureRandom
+import java.time.Clock
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
-trait HexToBytes {
+class ShortUUIDSpec extends AnyFlatSpec with Matchers {
+  val instant: OffsetDateTime = OffsetDateTime.now
+  val clock: Clock            = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
+  val random                  = new SecureRandom
 
-  def fromHex(hex: String): ByteString = {
-    val buffer = ByteBuffer.wrap(new Array[Byte](8))
-
-    val hexBytes = hex.sliding(2, 2)
-
-    while (hexBytes.hasNext) {
-      val hexByte = hexBytes.next
-      val hexInt  = Integer.parseInt(hexByte, 16)
-      buffer.put(hexInt.toByte)
-    }
-
-    ByteString(buffer.array())
+  "a valid short UUID " should "be created" in {
+    val shortUUID = ShortUUID.next(clock, random)
+    shortUUID should fullyMatch regex ShortUUID.ShortUUIDRegex
   }
 }

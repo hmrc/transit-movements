@@ -27,7 +27,7 @@ import uk.gov.hmrc.transitmovements.models.formats.MongoFormats._
 
 class DepartureSpec extends AnyFlatSpec with Matchers {
 
-  "json movement message" should "be created correctly" in {
+  "json formatted departure" should "be created correctly" in {
 
     val movement = Departure(
       DepartureId("1"),

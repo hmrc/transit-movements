@@ -16,16 +16,19 @@
 
 package uk.gov.hmrc.transitmovements.models.values
 
+import akka.util
 import akka.util.ByteString
-
 import java.nio.ByteBuffer
 import java.time.Clock
 import java.util.Random
+import scala.util.matching.Regex
 
 object ShortUUID {
-  val ShortUUIDRegex = """([0-9a-fA-F]{16})""".r
+  val ShortUUIDRegex: Regex = """([0-9a-fA-F]{16})""".r
 
-  def next(clock: Clock, random: Random) = {
+  def next(clock: Clock, random: Random): String = toHex(getNext(clock, random))
+
+  private def getNext(clock: Clock, random: Random): util.ByteString = {
     val randomBuffer    = ByteBuffer.wrap(new Array[Byte](8))
     val timeComponent   = clock.instant().getEpochSecond << 32
     val bottom4Mask     = 0xffffffffL
@@ -33,4 +36,11 @@ object ShortUUID {
     randomBuffer.putLong(timeComponent | randomComponent)
     ByteString(randomBuffer.array())
   }
+
+  private def toHex(bytes: ByteString) =
+    Range(0, bytes.length)
+      .map(
+        idx => f"${bytes(idx)}%02x"
+      )
+      .mkString("")
 }

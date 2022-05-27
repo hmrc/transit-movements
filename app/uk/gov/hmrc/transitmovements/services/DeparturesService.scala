@@ -19,7 +19,6 @@ package uk.gov.hmrc.transitmovements.services
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
-import uk.gov.hmrc.transitmovements.models.values.BytesToHex
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.Departure
@@ -60,6 +59,6 @@ class DeparturesServiceImpl @Inject() (
     )
 
   private def createDepartureId(): DepartureId =
-    DepartureId(BytesToHex.toHex(ShortUUID.next(clock, random)))
+    DepartureId(ShortUUID.next(clock, random))
 
 }
