@@ -24,9 +24,7 @@ case class MovementMessage(
   received: OffsetDateTime,
   generated: OffsetDateTime,
   messageType: MessageType,
-  triggerId: Option[TriggerId], // "short UUID of triggering message (optional)"
-  url: Option[URI],             //,             // "internal object store url - either this or url", // large messages
-  body: Option[String]          // "<xml> - either this or url", // small messages
+  triggerId: Option[TriggerId],
+  url: Option[URI],
+  body: Option[String]
 )
-
-object MovementMessage {}

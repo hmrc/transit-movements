@@ -19,63 +19,65 @@ package uk.gov.hmrc.transitmovements.repositories
 import akka.pattern.retry
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
-import uk.gov.hmrc.transitmovements.models.DeclarationData
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.Departure
-import uk.gov.hmrc.transitmovements.models.DepartureId
+import org.mongodb.scala.result.InsertOneResult
 import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.values.BytesToHex
-import uk.gov.hmrc.transitmovements.models.values.ShortUUID
+import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
+import uk.gov.hmrc.transitmovements.models.Departure
+import uk.gov.hmrc.transitmovements.models.DepartureId
+import uk.gov.hmrc.transitmovements.models.MovementMessageId
 
-import java.security.SecureRandom
-import java.time.Clock
 import javax.inject.Inject
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 @ImplementedBy(classOf[DeparturesRepositoryImpl])
 trait DeparturesRepository {
-  def insert(request: Departure): EitherT[Future, Error, DeclarationResponse]
+  def insert(request: Departure): EitherT[Future, Throwable, DeclarationResponse]
 }
 
-class DeparturesRepositoryImpl @Inject()(
-  mongoComponent: MongoComponent,
-  clock: Clock,
-  random: SecureRandom
+class DeparturesRepositoryImpl @Inject() (
+  mongoComponent: MongoComponent
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[Departure](
       mongoComponent = mongoComponent,
       collectionName = DeparturesRepository.collectionName,
-      domainFormat = MongoFormats.movementFormat,
+      domainFormat = MongoFormats.departureFormat,
       indexes = Seq()
     )
     with DeparturesRepository
     with Logging {
 
+  def insert(departure: Departure): EitherT[Future, Throwable, DeclarationResponse] =
+    EitherT {
+      retry(
+        attempts = 0,
+        attempt = () => insertDocument(departure)
+      )
+    }
 
-  def insert(departure: Departure): EitherT[Future, Error, DeclarationResponse] =
-    retry(
-      attempts = 0,
-      attempt = {
-        () =>
-          val nextId     = ShortUUID.next(clock, random)
-          val movementId = DepartureId(BytesToHex.toHex(nextId))
-
-
-          collection
-            .insertOne(departure.copy(_id = movementId))
-            .headOption()
-            .map {
-              result =>
-                DeclarationResponse(
-                  DepartureId(result.get.getInsertedId.toString)
-                )
-            }
+  val insertDocument: Departure => Future[Either[Throwable, DeclarationResponse]] = {
+    departure =>
+      Try(collection.insertOne(departure)) match {
+        case Success(value) =>
+          value
+            .head()
+            .map(
+              result => Right(createResponse(result))
+            )
+        case Failure(ex) =>
+          Future.successful(Left(ex))
       }
-    )
+  }
+
+  val createResponse: InsertOneResult => DeclarationResponse =
+    result => DeclarationResponse(DepartureId(result.getInsertedId.toString), MovementMessageId("not-implemented"))
+
 }
 
 object DeparturesRepository {

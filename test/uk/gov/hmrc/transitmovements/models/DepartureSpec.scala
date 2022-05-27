@@ -25,16 +25,12 @@ import java.net.URI
 import java.time.OffsetDateTime
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats._
 
-class MovementSpec extends AnyFlatSpec with Matchers {
+class DepartureSpec extends AnyFlatSpec with Matchers {
 
   "json movement message" should "be created correctly" in {
-<<<<<<< Updated upstream
-    val movement = Movement(
-      MovementId("1"),
-=======
+
     val movement = Departure(
       DepartureId("1"),
->>>>>>> Stashed changes
       EORINumber("222"),
       EORINumber("223"),
       Some(MovementReferenceNumber("333")),
@@ -53,11 +49,7 @@ class MovementSpec extends AnyFlatSpec with Matchers {
       )
     )
 
-<<<<<<< Updated upstream
-    val result = Json.toJson[Movement](movement)
-=======
     val result = Json.toJson[Departure](movement)
->>>>>>> Stashed changes
 
     (result \ "movementEORINumber").get should be(JsString("223"))
     (result \ "movementReferenceNumber").get should be(JsString("333"))

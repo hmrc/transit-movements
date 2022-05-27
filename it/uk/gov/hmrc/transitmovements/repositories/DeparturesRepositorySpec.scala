@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.repository
+package uk.gov.hmrc.transitmovements.repositories
 
 import org.mongodb.scala.bson.BsonString
 import org.mongodb.scala.model.Filters
@@ -27,10 +27,9 @@ import play.api.test.DefaultAwaitTimeout
 import play.api.test.FutureAwaits
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
-import uk.gov.hmrc.transitmovements.models.DeclarationData
+import uk.gov.hmrc.transitmovements.models.Departure
+import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.Movement
-import uk.gov.hmrc.transitmovements.repositories.DepartureMovementRepositoryImpl
 
 import java.security.SecureRandom
 import java.time.Clock
@@ -39,20 +38,18 @@ import java.time.ZoneOffset
 import scala.concurrent.ExecutionContext.Implicits.global
 
 @DoNotDiscover
-class DepartureMovementRepositorySpec
+class DeparturesRepositorySpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
     with FutureAwaits
     with DefaultAwaitTimeout
     with Logging
-    with DefaultPlayMongoRepositorySupport[Movement] {
+    with DefaultPlayMongoRepositorySupport[Departure] {
 
   val instant = OffsetDateTime.of(2022, 5, 25, 16, 0, 0, 0, ZoneOffset.UTC)
   val clock   = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
   val random  = new SecureRandom
-
-//  implicit val tc: TransactionConfiguration = TransactionConfiguration.strict
 
   override lazy val mongoComponent: MongoComponent = {
     val databaseName: String = "test-" + this.getClass.getSimpleName
@@ -60,11 +57,7 @@ class DepartureMovementRepositorySpec
     MongoComponent(mongoUri)
   }
 
-  override lazy val repository = new DepartureMovementRepositoryImpl(
-    mongoComponent,
-    clock,
-    random
-  )
+  override lazy val repository = new DeparturesRepositoryImpl(mongoComponent)
 
   "DepartureMovementRepository" should "have the correct name" in {
     repository.collectionName shouldBe "departure_movements"
@@ -72,15 +65,24 @@ class DepartureMovementRepositorySpec
 
   it should "insert departures based on declaration data" in {
 
-    val declarationData = DeclarationData(EORINumber("321"), instant)
+    val departure =
+      Departure(
+        DepartureId(""),
+        enrollmentEORINumber = EORINumber("111"),
+        movementEORINumber = EORINumber("222"),
+        movementReferenceNumber = None,
+        created = instant,
+        updated = instant,
+        messages = Seq.empty
+      )
 
-    val movementId = await(
-      repository.insert(declarationData)
+    val declarationResponse = await(
+      repository.insert(departure).value
     )
 
-    val movement = await {
-      find(Filters.eq("_id", BsonString(movementId.value)))
+    val departures = await {
+      find(Filters.eq("_id", BsonString(declarationResponse.right.get.departureId.value)))
     }
-    movement should not be empty
+    departures should not be empty
   }
 }

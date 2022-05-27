@@ -16,16 +16,4 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-<<<<<<< Updated upstream
-import play.api.libs.json.Format
-import play.api.libs.json.Json
-
 case class TriggerId(value: String) extends AnyVal
-
-object TriggerId {
-  implicit val triggerIdFormat: Format[TriggerId] = Json.valueFormat[TriggerId]
-
-}
-=======
-case class TriggerId(value: String) extends AnyVal
->>>>>>> Stashed changes

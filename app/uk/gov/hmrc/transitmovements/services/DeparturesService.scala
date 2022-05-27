@@ -1,35 +1,57 @@
+/*
+ * Copyright 2022 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package uk.gov.hmrc.transitmovements.services
 
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
-import uk.gov.hmrc.transitmovements.models.{DeclarationData, Departure, DepartureId, EORINumber}
+import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
+import uk.gov.hmrc.transitmovements.models.values.BytesToHex
+import uk.gov.hmrc.transitmovements.models.values.ShortUUID
+import uk.gov.hmrc.transitmovements.models.DeclarationData
+import uk.gov.hmrc.transitmovements.models.Departure
+import uk.gov.hmrc.transitmovements.models.DepartureId
+import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 
-import java.time.{Clock, OffsetDateTime, ZoneOffset}
+import java.security.SecureRandom
+import java.time.Clock
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import javax.inject.Inject
 import scala.concurrent.Future
 
-
 @ImplementedBy(classOf[DeparturesServiceImpl])
 trait DeparturesService {
-  def insertDeparture(declarationData: DeclarationData): EitherT[Future, Error, Departure]
+  def insertDeparture(declarationData: DeclarationData): EitherT[Future, Throwable, DeclarationResponse]
 }
 
+class DeparturesServiceImpl @Inject() (
+  repository: DeparturesRepository,
+  clock: Clock,
+  random: SecureRandom
+) extends DeparturesService {
 
-
-@Singleton
-class DeparturesServiceImpl @Inject()(repository: DeparturesRepository, clock: Clock) extends DeparturesService {
-
-  override def insertDeparture(declarationData: DeclarationData): EitherT[Future, Error, DeclarationResponse] = {
-    val departure = createDeparture(declarationData)
-    repository.insert(departure)
-  }
-
+  def insertDeparture(declarationData: DeclarationData): EitherT[Future, Throwable, DeclarationResponse] =
+    repository.insert(createDeparture(declarationData))
 
   val createDeparture: DeclarationData => Departure = {
-    (declarationData) =>
+    declarationData =>
       Departure(
-        DepartureId(""),
+        createDepartureId(),
         enrollmentEORINumber = EORINumber("111"),
         movementEORINumber = declarationData.movementEoriNumber,
         movementReferenceNumber = None,
@@ -38,5 +60,8 @@ class DeparturesServiceImpl @Inject()(repository: DeparturesRepository, clock: C
         messages = Seq.empty
       )
   }
+
+  def createDepartureId(): DepartureId =
+    DepartureId(BytesToHex.toHex(ShortUUID.next(clock, random)))
 
 }

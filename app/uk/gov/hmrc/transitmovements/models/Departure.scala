@@ -16,19 +16,14 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import akka.stream.Materializer
-import com.google.inject.{Inject, Singleton}
-import uk.gov.hmrc.transitmovements.services.{DeparturesXmlParsingService, XmlParsingServiceHelpers}
-
 import java.time.OffsetDateTime
-//import MongoDateTimeFormats.offsetDateTimeWrite
 
 case class Departure(
-                      _id: DepartureId,
-                      enrollmentEORINumber: EORINumber,
-                      movementEORINumber: EORINumber,
-                      movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
-                      created: OffsetDateTime,
-                      updated: OffsetDateTime,
-                      messages: Seq[MovementMessage]
+  _id: DepartureId,
+  enrollmentEORINumber: EORINumber,
+  movementEORINumber: EORINumber,
+  movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
+  created: OffsetDateTime,
+  updated: OffsetDateTime,
+  messages: Seq[MovementMessage]
 )

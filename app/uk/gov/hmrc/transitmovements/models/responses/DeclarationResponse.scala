@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.models.responses
 
-case class MovementId(value: String) extends AnyVal
+import play.api.libs.json.Json
+import play.api.libs.json.OFormat
+import uk.gov.hmrc.transitmovements.models.DepartureId
+import uk.gov.hmrc.transitmovements.models.MovementMessageId
+import uk.gov.hmrc.transitmovements.models.formats.MongoFormats._
 
-//object MovementId extends BytesToHex with HexToBytes with Logging {
-//
-//  def apply(id: String) = new MovementId(id)
-//
-//  def apply(id: ByteString): MovementId = new MovementId(toHex(id))
-//
-//  def next(clock: Clock, random: Random): MovementId =
-//    MovementId(ShortUUID.next(clock, random))
-//
-//}
+object DeclarationResponse {
+  implicit val declarationResponseFormat: OFormat[DeclarationResponse] = Json.format[DeclarationResponse]
+}
+
+case class DeclarationResponse(departureId: DepartureId, messageId: MovementMessageId)
