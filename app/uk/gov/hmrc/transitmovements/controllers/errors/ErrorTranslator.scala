@@ -29,12 +29,9 @@ import scala.concurrent.Future
 trait ErrorTranslator {
 
   implicit def translateError[E, A](either: EitherT[Future, E, A]): EitherT[Future, BaseError, A] =
-    either.leftMap(
-      error =>
-        error match {
-          case p: ParseError => translateParseError(p)
-        }
-    )
+    either.leftMap {
+      case p: ParseError => translateParseError(p)
+    }
 
   private def translateParseError(parseError: ParseError): BaseError = parseError match {
     case NoElementFound(element)       => BaseError.badRequestError(s"Element $element not found")
