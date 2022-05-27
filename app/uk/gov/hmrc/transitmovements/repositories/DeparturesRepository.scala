@@ -61,22 +61,20 @@ class DeparturesRepositoryImpl @Inject() (
       )
     }
 
-  val insertDocument: Departure => Future[Either[Throwable, DeclarationResponse]] = {
-    departure =>
-      Try(collection.insertOne(departure)) match {
-        case Success(value) =>
-          value
-            .head()
-            .map(
-              result => Right(createResponse(result))
-            )
-        case Failure(ex) =>
-          Future.successful(Left(ex))
-      }
-  }
+  def insertDocument(departure: Departure): Future[Either[Throwable, DeclarationResponse]] =
+    Try(collection.insertOne(departure)) match {
+      case Success(value) =>
+        value
+          .head()
+          .map(
+            result => Right(createResponse(result))
+          )
+      case Failure(ex) =>
+        Future.successful(Left(ex))
+    }
 
-  val createResponse: InsertOneResult => DeclarationResponse =
-    result => DeclarationResponse(DepartureId(result.getInsertedId.toString), MovementMessageId("not-implemented"))
+  def createResponse(result: InsertOneResult): DeclarationResponse =
+    DeclarationResponse(DepartureId(result.getInsertedId.toString), MovementMessageId("not-implemented"))
 
 }
 

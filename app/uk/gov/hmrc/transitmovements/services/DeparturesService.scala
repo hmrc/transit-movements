@@ -36,7 +36,7 @@ import scala.concurrent.Future
 
 @ImplementedBy(classOf[DeparturesServiceImpl])
 trait DeparturesService {
-  def insertDeparture(declarationData: DeclarationData): EitherT[Future, Throwable, DeclarationResponse]
+  def insertDeparture(eori: EORINumber, declarationData: DeclarationData): EitherT[Future, Throwable, DeclarationResponse]
 }
 
 class DeparturesServiceImpl @Inject() (
@@ -45,23 +45,21 @@ class DeparturesServiceImpl @Inject() (
   random: SecureRandom
 ) extends DeparturesService {
 
-  def insertDeparture(declarationData: DeclarationData): EitherT[Future, Throwable, DeclarationResponse] =
-    repository.insert(createDeparture(declarationData))
+  def insertDeparture(eori: EORINumber, declarationData: DeclarationData): EitherT[Future, Throwable, DeclarationResponse] =
+    repository.insert(createDeparture(eori, declarationData))
 
-  val createDeparture: DeclarationData => Departure = {
-    declarationData =>
-      Departure(
-        createDepartureId(),
-        enrollmentEORINumber = EORINumber("111"),
-        movementEORINumber = declarationData.movementEoriNumber,
-        movementReferenceNumber = None,
-        created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
-        updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
-        messages = Seq.empty
-      )
-  }
+  private def createDeparture(eori: EORINumber, declarationData: DeclarationData): Departure =
+    Departure(
+      createDepartureId(),
+      enrollmentEORINumber = eori,
+      movementEORINumber = declarationData.movementEoriNumber,
+      movementReferenceNumber = None,
+      created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+      updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+      messages = Seq.empty
+    )
 
-  def createDepartureId(): DepartureId =
+  private def createDepartureId(): DepartureId =
     DepartureId(BytesToHex.toHex(ShortUUID.next(clock, random)))
 
 }
