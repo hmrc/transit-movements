@@ -46,7 +46,7 @@ class DeparturesRepositoryImpl @Inject() (
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[Departure](
       mongoComponent = mongoComponent,
-      collectionName = DeparturesRepository.collectionName,
+      collectionName = "departure_movements",
       domainFormat = MongoFormats.departureFormat,
       indexes = Seq()
     )
@@ -61,7 +61,7 @@ class DeparturesRepositoryImpl @Inject() (
       )
     }
 
-  def insertDocument(departure: Departure): Future[Either[Throwable, DeclarationResponse]] =
+  private def insertDocument(departure: Departure): Future[Either[Throwable, DeclarationResponse]] =
     Try(collection.insertOne(departure)) match {
       case Success(value) =>
         value
@@ -73,11 +73,7 @@ class DeparturesRepositoryImpl @Inject() (
         Future.successful(Left(ex))
     }
 
-  def createResponse(result: InsertOneResult): DeclarationResponse =
+  private def createResponse(result: InsertOneResult): DeclarationResponse =
     DeclarationResponse(DepartureId(result.getInsertedId.toString), MovementMessageId("not-implemented"))
 
-}
-
-object DeparturesRepository {
-  val collectionName = "departure_movements"
 }

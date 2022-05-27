@@ -45,9 +45,7 @@ trait CommonFormats {
     override def reads(json: JsValue): JsResult[A] = json match {
       case JsString(str) =>
         values
-          .find(
-            value => getKey(value) == str
-          )
+          .find(getKey(_) == str)
           .map(JsSuccess(_))
           .getOrElse(JsError("error.expected.validenumvalue"))
       case _ =>
