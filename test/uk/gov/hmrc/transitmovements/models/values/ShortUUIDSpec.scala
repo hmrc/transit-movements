@@ -14,17 +14,23 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.models.values
 
-import java.net.URI
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+
+import java.security.SecureRandom
+import java.time.Clock
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
-case class MovementMessage(
-  id: MovementMessageId,
-  received: OffsetDateTime,
-  generated: OffsetDateTime,
-  messageType: MessageType,
-  triggerId: Option[TriggerId],
-  url: Option[URI],
-  body: Option[String]
-)
+class ShortUUIDSpec extends AnyFlatSpec with Matchers {
+  val instant: OffsetDateTime = OffsetDateTime.now
+  val clock: Clock            = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
+  val random                  = new SecureRandom
+
+  "a valid short UUID " should "be created" in {
+    val shortUUID = ShortUUID.next(clock, random)
+    shortUUID should fullyMatch regex ShortUUID.ShortUUIDRegex
+  }
+}

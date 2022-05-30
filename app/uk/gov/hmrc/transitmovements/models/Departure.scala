@@ -17,24 +17,13 @@
 package uk.gov.hmrc.transitmovements.models
 
 import java.time.OffsetDateTime
-//import MongoDateTimeFormats.offsetDateTimeWrite
 
-case class Movement(
-  _id: MovementId,
+case class Departure(
+  _id: DepartureId,
   enrollmentEORINumber: EORINumber,
   movementEORINumber: EORINumber,
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
   created: OffsetDateTime,
   updated: OffsetDateTime,
   messages: Seq[MovementMessage]
-) {}
-
-object Movement {
-//  import MovementMessage._
-//  implicit val movementWrites: OWrites[Movement] = Json.writes[Movement]
-//  implicit val movementMessageWrites: OWrites[MovementMessage] = Json.writes[MovementMessage]
-//  implicit val movementMessageSeqWrites: Writes[Seq[MovementMessage]] = Writes.seq(movementMessageWrites)
-//  implicit val movementReads: Reads[Movement]    = Json.reads[Movement]
-//  implicit val movementFormat: Format[Movement] =
-//    Format(movementReads, movementWrites)
-}
+)
