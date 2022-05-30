@@ -19,6 +19,11 @@ package uk.gov.hmrc.transitmovements.models.formats
 import cats.data.NonEmptyList
 import play.api.libs.functional.syntax.toInvariantFunctorOps
 import play.api.libs.json.Format
+import play.api.libs.json.JsError
+import play.api.libs.json.JsResult
+import play.api.libs.json.JsString
+import play.api.libs.json.JsSuccess
+import play.api.libs.json.JsValue
 
 object CommonFormats extends CommonFormats
 
@@ -32,4 +37,19 @@ trait CommonFormats {
         _.toList
       )
 
+  def enumFormat[A](values: Set[A])(getKey: A => String): Format[A] = new Format[A] {
+
+    override def writes(a: A): JsValue =
+      JsString(getKey(a))
+
+    override def reads(json: JsValue): JsResult[A] = json match {
+      case JsString(str) =>
+        values
+          .find(getKey(_) == str)
+          .map(JsSuccess(_))
+          .getOrElse(JsError("error.expected.validenumvalue"))
+      case _ =>
+        JsError("error.expected.enumstring")
+    }
+  }
 }
