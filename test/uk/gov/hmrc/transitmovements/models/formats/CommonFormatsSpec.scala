@@ -19,13 +19,12 @@ package uk.gov.hmrc.transitmovements.models.formats
 import cats.data.NonEmptyList
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
-import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import play.api.libs.json.JsArray
 import play.api.libs.json.JsNumber
 import play.api.libs.json.JsSuccess
 import play.api.libs.json.JsValue
 
-class CommonFormatsSpec extends AnyFreeSpec with Matchers with GuiceOneAppPerSuite {
+class CommonFormatsSpec extends AnyFreeSpec with Matchers {
 
   val nonEmptyListJson: JsValue = JsArray(
     Seq(1, 2, 3, 4).map(

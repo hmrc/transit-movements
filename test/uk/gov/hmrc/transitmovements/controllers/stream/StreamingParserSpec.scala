@@ -23,12 +23,10 @@ import akka.stream.scaladsl.Keep
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import play.api.http.HeaderNames
 import play.api.http.Status.OK
-import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.Files
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.json.Json
@@ -40,6 +38,7 @@ import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsString
 import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.status
+import uk.gov.hmrc.transitmovements.base.SpecBase
 
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
@@ -48,9 +47,9 @@ import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class StreamingParsersSpec extends AnyFreeSpec with Matchers with GuiceOneAppPerSuite {
+class StreamingParsersSpec extends SpecBase with Matchers with GuiceOneAppPerSuite {
 
-  override lazy val app                        = GuiceApplicationBuilder().build()
+  override lazy val app                        = baseApplicationBuilder.build()
   lazy val headers                             = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "text/plain", HeaderNames.ACCEPT -> "application/vnd.hmrc.2.0+json"))
   implicit lazy val materializer: Materializer = app.materializer
 

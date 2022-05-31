@@ -25,6 +25,7 @@ import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.security.SecureRandom
 import java.time.Clock
@@ -35,7 +36,7 @@ import scala.concurrent.Future
 
 @ImplementedBy(classOf[DeparturesServiceImpl])
 trait DeparturesService {
-  def insertDeparture(eori: EORINumber, declarationData: DeclarationData): EitherT[Future, Throwable, DeclarationResponse]
+  def insertDeparture(eori: EORINumber, declarationData: DeclarationData): EitherT[Future, MongoError, DeclarationResponse]
 }
 
 class DeparturesServiceImpl @Inject() (
@@ -44,7 +45,7 @@ class DeparturesServiceImpl @Inject() (
   random: SecureRandom
 ) extends DeparturesService {
 
-  def insertDeparture(eori: EORINumber, declarationData: DeclarationData): EitherT[Future, Throwable, DeclarationResponse] =
+  def insertDeparture(eori: EORINumber, declarationData: DeclarationData): EitherT[Future, MongoError, DeclarationResponse] =
     repository.insert(createDeparture(eori, declarationData))
 
   private def createDeparture(eori: EORINumber, declarationData: DeclarationData): Departure =
