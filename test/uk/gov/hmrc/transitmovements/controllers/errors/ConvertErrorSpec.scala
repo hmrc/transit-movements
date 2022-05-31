@@ -37,7 +37,7 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
   "Parse error" - {
     "for a success" in {
       val input = Right[ParseError, Unit](()).toEitherT[Future]
-      whenReady(input.asBaseError.value) {
+      whenReady(input.convertError.value) {
         _ mustBe Right(())
       }
     }
@@ -46,7 +46,7 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
   "Mongo error" - {
     "for a success" in {
       val input = Right[MongoError, Unit](()).toEitherT[Future]
-      whenReady(input.asBaseError.value) {
+      whenReady(input.convertError.value) {
         _ mustBe Right(())
       }
     }

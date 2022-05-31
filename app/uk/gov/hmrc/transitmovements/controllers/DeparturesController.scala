@@ -32,7 +32,7 @@ import play.api.libs.Files
 import play.api.libs.Files.TemporaryFileCreator
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
-import uk.gov.hmrc.transitmovements.controllers.errors.BaseError
+import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.EORINumber
@@ -63,13 +63,13 @@ class DeparturesController @Inject() (
   }
 
   def withTemporaryFile[A](
-    onSucceed: (Files.TemporaryFile, Source[ByteString, _]) => EitherT[Future, BaseError, A]
-  )(implicit request: Request[Source[ByteString, _]]): EitherT[Future, BaseError, A] =
+    onSucceed: (Files.TemporaryFile, Source[ByteString, _]) => EitherT[Future, PresentationError, A]
+  )(implicit request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, A] =
     EitherT(Future.successful(Try(temporaryFileCreator.create()).toEither))
       .leftMap {
         thr =>
           request.body.runWith(Sink.ignore)
-          BaseError.internalServiceError(cause = Some(thr))
+          PresentationError.internalServiceError(cause = Some(thr))
       }
       .flatMap {
         temporaryFile =>
@@ -83,8 +83,8 @@ class DeparturesController @Inject() (
       withTemporaryFile {
         (_, source) =>
           for {
-            declarationData     <- xmlParsingService.extractDeclarationData(source).asBaseError
-            declarationResponse <- departuresService.insertDeparture(eori, declarationData).asBaseError
+            declarationData     <- xmlParsingService.extractDeclarationData(source).convertError
+            declarationResponse <- departuresService.insertDeparture(eori, declarationData).convertError
           } yield declarationResponse
       }.fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

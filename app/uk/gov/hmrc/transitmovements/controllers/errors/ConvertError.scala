@@ -32,29 +32,29 @@ trait ConvertError {
 
   implicit class ErrorConverter[E, A](value: EitherT[Future, E, A]) {
 
-    def asBaseError(implicit c: Converter[E], ec: ExecutionContext): EitherT[Future, BaseError, A] =
+    def convertError(implicit c: Converter[E], ec: ExecutionContext): EitherT[Future, PresentationError, A] =
       value.leftMap(c.convert)
   }
 
   sealed trait Converter[E] {
-    def convert(input: E): BaseError
+    def convert(input: E): PresentationError
   }
 
   implicit val parseErrorConverter = new Converter[ParseError] {
 
-    def convert(parseError: ParseError): BaseError = parseError match {
-      case NoElementFound(element)       => BaseError.badRequestError(s"Element $element not found")
-      case TooManyElementsFound(element) => BaseError.badRequestError(s"Found too many elements of type $element")
-      case BadDateTime(element, ex)      => BaseError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
-      case Unknown(ex)                   => BaseError.internalServiceError(cause = ex)
+    def convert(parseError: ParseError): PresentationError = parseError match {
+      case NoElementFound(element)       => PresentationError.badRequestError(s"Element $element not found")
+      case TooManyElementsFound(element) => PresentationError.badRequestError(s"Found too many elements of type $element")
+      case BadDateTime(element, ex)      => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
+      case Unknown(ex)                   => PresentationError.internalServiceError(cause = ex)
     }
 
   }
 
   implicit val mongoErrorConverter = new Converter[MongoError] {
 
-    def convert(mongoError: MongoError): BaseError = mongoError match {
-      case OtherError(ex) => BaseError.internalServiceError(cause = ex)
+    def convert(mongoError: MongoError): PresentationError = mongoError match {
+      case OtherError(ex) => PresentationError.internalServiceError(cause = ex)
     }
   }
 
