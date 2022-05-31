@@ -32,7 +32,7 @@ trait ConvertError {
 
   implicit class ErrorConverter[E, A](value: EitherT[Future, E, A]) {
 
-    def convertError(implicit c: Converter[E], ec: ExecutionContext): EitherT[Future, PresentationError, A] =
+    def asPresentation(implicit c: Converter[E], ec: ExecutionContext): EitherT[Future, PresentationError, A] =
       value.leftMap(c.convert)
   }
 

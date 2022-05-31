@@ -40,7 +40,7 @@ import scala.util.Try
 
 @ImplementedBy(classOf[DeparturesRepositoryImpl])
 trait DeparturesRepository {
-  def insert(request: Departure): EitherT[Future, MongoError, DeclarationResponse]
+  def insert(departure: Departure): EitherT[Future, MongoError, DeclarationResponse]
 }
 
 class DeparturesRepositoryImpl @Inject() (
@@ -59,11 +59,11 @@ class DeparturesRepositoryImpl @Inject() (
     EitherT {
       retry(
         attempts = 0,
-        attempt = () => insertDepartureAttempt(departure)
+        attempt = () => insertDeparture(departure)
       )
     }
 
-  private def insertDepartureAttempt(departure: Departure): Future[Either[MongoError, DeclarationResponse]] =
+  private def insertDeparture(departure: Departure): Future[Either[MongoError, DeclarationResponse]] =
     Try(collection.insertOne(departure)) match {
       case Success(value) =>
         value

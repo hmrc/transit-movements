@@ -83,8 +83,8 @@ class DeparturesController @Inject() (
       withTemporaryFile {
         (_, source) =>
           for {
-            declarationData     <- xmlParsingService.extractDeclarationData(source).convertError
-            declarationResponse <- departuresService.insertDeparture(eori, declarationData).convertError
+            declarationData     <- xmlParsingService.extractDeclarationData(source).asPresentation
+            declarationResponse <- departuresService.create(eori, declarationData).asPresentation
           } yield declarationResponse
       }.fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

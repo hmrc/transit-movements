@@ -120,7 +120,7 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
       when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockDeparturesService.insertDeparture(eori, declarationData))
+      when(mockDeparturesService.create(eori, declarationData))
         .thenReturn(declarationResponseEither)
 
       val request = fakeRequestDepartures(POST, validXml)

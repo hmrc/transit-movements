@@ -57,7 +57,7 @@ class DeparturesServiceImplSpec extends AnyFreeSpec with ScalaFutures with Match
         EitherT.rightT(DeclarationResponse(DepartureId("888"), MovementMessageId("111")))
       )
 
-      val result = service.insertDeparture(eori, declarationData)
+      val result = service.create(eori, declarationData)
 
       whenReady(result.value) {
         either =>
