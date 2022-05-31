@@ -42,15 +42,16 @@ class DepartureSpec extends AnyFlatSpec with Matchers {
           received = OffsetDateTime.now(),
           generated = OffsetDateTime.now(),
           messageType = MessageType.ReleaseForTransit,
-          triggerId = Some(TriggerId("888")),
+          triggerId = Some(MovementMessageId("888")),
           url = Some(URI.create("xyz")),
-          None
+          body = Some("body")
         )
       )
     )
 
     val result = Json.toJson[Departure](movement)
 
+    (result \ "_id").get should be(JsString("1"))
     (result \ "movementEORINumber").get should be(JsString("223"))
     (result \ "movementReferenceNumber").get should be(JsString("333"))
   }

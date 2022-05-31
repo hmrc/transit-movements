@@ -19,7 +19,6 @@ package uk.gov.hmrc.transitmovements.services
 import cats.data.EitherT
 import cats.implicits.catsStdInstancesForFuture
 import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.MockitoSugar.when
 import org.scalatest.concurrent.ScalaFutures
@@ -62,7 +61,7 @@ class DeparturesServiceImplSpec extends AnyFreeSpec with ScalaFutures with Match
       whenReady(result.value) {
         either =>
           either mustBe Right(DeclarationResponse(DepartureId("888"), MovementMessageId("111")))
-          verify(repository, times(1)).insert(any())
+          verify(repository).insert(any[Departure]())
       }
     }
   }

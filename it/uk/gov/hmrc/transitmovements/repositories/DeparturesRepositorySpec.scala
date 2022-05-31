@@ -16,28 +16,26 @@
 
 package uk.gov.hmrc.transitmovements.repositories
 
-import org.mongodb.scala.bson.BsonString
 import org.mongodb.scala.model.Filters
-import org.scalatest.DoNotDiscover
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import play.api.inject.guice.GuiceApplicationBuilder
+import play.api.Application
 import play.api.Logging
 import play.api.test.DefaultAwaitTimeout
 import play.api.test.FutureAwaits
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
+import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 
-import java.security.SecureRandom
-import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import scala.concurrent.ExecutionContext.Implicits.global
 
-@DoNotDiscover
 class DeparturesRepositorySpec
     extends AnyFlatSpec
     with Matchers
@@ -47,9 +45,7 @@ class DeparturesRepositorySpec
     with Logging
     with DefaultPlayMongoRepositorySupport[Departure] {
 
-  val instant = OffsetDateTime.of(2022, 5, 25, 16, 0, 0, 0, ZoneOffset.UTC)
-  val clock   = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
-  val random  = new SecureRandom
+  val instant: OffsetDateTime = OffsetDateTime.of(2022, 5, 25, 16, 0, 0, 0, ZoneOffset.UTC)
 
   override lazy val mongoComponent: MongoComponent = {
     val databaseName: String = "test-" + this.getClass.getSimpleName
@@ -57,17 +53,20 @@ class DeparturesRepositorySpec
     MongoComponent(mongoUri)
   }
 
-  override lazy val repository = new DeparturesRepositoryImpl(mongoComponent)
+  implicit lazy val app: Application = GuiceApplicationBuilder().configure().build()
+  private val appConfig              = app.injector.instanceOf[AppConfig]
+
+  override lazy val repository = new DeparturesRepositoryImpl(appConfig, mongoComponent)
 
   "DepartureMovementRepository" should "have the correct name" in {
     repository.collectionName shouldBe "departure_movements"
   }
 
-  it should "insert departures based on declaration data" in {
+  it should "insert the given departure" in {
 
     val departure =
       Departure(
-        DepartureId(""),
+        DepartureId("1"),
         enrollmentEORINumber = EORINumber("111"),
         movementEORINumber = EORINumber("222"),
         movementReferenceNumber = None,
@@ -80,9 +79,10 @@ class DeparturesRepositorySpec
       repository.insert(departure).value
     )
 
-    val departures = await {
-      find(Filters.eq("_id", BsonString(declarationResponse.right.get.departureId.value)))
+    val firstItem = await {
+      repository.collection.find(Filters.eq("_id", "1")).first().toFuture()
     }
-    departures should not be empty
+
+    firstItem._id.value should be("1")
   }
 }

@@ -31,4 +31,6 @@ class AppConfig @Inject() (
 
   lazy val auditingEnabled: Boolean = config.get[Boolean]("auditing.enabled")
   lazy val graphiteHost: String     = config.get[String]("microservice.metrics.graphite.host")
+
+  lazy val mongoRetryAttempts: Int = config.get[Int]("mongodb.retryAttempts")
 }

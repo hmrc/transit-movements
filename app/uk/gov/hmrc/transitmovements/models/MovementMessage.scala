@@ -24,7 +24,7 @@ case class MovementMessage(
   received: OffsetDateTime,
   generated: OffsetDateTime,
   messageType: MessageType,
-  triggerId: Option[TriggerId],
+  triggerId: Option[MovementMessageId],
   url: Option[URI],
   body: Option[String]
 )
