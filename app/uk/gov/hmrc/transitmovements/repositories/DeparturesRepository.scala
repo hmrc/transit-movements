@@ -29,7 +29,7 @@ import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.MovementMessageId
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
-import uk.gov.hmrc.transitmovements.services.errors.MongoError.OtherError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 
 import javax.inject.Inject
 import scala.concurrent.ExecutionContext
@@ -59,11 +59,11 @@ class DeparturesRepositoryImpl @Inject() (
     EitherT {
       retry(
         attempts = 0,
-        attempt = () => insertDocument(departure)
+        attempt = () => insertDepartureAttempt(departure)
       )
     }
 
-  private def insertDocument(departure: Departure): Future[Either[MongoError, DeclarationResponse]] =
+  private def insertDepartureAttempt(departure: Departure): Future[Either[MongoError, DeclarationResponse]] =
     Try(collection.insertOne(departure)) match {
       case Success(value) =>
         value
@@ -72,7 +72,7 @@ class DeparturesRepositoryImpl @Inject() (
             result => Right(createResponse(result))
           )
       case Failure(ex) =>
-        Future.successful(Left(OtherError(Some(ex))))
+        Future.successful(Left(UnexpectedError(Some(ex))))
     }
 
   private def createResponse(result: InsertOneResult): DeclarationResponse =

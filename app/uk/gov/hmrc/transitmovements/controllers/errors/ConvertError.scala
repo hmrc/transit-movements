@@ -18,7 +18,7 @@ package uk.gov.hmrc.transitmovements.controllers.errors
 
 import cats.data.EitherT
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
-import uk.gov.hmrc.transitmovements.services.errors.MongoError.OtherError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError.BadDateTime
 import uk.gov.hmrc.transitmovements.services.errors.ParseError.NoElementFound
@@ -54,7 +54,7 @@ trait ConvertError {
   implicit val mongoErrorConverter = new Converter[MongoError] {
 
     def convert(mongoError: MongoError): PresentationError = mongoError match {
-      case OtherError(ex) => PresentationError.internalServiceError(cause = ex)
+      case UnexpectedError(ex) => PresentationError.internalServiceError(cause = ex)
     }
   }
 
