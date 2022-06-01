@@ -31,6 +31,9 @@ import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementMessage
+import uk.gov.hmrc.transitmovements.models.MovementMessageId
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -66,13 +69,23 @@ class DeparturesRepositorySpec
 
     val departure =
       Departure(
-        DepartureId("1"),
+        DepartureId("2"),
         enrollmentEORINumber = EORINumber("111"),
         movementEORINumber = EORINumber("222"),
         movementReferenceNumber = None,
         created = instant,
         updated = instant,
-        messages = Seq.empty
+        messages = Seq(
+          MovementMessage(
+            MovementMessageId("100"),
+            instant,
+            instant,
+            messageType = MessageType.DeclarationData,
+            triggerId = Some(MovementMessageId("101")),
+            url = None,
+            body = Some("random-body")
+          )
+        )
       )
 
     val declarationResponse = await(
@@ -80,9 +93,9 @@ class DeparturesRepositorySpec
     )
 
     val firstItem = await {
-      repository.collection.find(Filters.eq("_id", "1")).first().toFuture()
+      repository.collection.find(Filters.eq("_id", "2")).first().toFuture()
     }
 
-    firstItem._id.value should be("1")
+    firstItem._id.value should be("2")
   }
 }

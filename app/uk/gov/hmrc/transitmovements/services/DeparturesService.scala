@@ -24,6 +24,9 @@ import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementMessage
+import uk.gov.hmrc.transitmovements.models.MovementMessageId
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
@@ -45,20 +48,28 @@ class DeparturesServiceImpl @Inject() (
   random: SecureRandom
 ) extends DeparturesService {
 
-  def create(eori: EORINumber, declarationData: DeclarationData): EitherT[Future, MongoError, DeclarationResponse] =
-    repository.insert(
-      Departure(
-        createDepartureId(),
-        enrollmentEORINumber = eori,
-        movementEORINumber = declarationData.movementEoriNumber,
-        movementReferenceNumber = None,
-        created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
-        updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
-        messages = Seq.empty
-      )
+  def insertDeparture(eori: EORINumber, declarationData: DeclarationData): EitherT[Future, MongoError, DeclarationResponse] =
+    repository.insert(createDeparture(eori, declarationData))
+
+  private def createDeparture(eori: EORINumber, declarationData: DeclarationData): Departure =
+    Departure(
+      _id = DepartureId(ShortUUID.next(clock, random)),
+      enrollmentEORINumber = eori,
+      movementEORINumber = declarationData.movementEoriNumber,
+      movementReferenceNumber = None,
+      created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+      updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+      messages = Seq(createDeclarationMessage(declarationData))
     )
 
-  private def createDepartureId(): DepartureId =
-    DepartureId(ShortUUID.next(clock, random))
-
+  private def createDeclarationMessage(declarationData: DeclarationData): MovementMessage =
+    MovementMessage(
+      id = MovementMessageId(ShortUUID.next(clock, random)),
+      received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+      generated = declarationData.generationDate,
+      messageType = MessageType.DeclarationData,
+      triggerId = None,
+      url = None,
+      body = None
+    )
 }

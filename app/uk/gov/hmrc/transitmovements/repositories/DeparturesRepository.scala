@@ -82,7 +82,7 @@ class DeparturesRepositoryImpl @Inject() (
   private def processReturn(returned: Future[InsertOneResult], departure: Departure) =
     returned.map {
       extractResult(_) match {
-        case Some(value) => Right(createResponse(value))
+        case Some(value) => Right(createResponse(value, departure.messages.head.id))
         case None        => Left(UnexpectedError(Some(new RuntimeException(s"Insert failed for departure ${departure}"))))
       }
     }
@@ -94,7 +94,7 @@ class DeparturesRepositoryImpl @Inject() (
       None
     }
 
-  private def createResponse(value: BsonValue): DeclarationResponse =
-    DeclarationResponse(DepartureId(value.asString().getValue), MovementMessageId("not-implemented"))
+  private def createResponse(value: BsonValue, movementMessageId: MovementMessageId): DeclarationResponse =
+    DeclarationResponse(DepartureId(value.asString().getValue), movementMessageId)
 
 }
