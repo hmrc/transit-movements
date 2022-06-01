@@ -105,6 +105,13 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
   lazy val declarationResponseEither: EitherT[Future, MongoError, DeclarationResponse] =
     EitherT.rightT(DeclarationResponse(DepartureId("ABC123"), MovementMessageId("XYZ345")))
 
+  override def afterEach() {
+    reset(mockTemporaryFileCreator)
+    reset(mockXmlParsingService)
+    reset(mockDeparturesService)
+    super.afterEach()
+  }
+
   "/POST" - {
 
     val validXml: NodeSeq =
@@ -132,10 +139,6 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
         "departureId" -> "ABC123",
         "messageId"   -> "XYZ345"
       )
-
-      reset(mockTemporaryFileCreator)
-      reset(mockXmlParsingService)
-      reset(mockDeparturesService)
     }
 
     "must return BAD_REQUEST when XML data extraction fails" - {
@@ -159,10 +162,6 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
           "code"    -> "BAD_REQUEST",
           "message" -> "Element messageSender not found"
         )
-
-        reset(mockTemporaryFileCreator)
-        reset(mockXmlParsingService)
-        reset(mockDeparturesService)
       }
 
       "contains message to indicate too many elements found" in {
@@ -187,10 +186,6 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
           "code"    -> "BAD_REQUEST",
           "message" -> "Found too many elements of type messageSender"
         )
-
-        reset(mockTemporaryFileCreator)
-        reset(mockXmlParsingService)
-        reset(mockDeparturesService)
       }
 
       "contains message to indicate date time failure" in {
@@ -221,10 +216,6 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
           "code"    -> "BAD_REQUEST",
           "message" -> "Could not parse datetime for preparationDateAndTime: Text 'no' could not be parsed at index 0"
         )
-
-        reset(mockTemporaryFileCreator)
-        reset(mockXmlParsingService)
-        reset(mockDeparturesService)
       }
     }
 
@@ -254,10 +245,6 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
           "code"    -> "INTERNAL_SERVER_ERROR",
           "message" -> "Internal server error"
         )
-
-        reset(mockTemporaryFileCreator)
-        reset(mockXmlParsingService)
-        reset(mockDeparturesService)
       }
 
       "when file creation fails" in {
@@ -273,10 +260,6 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
           "code"    -> "INTERNAL_SERVER_ERROR",
           "message" -> "Internal server error"
         )
-
-        reset(mockTemporaryFileCreator)
-        reset(mockXmlParsingService)
-        reset(mockDeparturesService)
       }
     }
   }
