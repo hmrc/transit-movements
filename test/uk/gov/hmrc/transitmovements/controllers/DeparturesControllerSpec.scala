@@ -20,81 +20,125 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import akka.util.Timeout
-import org.mockito.scalatest.MockitoSugar
+import cats.data.EitherT
+import org.mockito.ArgumentMatchers.any
+import org.mockito.MockitoSugar.reset
+import org.mockito.MockitoSugar.when
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
-import play.api.Application
+
+import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.http.HeaderNames
-import play.api.http.Status.ACCEPTED
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
-import play.api.inject.guice.GuiceApplicationBuilder
+import play.api.http.Status.OK
+import play.api.inject.bind
+import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 
 import scala.concurrent.duration.DurationInt
-import play.api.mvc.ControllerComponents
 import play.api.mvc.Request
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
+import play.api.test.Helpers.route
 import play.api.test.Helpers.status
 import uk.gov.hmrc.http.HttpVerbs.POST
+import uk.gov.hmrc.transitmovements.base.SpecBase
+import uk.gov.hmrc.transitmovements.models.DeclarationData
+import uk.gov.hmrc.transitmovements.models.DepartureId
+import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.MovementMessageId
+import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
+import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
+import uk.gov.hmrc.transitmovements.services.DeparturesService
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
+import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
-import java.nio.charset.StandardCharsets
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeParseException
+import scala.concurrent.Future
 import scala.xml.NodeSeq
 
-class DeparturesControllerSpec
-    extends AnyFreeSpec
-    with Matchers
-    with GuiceOneAppPerSuite
-    with OptionValues
-    with ScalaFutures
-    with MockitoSugar
-    with BeforeAndAfterEach {
-
-  val validXml: NodeSeq =
-    <CC015C>
-      <messageSender>ABC123</messageSender>
-      <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-    </CC015C>
-
-  private def createStream(node: NodeSeq): Source[ByteString, _] = createStream(node.mkString)
-
-  private def createStream(string: String): Source[ByteString, _] =
-    Source.single(ByteString(string, StandardCharsets.UTF_8))
+class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Matchers with OptionValues with ScalaFutures with BeforeAndAfterEach {
 
   def fakeRequestDepartures[A](
     method: String,
     body: NodeSeq
-  ): Request[Source[ByteString, _]] =
+  ): Request[NodeSeq] =
     FakeRequest(
       method = method,
-      uri = routes.DeparturesController.post().url,
-      headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "application/xml")),
-      body = createStream(body)
+      uri = routes.DeparturesController.post(eori).url,
+      headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "app/xml")),
+      body = body
     )
 
   implicit val timeout: Timeout = 5.seconds
 
-  override lazy val app: Application = GuiceApplicationBuilder().build()
+  val mockXmlParsingService    = mock[DeparturesXmlParsingService]
+  val repository               = mock[DeparturesRepository]
+  val mockDeparturesService    = mock[DeparturesService]
+  val mockTemporaryFileCreator = mock[TemporaryFileCreator]
+
+  override lazy val app = baseApplicationBuilder
+    .overrides(
+      bind[DeparturesXmlParsingService].toInstance(mockXmlParsingService),
+      bind[TemporaryFileCreator].toInstance(mockTemporaryFileCreator),
+      bind[DeparturesService].toInstance(mockDeparturesService)
+    )
+    .build()
 
   implicit lazy val materializer: Materializer = app.materializer
 
+  lazy val eori            = EORINumber("eori")
+  lazy val declarationData = DeclarationData(eori, OffsetDateTime.now(ZoneId.of("UTC")))
+
+  lazy val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
+    EitherT.rightT(declarationData)
+
+  lazy val declarationResponseEither: EitherT[Future, MongoError, DeclarationResponse] =
+    EitherT.rightT(DeclarationResponse(DepartureId("ABC123"), MovementMessageId("XYZ345")))
+
+  override def afterEach() {
+    reset(mockTemporaryFileCreator)
+    reset(mockXmlParsingService)
+    reset(mockDeparturesService)
+    super.afterEach()
+  }
+
   "/POST" - {
 
-    "must return ACCEPTED if XML data extraction is successful" in {
+    val validXml: NodeSeq =
+      <CC015C>
+        <messageSender>ABC123</messageSender>
+        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+      </CC015C>
+
+    "must return OK if XML data extraction is successful" in {
+
+      when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
+
+      when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+        .thenReturn(departureDataEither)
+
+      when(mockDeparturesService.create(eori, declarationData))
+        .thenReturn(declarationResponseEither)
 
       val request = fakeRequestDepartures(POST, validXml)
 
-      val result = app.injector.instanceOf[DeparturesController].post()(request)
+      val result = route(app, request).value
 
-      status(result) mustBe ACCEPTED
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.obj(
+        "departureId" -> "ABC123",
+        "messageId"   -> "XYZ345"
+      )
     }
 
     "must return BAD_REQUEST when XML data extraction fails" - {
@@ -104,9 +148,14 @@ class DeparturesControllerSpec
         val elementNotFoundXml: NodeSeq =
           <CC015C></CC015C>
 
+        when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+          .thenReturn(EitherT.leftT(ParseError.NoElementFound("messageSender")))
+
+        when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
+
         val request = fakeRequestDepartures(POST, elementNotFoundXml)
 
-        val result = app.injector.instanceOf[DeparturesController].post()(request)
+        val result = route(app, request).value
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -123,9 +172,14 @@ class DeparturesControllerSpec
             <messageSender>XI1234</messageSender>
           </CC015C>
 
+        when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+          .thenReturn(EitherT.leftT(ParseError.TooManyElementsFound("messageSender")))
+
+        when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
+
         val request = fakeRequestDepartures(POST, tooManyFoundXml)
 
-        val result = app.injector.instanceOf[DeparturesController].post()(request)
+        val result = route(app, request).value
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -142,9 +196,20 @@ class DeparturesControllerSpec
             <preparationDateAndTime>no</preparationDateAndTime>
           </CC015C>
 
+        val cs: CharSequence = "no"
+
+        when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+          .thenReturn(
+            EitherT.leftT(
+              ParseError.BadDateTime("preparationDateAndTime", new DateTimeParseException("Text 'no' could not be parsed at index 0", cs, 0))
+            )
+          )
+
+        when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
+
         val request = fakeRequestDepartures(POST, tooManyFoundXml)
 
-        val result = app.injector.instanceOf[DeparturesController].post()(request)
+        val result = route(app, request).value
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -161,14 +226,19 @@ class DeparturesControllerSpec
         val unknownErrorXml: String =
           "<CC015C><messageSender>GB1234</messageSender>"
 
+        when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+          .thenReturn(EitherT.leftT(ParseError.Unknown(Some(new IllegalArgumentException()))))
+
+        when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
+
         val request = FakeRequest(
           method = POST,
-          uri = routes.DeparturesController.post().url,
-          headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "application/xml")),
-          body = createStream(unknownErrorXml)
+          uri = routes.DeparturesController.post(eori).url,
+          headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "app/xml")),
+          body = unknownErrorXml
         )
 
-        val result = app.injector.instanceOf[DeparturesController].post()(request)
+        val result = route(app, request).value
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
@@ -179,16 +249,11 @@ class DeparturesControllerSpec
 
       "when file creation fails" in {
 
-        val mockXmlParsingService    = mock[DeparturesXmlParsingService]
-        val mockTemporaryFileCreator = mock[TemporaryFileCreator]
-
-        val sut = new DeparturesController(app.injector.instanceOf[ControllerComponents], mockXmlParsingService, mockTemporaryFileCreator)(app.materializer)
-
         when(mockTemporaryFileCreator.create()).thenThrow(new Exception("File creation failed"))
 
         val request = fakeRequestDepartures(POST, validXml)
 
-        val result = sut.post()(request)
+        val result = route(app, request).value
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(

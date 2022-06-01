@@ -22,21 +22,21 @@ import org.scalatest.matchers.must.Matchers
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.UpstreamErrorResponse
 
-class BaseErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar {
+class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar {
 
   "Test Json is as expected" - {
-    def testStandard(function: String => BaseError, message: String, code: String) = {
+    def testStandard(function: String => PresentationError, message: String, code: String) = {
       val sut    = function(message)
       val result = Json.toJson(sut)
 
       result mustBe Json.obj("message" -> message, "code" -> code)
     }
 
-    "for Forbidden" in testStandard(BaseError.forbiddenError, "forbidden", "FORBIDDEN")
+    "for Forbidden" in testStandard(PresentationError.forbiddenError, "forbidden", "FORBIDDEN")
 
-    "for BadRequest" in testStandard(BaseError.badRequestError, "bad request", "BAD_REQUEST")
+    "for BadRequest" in testStandard(PresentationError.badRequestError, "bad request", "BAD_REQUEST")
 
-    "for NotFound" in testStandard(BaseError.notFoundError, "not found", "NOT_FOUND")
+    "for NotFound" in testStandard(PresentationError.notFoundError, "not found", "NOT_FOUND")
 
     Seq(Some(new IllegalStateException("message")), None).foreach {
       exception =>

@@ -28,6 +28,8 @@ import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.MovementMessageId
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 
 import javax.inject.Inject
 import scala.concurrent.ExecutionContext
@@ -38,7 +40,7 @@ import scala.util.Try
 
 @ImplementedBy(classOf[DeparturesRepositoryImpl])
 trait DeparturesRepository {
-  def insert(request: Departure): EitherT[Future, Throwable, DeclarationResponse]
+  def insert(departure: Departure): EitherT[Future, MongoError, DeclarationResponse]
 }
 
 class DeparturesRepositoryImpl @Inject() (
@@ -53,15 +55,15 @@ class DeparturesRepositoryImpl @Inject() (
     with DeparturesRepository
     with Logging {
 
-  def insert(departure: Departure): EitherT[Future, Throwable, DeclarationResponse] =
+  def insert(departure: Departure): EitherT[Future, MongoError, DeclarationResponse] =
     EitherT {
       retry(
         attempts = 0,
-        attempt = () => insertDocument(departure)
+        attempt = () => insertDeparture(departure)
       )
     }
 
-  private def insertDocument(departure: Departure): Future[Either[Throwable, DeclarationResponse]] =
+  private def insertDeparture(departure: Departure): Future[Either[MongoError, DeclarationResponse]] =
     Try(collection.insertOne(departure)) match {
       case Success(value) =>
         value
@@ -70,7 +72,7 @@ class DeparturesRepositoryImpl @Inject() (
             result => Right(createResponse(result))
           )
       case Failure(ex) =>
-        Future.successful(Left(ex))
+        Future.successful(Left(UnexpectedError(Some(ex))))
     }
 
   private def createResponse(result: InsertOneResult): DeclarationResponse =

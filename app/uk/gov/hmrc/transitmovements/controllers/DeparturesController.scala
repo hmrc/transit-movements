@@ -32,11 +32,12 @@ import play.api.libs.Files
 import play.api.libs.Files.TemporaryFileCreator
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
-import uk.gov.hmrc.transitmovements.controllers.errors.BaseError
+import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
+import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.services.DeparturesService
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
-import uk.gov.hmrc.transitmovements.services.errors.ParseError
-import uk.gov.hmrc.transitmovements.services.errors.ParseError._
 
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,11 +45,17 @@ import scala.concurrent.Future
 import scala.util.Try
 
 @Singleton
-class DeparturesController @Inject() (cc: ControllerComponents, xmlParsingService: DeparturesXmlParsingService, temporaryFileCreator: TemporaryFileCreator)(
-  implicit val materializer: Materializer
+class DeparturesController @Inject() (
+  cc: ControllerComponents,
+  departuresService: DeparturesService,
+  xmlParsingService: DeparturesXmlParsingService,
+  temporaryFileCreator: TemporaryFileCreator
+)(implicit
+  val materializer: Materializer
 ) extends BackendController(cc)
     with Logging
-    with StreamingParsers {
+    with StreamingParsers
+    with ConvertError {
 
   private def deleteFile[A](temporaryFile: Files.TemporaryFile)(identity: A): A = {
     temporaryFile.delete()
@@ -56,13 +63,13 @@ class DeparturesController @Inject() (cc: ControllerComponents, xmlParsingServic
   }
 
   def withTemporaryFile[A](
-    onSucceed: (Files.TemporaryFile, Source[ByteString, _]) => EitherT[Future, BaseError, A]
-  )(implicit request: Request[Source[ByteString, _]]): EitherT[Future, BaseError, A] =
+    onSucceed: (Files.TemporaryFile, Source[ByteString, _]) => EitherT[Future, PresentationError, A]
+  )(implicit request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, A] =
     EitherT(Future.successful(Try(temporaryFileCreator.create()).toEither))
       .leftMap {
         thr =>
           request.body.runWith(Sink.ignore)
-          BaseError.internalServiceError(cause = Some(thr))
+          PresentationError.internalServiceError(cause = Some(thr))
       }
       .flatMap {
         temporaryFile =>
@@ -70,24 +77,18 @@ class DeparturesController @Inject() (cc: ControllerComponents, xmlParsingServic
           onSucceed(temporaryFile, source).bimap(deleteFile(temporaryFile), deleteFile(temporaryFile))
       }
 
-  def translateParseError(parseError: ParseError): BaseError = parseError match {
-    case NoElementFound(element)       => BaseError.badRequestError(s"Element $element not found")
-    case TooManyElementsFound(element) => BaseError.badRequestError(s"Found too many elements of type $element")
-    case BadDateTime(element, ex)      => BaseError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
-    case Unknown(ex)                   => BaseError.internalServiceError(cause = ex)
-  }
-
-  def post() = Action.async(streamFromMemory) {
+  def post(eori: EORINumber) = Action.async(streamFromMemory) {
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       withTemporaryFile {
-        (temporaryFile, source) =>
-          xmlParsingService
-            .extractDeclarationData(source)
-            .leftMap(translateParseError)
+        (_, source) =>
+          for {
+            declarationData     <- xmlParsingService.extractDeclarationData(source).asPresentation
+            declarationResponse <- departuresService.create(eori, declarationData).asPresentation
+          } yield declarationResponse
       }.fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        _ => Accepted
+        response => Ok(Json.toJson(response))
       )
   }
 
