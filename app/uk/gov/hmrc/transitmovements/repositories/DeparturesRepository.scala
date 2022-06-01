@@ -83,7 +83,7 @@ class DeparturesRepositoryImpl @Inject() (
     returned.map {
       extractResult(_) match {
         case Some(value) => Right(createResponse(value, departure.messages.head.id))
-        case None        => Left(UnexpectedError(Some(new RuntimeException(s"Insert failed for departure ${departure}"))))
+        case None        => Left(UnexpectedError(Some(new RuntimeException(s"Insert failed for departure $departure"))))
       }
     }
 

@@ -48,7 +48,7 @@ class DeparturesServiceImpl @Inject() (
   random: SecureRandom
 ) extends DeparturesService {
 
-  def insertDeparture(eori: EORINumber, declarationData: DeclarationData): EitherT[Future, MongoError, DeclarationResponse] =
+  def create(eori: EORINumber, declarationData: DeclarationData): EitherT[Future, MongoError, DeclarationResponse] =
     repository.insert(createDeparture(eori, declarationData))
 
   private def createDeparture(eori: EORINumber, declarationData: DeclarationData): Departure =
