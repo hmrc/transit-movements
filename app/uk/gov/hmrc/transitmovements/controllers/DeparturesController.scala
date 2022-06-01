@@ -81,10 +81,11 @@ class DeparturesController @Inject() (
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       withTemporaryFile {
-        (_, source) =>
+        (temporaryFile, source) =>
           for {
-            declarationData     <- xmlParsingService.extractDeclarationData(source).asPresentation
-            declarationResponse <- departuresService.create(eori, declarationData).asPresentation
+            declarationData <- xmlParsingService.extractDeclarationData(source).asPresentation
+            fileSource = FileIO.fromPath(temporaryFile)
+            declarationResponse <- departuresService.create(eori, declarationData, fileSource).asPresentation
           } yield declarationResponse
       }.fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

@@ -26,13 +26,8 @@ import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
 
 import java.time.Clock
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
 
 trait SpecBase extends AnyFreeSpec with Matchers with MockitoSugar with ScalaFutures with OptionValues with EitherValues {
-
-  val instant: OffsetDateTime = OffsetDateTime.of(2022, 5, 27, 11, 0, 0, 0, ZoneOffset.UTC)
-  val clock: Clock            = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
 
   protected def baseApplicationBuilder: GuiceApplicationBuilder =
     new GuiceApplicationBuilder()

@@ -16,15 +16,17 @@
 
 package uk.gov.hmrc.transitmovements.services
 
+import akka.stream.Materializer
+import akka.stream.scaladsl.FileIO
 import cats.data.EitherT
-import cats.implicits.catsStdInstancesForFuture
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.verify
 import org.mockito.MockitoSugar.when
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
-import org.scalatestplus.mockito.MockitoSugar.mock
+import play.api.libs.Files
+import play.api.libs.Files.SingletonTemporaryFileCreator
+import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.Departure
@@ -39,11 +41,13 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class DeparturesServiceImplSpec extends AnyFreeSpec with ScalaFutures with Matchers {
+class DeparturesServiceImplSpec extends SpecBase with ScalaFutures with Matchers {
   val instant: OffsetDateTime          = OffsetDateTime.of(2022, 5, 27, 11, 0, 0, 0, ZoneOffset.UTC)
   val clock: Clock                     = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
   val random                           = new SecureRandom
   val repository: DeparturesRepository = mock[DeparturesRepository]
+
+  implicit lazy val materializer: Materializer = baseApplicationBuilder.build().materializer
 
   "When handed declaration data, the departures service" - {
     val service = new DeparturesServiceImpl(repository, clock, random)
@@ -56,7 +60,9 @@ class DeparturesServiceImplSpec extends AnyFreeSpec with ScalaFutures with Match
         EitherT.rightT(DeclarationResponse(DepartureId("888"), MovementMessageId("111")))
       )
 
-      val result = service.create(eori, declarationData)
+      val a: Files.TemporaryFile = SingletonTemporaryFileCreator.create()
+      val msgBody                = FileIO.fromPath(a.path)
+      val result                 = service.create(eori, declarationData, msgBody)
 
       whenReady(result.value) {
         either =>

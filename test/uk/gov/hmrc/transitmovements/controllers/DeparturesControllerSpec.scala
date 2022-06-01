@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.controllers
 
+import akka.stream.IOResult
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -122,12 +123,13 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
 
     "must return OK if XML data extraction is successful" in {
 
-      when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
+      val tempFile = SingletonTemporaryFileCreator.create()
+      when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
       when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockDeparturesService.create(eori, declarationData))
+      when(mockDeparturesService.create(any[String].asInstanceOf[EORINumber], any[DeclarationData], any[Source[ByteString, Future[IOResult]]]))
         .thenReturn(declarationResponseEither)
 
       val request = fakeRequestDepartures(POST, validXml)
