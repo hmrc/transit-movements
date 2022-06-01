@@ -95,6 +95,6 @@ class DeparturesRepositoryImpl @Inject() (
     }
 
   private def createResponse(value: BsonValue): DeclarationResponse =
-    DeclarationResponse(DepartureId(value.toString), MovementMessageId("not-implemented"))
+    DeclarationResponse(DepartureId(value.asString().getValue), MovementMessageId("not-implemented"))
 
 }
