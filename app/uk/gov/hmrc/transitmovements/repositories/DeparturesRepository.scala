@@ -19,6 +19,9 @@ package uk.gov.hmrc.transitmovements.repositories
 import akka.pattern.retry
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
+import org.mongodb.scala.model.IndexModel
+import org.mongodb.scala.model.IndexOptions
+import org.mongodb.scala.model.Indexes
 import org.mongodb.scala.result.InsertOneResult
 import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
@@ -31,6 +34,7 @@ import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.InsertNotAcknowledged
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -52,7 +56,9 @@ class DeparturesRepositoryImpl @Inject() (
       mongoComponent = mongoComponent,
       collectionName = "departure_movements",
       domainFormat = MongoFormats.departureFormat,
-      indexes = Seq.empty,
+      indexes = Seq(
+        IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS))
+      ),
       extraCodecs = Seq(
         Codecs.playFormatCodec(MongoFormats.departureFormat)
       )
