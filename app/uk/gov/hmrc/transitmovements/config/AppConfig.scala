@@ -33,4 +33,5 @@ class AppConfig @Inject() (
   lazy val graphiteHost: String     = config.get[String]("microservice.metrics.graphite.host")
 
   lazy val mongoRetryAttempts: Int = config.get[Int]("mongodb.retryAttempts")
+  lazy val documentTtl: Long       = config.get[Long]("mongodb.timeToLiveInSeconds")
 }
