@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.controllers
 
+import akka.stream.IOResult
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -36,6 +37,7 @@ import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.OK
 import play.api.inject.bind
+import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
@@ -60,6 +62,7 @@ import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
+import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeParseException
@@ -78,6 +81,15 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
       headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "app/xml")),
       body = body
     )
+
+  protected def baseApplicationBuilder: GuiceApplicationBuilder =
+    new GuiceApplicationBuilder()
+      .configure(
+        "metrics.jvm" -> false
+      )
+      .overrides(
+        bind[Clock].toInstance(Clock.systemUTC())
+      )
 
   implicit val timeout: Timeout = 5.seconds
 
@@ -122,12 +134,13 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
 
     "must return OK if XML data extraction is successful" in {
 
-      when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
+      val tempFile = SingletonTemporaryFileCreator.create()
+      when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
       when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockDeparturesService.create(eori, declarationData))
+      when(mockDeparturesService.create(any[String].asInstanceOf[EORINumber], any[DeclarationData], any[Source[ByteString, Future[IOResult]]]))
         .thenReturn(declarationResponseEither)
 
       val request = fakeRequestDepartures(POST, validXml)

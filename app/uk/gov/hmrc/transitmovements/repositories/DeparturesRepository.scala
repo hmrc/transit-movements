@@ -22,13 +22,13 @@ import com.google.inject.ImplementedBy
 import org.mongodb.scala.result.InsertOneResult
 import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
+import uk.gov.hmrc.mongo.play.json.Codecs
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
+import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.models.Departure
-import uk.gov.hmrc.transitmovements.models.DepartureId
-import uk.gov.hmrc.transitmovements.models.MovementMessageId
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError.InsertNotAcknowledged
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 
 import javax.inject.Inject
@@ -37,45 +37,53 @@ import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[DeparturesRepositoryImpl])
 trait DeparturesRepository {
-  def insert(departure: Departure): EitherT[Future, MongoError, DeclarationResponse]
+  def insert(departure: Departure): EitherT[Future, MongoError, Unit]
 }
 
 class DeparturesRepositoryImpl @Inject() (
+  appConfig: AppConfig,
   mongoComponent: MongoComponent
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[Departure](
       mongoComponent = mongoComponent,
       collectionName = "departure_movements",
       domainFormat = MongoFormats.departureFormat,
-      indexes = Seq()
+      indexes = Seq.empty,
+      extraCodecs = Seq(
+        Codecs.playFormatCodec(MongoFormats.departureFormat)
+      )
     )
     with DeparturesRepository
     with Logging {
 
-  def insert(departure: Departure): EitherT[Future, MongoError, DeclarationResponse] =
+  def insert(departure: Departure): EitherT[Future, MongoError, Unit] =
     EitherT {
       retry(
-        attempts = 0,
+        attempts = appConfig.mongoRetryAttempts,
         attempt = () => insertDeparture(departure)
       )
     }
 
-  private def insertDeparture(departure: Departure): Future[Either[MongoError, DeclarationResponse]] =
+  private def insertDeparture(departure: Departure): Future[Either[MongoError, Unit]] =
     Try(collection.insertOne(departure)) match {
       case Success(value) =>
-        value
-          .head()
-          .map(
-            result => Right(createResponse(result))
-          )
-      case Failure(ex) =>
+        processReturn(value.head(), departure)
+      case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     }
 
-  private def createResponse(result: InsertOneResult): DeclarationResponse =
-    DeclarationResponse(DepartureId(result.getInsertedId.toString), MovementMessageId("not-implemented"))
+  private def processReturn(returned: Future[InsertOneResult], departure: Departure) =
+    returned.map {
+      result =>
+        if (result.wasAcknowledged()) {
+          Right(())
+        } else {
+          Left(InsertNotAcknowledged(s"Insert failed for departure $departure"))
+        }
+    }
 
 }

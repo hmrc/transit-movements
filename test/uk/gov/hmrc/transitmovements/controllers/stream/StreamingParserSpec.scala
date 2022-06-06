@@ -24,7 +24,6 @@ import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import org.scalatest.matchers.must.Matchers
-import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import play.api.http.HeaderNames
 import play.api.http.Status.OK
 import play.api.libs.Files
@@ -38,7 +37,9 @@ import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsString
 import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.status
+import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovements.base.SpecBase
+import uk.gov.hmrc.transitmovements.base.TestActorSystem
 
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
@@ -47,13 +48,13 @@ import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class StreamingParsersSpec extends SpecBase with Matchers with GuiceOneAppPerSuite {
+class StreamingParsersSpec extends SpecBase with Matchers with TestActorSystem {
 
-  override lazy val app                        = baseApplicationBuilder.build()
-  lazy val headers                             = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "text/plain", HeaderNames.ACCEPT -> "application/vnd.hmrc.2.0+json"))
-  implicit lazy val materializer: Materializer = app.materializer
+  lazy val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "text/plain", HeaderNames.ACCEPT -> "application/vnd.hmrc.2.0+json"))
 
-  class Harness(val controllerComponents: ControllerComponents)(implicit val materializer: Materializer) extends BaseController with StreamingParsers {
+  class Harness(val controllerComponents: ControllerComponents = stubControllerComponents())(implicit val materializer: Materializer)
+      extends BaseController
+      with StreamingParsers {
 
     def testFromMemory: Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
       request => result.apply(request).run(request.body)(materializer)
@@ -100,7 +101,7 @@ class StreamingParsersSpec extends SpecBase with Matchers with GuiceOneAppPerSui
           s"~$value kb string is created" in {
             val byteString = generateByteString(value)
             val request    = FakeRequest("POST", "/", headers, generateSource(byteString))
-            val sut        = new Harness(app.injector.instanceOf[ControllerComponents])(app.materializer)
+            val sut        = new Harness()
             val result     = sut.testFromMemory()(request)
             status(result) mustBe OK
             contentAsString(result) mustBe byteString.decodeString(StandardCharsets.UTF_8)
@@ -122,7 +123,7 @@ class StreamingParsersSpec extends SpecBase with Matchers with GuiceOneAppPerSui
           generateSource(byteString).runWith(FileIO.toPath(file.path)).map {
             _ =>
               val request = FakeRequest("POST", "/", headers, file)
-              val sut     = new Harness(app.injector.instanceOf[ControllerComponents])(app.materializer)
+              val sut     = new Harness()
               val result  = sut.testFile()(request)
               status(result) mustBe OK
               Json.parse(contentAsString(result)) mustBe Json.obj("first" -> expectedString, "second" -> expectedString)
