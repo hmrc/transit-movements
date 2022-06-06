@@ -68,9 +68,10 @@ class DeparturesServiceImpl @Inject() (
     tempFile: Source[ByteString, Future[IOResult]]
   ): EitherT[Future, MongoError, DeclarationResponse] =
     for {
-      messageBody         <- getMessageBody(tempFile)
-      declarationResponse <- repository.insert(createDeparture(eori, declarationData, Some(messageBody)))
-    } yield declarationResponse
+      messageBody <- getMessageBody(tempFile)
+      departure = createDeparture(eori, declarationData, Some(messageBody))
+      _ <- repository.insert(departure)
+    } yield DeclarationResponse(departure._id, departure.messages.head.id)
 
   private def createDeparture(eori: EORINumber, declarationData: DeclarationData, messageBody: Option[String]): Departure =
     Departure(

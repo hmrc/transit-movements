@@ -22,20 +22,5 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
-import play.api.inject.bind
-import play.api.inject.guice.GuiceApplicationBuilder
 
-import java.time.Clock
-
-trait SpecBase extends AnyFreeSpec with Matchers with MockitoSugar with ScalaFutures with OptionValues with EitherValues {
-
-  protected def baseApplicationBuilder: GuiceApplicationBuilder =
-    new GuiceApplicationBuilder()
-      .configure(
-        "metrics.jvm" -> false
-      )
-      .overrides(
-        bind[Clock].toInstance(Clock.systemUTC())
-      )
-
-}
+trait SpecBase extends AnyFreeSpec with Matchers with MockitoSugar with ScalaFutures with OptionValues with EitherValues {}

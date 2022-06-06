@@ -19,7 +19,6 @@ package uk.gov.hmrc.transitmovements.repositories
 import akka.pattern.retry
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
-import org.mongodb.scala.bson.BsonValue
 import org.mongodb.scala.result.InsertOneResult
 import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
@@ -27,11 +26,9 @@ import uk.gov.hmrc.mongo.play.json.Codecs
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.models.Departure
-import uk.gov.hmrc.transitmovements.models.DepartureId
-import uk.gov.hmrc.transitmovements.models.MovementMessageId
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError.InsertNotAcknowledged
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 
 import javax.inject.Inject
@@ -44,7 +41,7 @@ import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[DeparturesRepositoryImpl])
 trait DeparturesRepository {
-  def insert(departure: Departure): EitherT[Future, MongoError, DeclarationResponse]
+  def insert(departure: Departure): EitherT[Future, MongoError, Unit]
 }
 
 class DeparturesRepositoryImpl @Inject() (
@@ -55,7 +52,7 @@ class DeparturesRepositoryImpl @Inject() (
       mongoComponent = mongoComponent,
       collectionName = "departure_movements",
       domainFormat = MongoFormats.departureFormat,
-      indexes = Seq(),
+      indexes = Seq.empty,
       extraCodecs = Seq(
         Codecs.playFormatCodec(MongoFormats.departureFormat)
       )
@@ -63,7 +60,7 @@ class DeparturesRepositoryImpl @Inject() (
     with DeparturesRepository
     with Logging {
 
-  def insert(departure: Departure): EitherT[Future, MongoError, DeclarationResponse] =
+  def insert(departure: Departure): EitherT[Future, MongoError, Unit] =
     EitherT {
       retry(
         attempts = appConfig.mongoRetryAttempts,
@@ -71,7 +68,7 @@ class DeparturesRepositoryImpl @Inject() (
       )
     }
 
-  private def insertDeparture(departure: Departure): Future[Either[MongoError, DeclarationResponse]] =
+  private def insertDeparture(departure: Departure): Future[Either[MongoError, Unit]] =
     Try(collection.insertOne(departure)) match {
       case Success(value) =>
         processReturn(value.head(), departure)
@@ -81,20 +78,12 @@ class DeparturesRepositoryImpl @Inject() (
 
   private def processReturn(returned: Future[InsertOneResult], departure: Departure) =
     returned.map {
-      extractResult(_) match {
-        case Some(value) => Right(createResponse(value, departure.messages.head.id))
-        case None        => Left(UnexpectedError(Some(new RuntimeException(s"Insert failed for departure $departure"))))
-      }
+      result =>
+        if (result.wasAcknowledged()) {
+          Right(())
+        } else {
+          Left(InsertNotAcknowledged(s"Insert failed for departure $departure"))
+        }
     }
-
-  private def extractResult(result: InsertOneResult): Option[BsonValue] =
-    if (result.wasAcknowledged()) {
-      Some(result.getInsertedId)
-    } else {
-      None
-    }
-
-  private def createResponse(value: BsonValue, movementMessageId: MovementMessageId): DeclarationResponse =
-    DeclarationResponse(DepartureId(value.asString().getValue), movementMessageId)
 
 }
