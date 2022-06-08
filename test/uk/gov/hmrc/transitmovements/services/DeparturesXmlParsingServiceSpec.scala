@@ -39,7 +39,9 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
 
   val validXml: NodeSeq =
     <CC015C>
-      <messageSender>GB1234</messageSender>
+      <HolderOfTheTransitProcedure>
+        <identificationNumber>GB1234</identificationNumber>
+      </HolderOfTheTransitProcedure>
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
     </CC015C>
 
@@ -50,26 +52,34 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
 
   val twoSenders: NodeSeq =
     <CC015C>
-      <messageSender>GB1234</messageSender>
-      <messageSender>XI1234</messageSender>
+      <HolderOfTheTransitProcedure>
+        <identificationNumber>GB1234</identificationNumber>
+        <identificationNumber>XI1234</identificationNumber>
+      </HolderOfTheTransitProcedure>
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
     </CC015C>
 
   val noDate: NodeSeq =
     <CC015C>
-      <messageSender>GB1234</messageSender>
+      <HolderOfTheTransitProcedure>
+        <identificationNumber>GB1234</identificationNumber>
+      </HolderOfTheTransitProcedure>
     </CC015C>
 
   val twoDates: NodeSeq =
     <CC015C>
-      <messageSender>GB1234</messageSender>
+      <HolderOfTheTransitProcedure>
+        <identificationNumber>GB1234</identificationNumber>
+      </HolderOfTheTransitProcedure>
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
     </CC015C>
 
   val badDate: NodeSeq =
     <CC015C>
-      <messageSender>GB1234</messageSender>
+      <HolderOfTheTransitProcedure>
+        <identificationNumber>GB1234</identificationNumber>
+      </HolderOfTheTransitProcedure>
       <preparationDateAndTime>notadate</preparationDateAndTime>
     </CC015C>
 
@@ -95,13 +105,13 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
       }
     }
 
-    "if it doesn't have a message sender, return ParseError.NoElementFound for the message sender" in {
+    "if it doesn't have a identificationNumber, return ParseError.NoElementFound for the message sender" in {
       val source = createStream(noSender)
 
       val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        _ mustBe Left(ParseError.NoElementFound("messageSender"))
+        _ mustBe Left(ParseError.NoElementFound("identificationNumber"))
       }
     }
 
@@ -115,13 +125,13 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
       }
     }
 
-    "if it has two senders, return ParseError.TooManyElementsFound" in {
+    "if it has two identificationNumbers, return ParseError.TooManyElementsFound" in {
       val source = createStream(twoSenders)
 
       val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        _ mustBe Left(ParseError.TooManyElementsFound("messageSender"))
+        _ mustBe Left(ParseError.TooManyElementsFound("identificationNumber"))
       }
     }
 

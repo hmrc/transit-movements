@@ -31,11 +31,11 @@ import java.time.format.DateTimeParseException
 object XmlParsers extends XmlParsingServiceHelpers {
 
   val movementEORINumberExtractor: Flow[ParseEvent, ParseResult[EORINumber], NotUsed] = XmlParsing
-    .subtree("CC015C" :: "messageSender" :: Nil) // TODO: see if we can get the EORI from the XSD in the future
+    .subtree("CC015C" :: "HolderOfTheTransitProcedure" :: "identificationNumber" :: Nil)
     .collect {
       case element if element.getTextContent.nonEmpty => EORINumber(element.getTextContent)
     }
-    .single("messageSender")
+    .single("identificationNumber")
 
   val preparationDateTimeExtractor: Flow[ParseEvent, ParseResult[OffsetDateTime], NotUsed] = XmlParsing
     .subtree("CC015C" :: "preparationDateAndTime" :: Nil)
