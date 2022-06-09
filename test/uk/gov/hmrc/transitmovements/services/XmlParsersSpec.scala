@@ -37,7 +37,9 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
 
     val withEntry: NodeSeq =
       <CC015C>
-        <messageSender>GB1234</messageSender>
+        <HolderOfTheTransitProcedure>
+          <identificationNumber>GB1234</identificationNumber>
+        </HolderOfTheTransitProcedure>
       </CC015C>
 
     val withNoEntry: NodeSeq =
@@ -46,8 +48,10 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
 
     val withTwoEntries: NodeSeq =
       <CC015C>
-        <messageSender>GB1234</messageSender>
-        <messageSender>XI1234</messageSender>
+        <HolderOfTheTransitProcedure>
+          <identificationNumber>GB1234</identificationNumber>
+          <identificationNumber>XI1234</identificationNumber>
+        </HolderOfTheTransitProcedure>
       </CC015C>
 
     "when provided with a valid entry" in {
@@ -64,7 +68,7 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
       val parsedResult = stream.via(XmlParsers.movementEORINumberExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _ mustBe Left(ParseError.NoElementFound("messageSender"))
+        _ mustBe Left(ParseError.NoElementFound("identificationNumber"))
       }
     }
 
@@ -73,7 +77,7 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
       val parsedResult = stream.via(XmlParsers.movementEORINumberExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _ mustBe Left(ParseError.TooManyElementsFound("messageSender"))
+        _ mustBe Left(ParseError.TooManyElementsFound("identificationNumber"))
       }
     }
 
