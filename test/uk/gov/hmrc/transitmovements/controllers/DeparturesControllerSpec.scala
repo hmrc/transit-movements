@@ -65,7 +65,7 @@ import java.time.format.DateTimeParseException
 import scala.concurrent.Future
 import scala.xml.NodeSeq
 
-class DeparturesControllerSpec extends TestActorSystem with SpecBase with Matchers with OptionValues with ScalaFutures with BeforeAndAfterEach {
+class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matchers with OptionValues with ScalaFutures with BeforeAndAfterEach {
 
   def fakeRequestDepartures[A](
     method: String,
