@@ -17,7 +17,6 @@
 package uk.gov.hmrc.transitmovements.controllers
 
 import akka.stream.IOResult
-import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import akka.util.Timeout
@@ -29,15 +28,12 @@ import org.scalatest.BeforeAndAfterEach
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
-import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.http.HeaderNames
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.OK
-import play.api.inject.bind
-import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
@@ -47,10 +43,11 @@ import play.api.mvc.Request
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
-import play.api.test.Helpers.route
 import play.api.test.Helpers.status
+import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovements.base.SpecBase
+import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
@@ -62,14 +59,13 @@ import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
-import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeParseException
 import scala.concurrent.Future
 import scala.xml.NodeSeq
 
-class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Matchers with OptionValues with ScalaFutures with BeforeAndAfterEach {
+class DeparturesControllerSpec extends TestActorSystem with SpecBase with Matchers with OptionValues with ScalaFutures with BeforeAndAfterEach {
 
   def fakeRequestDepartures[A](
     method: String,
@@ -82,31 +78,12 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
       body = body
     )
 
-  protected def baseApplicationBuilder: GuiceApplicationBuilder =
-    new GuiceApplicationBuilder()
-      .configure(
-        "metrics.jvm" -> false
-      )
-      .overrides(
-        bind[Clock].toInstance(Clock.systemUTC())
-      )
-
   implicit val timeout: Timeout = 5.seconds
 
   val mockXmlParsingService    = mock[DeparturesXmlParsingService]
   val repository               = mock[DeparturesRepository]
   val mockDeparturesService    = mock[DeparturesService]
   val mockTemporaryFileCreator = mock[TemporaryFileCreator]
-
-  override lazy val app = baseApplicationBuilder
-    .overrides(
-      bind[DeparturesXmlParsingService].toInstance(mockXmlParsingService),
-      bind[TemporaryFileCreator].toInstance(mockTemporaryFileCreator),
-      bind[DeparturesService].toInstance(mockDeparturesService)
-    )
-    .build()
-
-  implicit lazy val materializer: Materializer = app.materializer
 
   lazy val eori            = EORINumber("eori")
   lazy val declarationData = DeclarationData(eori, OffsetDateTime.now(ZoneId.of("UTC")))
@@ -123,6 +100,9 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
     reset(mockDeparturesService)
     super.afterEach()
   }
+
+  val controller =
+    new DeparturesController(stubControllerComponents(), mockDeparturesService, mockXmlParsingService, mockTemporaryFileCreator)
 
   "/POST" - {
 
@@ -145,7 +125,8 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
 
       val request = fakeRequestDepartures(POST, validXml)
 
-      val result = route(app, request).value
+      val result =
+        controller.post(eori)(request)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
@@ -168,7 +149,8 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
 
         val request = fakeRequestDepartures(POST, elementNotFoundXml)
 
-        val result = route(app, request).value
+        val result =
+          controller.post(eori)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -192,7 +174,8 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
 
         val request = fakeRequestDepartures(POST, tooManyFoundXml)
 
-        val result = route(app, request).value
+        val result =
+          controller.post(eori)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -222,7 +205,8 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
 
         val request = fakeRequestDepartures(POST, tooManyFoundXml)
 
-        val result = route(app, request).value
+        val result =
+          controller.post(eori)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -251,7 +235,8 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
           body = unknownErrorXml
         )
 
-        val result = route(app, request).value
+        val result =
+          controller.post(eori)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
@@ -266,7 +251,8 @@ class DeparturesControllerSpec extends SpecBase with GuiceOneAppPerSuite with Ma
 
         val request = fakeRequestDepartures(POST, validXml)
 
-        val result = route(app, request).value
+        val result =
+          controller.post(eori)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
