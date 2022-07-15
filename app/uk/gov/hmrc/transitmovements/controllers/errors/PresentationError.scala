@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.controllers.errors
 
+import play.api.Logging
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.functional.syntax.unlift
 import play.api.libs.json.OWrites
@@ -24,7 +25,7 @@ import play.api.libs.json.__
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 
-object PresentationError extends CommonFormats {
+object PresentationError extends CommonFormats with Logging {
 
   val MessageFieldName = "message"
   val CodeFieldName    = "code"
@@ -32,8 +33,10 @@ object PresentationError extends CommonFormats {
   def forbiddenError(message: String): PresentationError =
     StandardError(message, ErrorCode.Forbidden)
 
-  def badRequestError(message: String): PresentationError =
+  def badRequestError(message: String): PresentationError = {
+    logger.warn(s"Unable to parse the XML: $message")
     StandardError(message, ErrorCode.BadRequest)
+  }
 
   def notFoundError(message: String): PresentationError =
     StandardError(message, ErrorCode.NotFound)
