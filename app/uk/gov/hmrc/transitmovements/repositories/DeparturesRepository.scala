@@ -19,17 +19,21 @@ package uk.gov.hmrc.transitmovements.repositories
 import akka.pattern.retry
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
+import org.bson.conversions.Bson
+import com.mongodb.client.model.Filters.{eq => mongoEq}
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.IndexOptions
 import org.mongodb.scala.model.Indexes
 import org.mongodb.scala.result.InsertOneResult
 import play.api.Logging
+import play.api.libs.json.Json
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.Codecs
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.Departure
+import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.InsertNotAcknowledged
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
@@ -42,6 +46,8 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 import scala.util.control.NonFatal
+
+import org.bson.conversions.Bson
 
 @ImplementedBy(classOf[DeparturesRepositoryImpl])
 trait DeparturesRepository {
@@ -67,29 +73,36 @@ class DeparturesRepositoryImpl @Inject() (
     with Logging {
 
   def insert(departure: Departure): EitherT[Future, MongoError, Unit] =
+    mongoRetry(Try(collection.insertOne(departure)) match {
+      case Success(obs) =>
+        obs.toFuture().map {
+          result =>
+            if (result.wasAcknowledged()) {
+              Right(())
+            } else {
+              Left(InsertNotAcknowledged(s"Insert failed for departure $departure"))
+            }
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+
+  def get(departureId: DepartureId): EitherT[Future, MongoError, Option[Departure]] =
+    mongoRetry(Try(collection.find(mongoEq("_id", departureId.value))) match {
+      case Success(obs) =>
+        obs.headOption().map {
+          opt => Right(opt)
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+
+  private def mongoRetry[A](func: Future[Either[MongoError, A]]): EitherT[Future, MongoError, A] =
     EitherT {
       retry(
         attempts = appConfig.mongoRetryAttempts,
-        attempt = () => insertDeparture(departure)
+        attempt = () => func
       )
-    }
-
-  private def insertDeparture(departure: Departure): Future[Either[MongoError, Unit]] =
-    Try(collection.insertOne(departure)) match {
-      case Success(value) =>
-        processReturn(value.head(), departure)
-      case Failure(NonFatal(ex)) =>
-        Future.successful(Left(UnexpectedError(Some(ex))))
-    }
-
-  private def processReturn(returned: Future[InsertOneResult], departure: Departure) =
-    returned.map {
-      result =>
-        if (result.wasAcknowledged()) {
-          Right(())
-        } else {
-          Left(InsertNotAcknowledged(s"Insert failed for departure $departure"))
-        }
     }
 
 }
