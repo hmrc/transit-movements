@@ -166,8 +166,8 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
       whenReady(result.value) {
         either =>
           either mustBe a[Left[ParseError, _]]
-          either.left.get mustBe a[ParseError.Unknown]
-          either.left.get.asInstanceOf[ParseError.Unknown].caughtException.get mustBe a[IllegalStateException]
+          either.left.get mustBe a[ParseError.UnexpectedError]
+          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[IllegalStateException]
       }
     }
 
@@ -179,8 +179,8 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
       whenReady(result.value) {
         either =>
           either mustBe a[Left[ParseError, _]]
-          either.left.get mustBe a[ParseError.Unknown]
-          either.left.get.asInstanceOf[ParseError.Unknown].caughtException.get mustBe a[WFCException]
+          either.left.get mustBe a[ParseError.UnexpectedError]
+          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
       }
     }
 
@@ -192,8 +192,8 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
       whenReady(result.value) {
         either =>
           either mustBe a[Left[ParseError, _]]
-          either.left.get mustBe a[ParseError.Unknown]
-          either.left.get.asInstanceOf[ParseError.Unknown].caughtException.get mustBe a[WFCException]
+          either.left.get mustBe a[ParseError.UnexpectedError]
+          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
       }
     }
   }
