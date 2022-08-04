@@ -51,10 +51,10 @@ import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.MovementMessageId
+import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
-import uk.gov.hmrc.transitmovements.services.DeparturesService
+import uk.gov.hmrc.transitmovements.services.DeparturesFactory
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
@@ -82,7 +82,7 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
 
   val mockXmlParsingService    = mock[DeparturesXmlParsingService]
   val repository               = mock[DeparturesRepository]
-  val mockDeparturesService    = mock[DeparturesService]
+  val mockDeparturesService    = mock[DeparturesFactory]
   val mockTemporaryFileCreator = mock[TemporaryFileCreator]
 
   lazy val eori            = EORINumber("eori")
@@ -92,7 +92,7 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
     EitherT.rightT(declarationData)
 
   lazy val declarationResponseEither: EitherT[Future, MongoError, DeclarationResponse] =
-    EitherT.rightT(DeclarationResponse(DepartureId("ABC123"), MovementMessageId("XYZ345")))
+    EitherT.rightT(DeclarationResponse(DepartureId("ABC123"), MessageId("XYZ345")))
 
   override def afterEach() {
     reset(mockTemporaryFileCreator)

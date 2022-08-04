@@ -45,7 +45,7 @@ class DeparturesServiceImplSpec extends SpecBase with ScalaFutures with Matchers
   val repository: DeparturesRepository = mock[DeparturesRepository]
 
   "When handed declaration data, the departures service" - {
-    val service = new DeparturesServiceImpl(repository, clock, random)
+    val service = new DeparturesFactoryImpl(repository, clock, random)
 
     "must create a Departure and persist it" in {
       val eori            = EORINumber("GB1234")

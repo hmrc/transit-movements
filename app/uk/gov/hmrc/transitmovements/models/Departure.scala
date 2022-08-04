@@ -16,6 +16,8 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import cats.data.NonEmptyList
+
 import java.time.OffsetDateTime
 
 case class Departure(
@@ -25,5 +27,5 @@ case class Departure(
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
   created: OffsetDateTime,
   updated: OffsetDateTime,
-  messages: Seq[MovementMessage]
+  messages: NonEmptyList[Message]
 )

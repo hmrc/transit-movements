@@ -23,7 +23,7 @@ import play.api.libs.json.Json
 import java.net.URI
 
 import java.time.OffsetDateTime
-import uk.gov.hmrc.transitmovements.models.formats.MongoFormats._
+import uk.gov.hmrc.transitmovements.models.formats.ModelFormats._
 
 class DepartureSpec extends AnyFlatSpec with Matchers {
 
@@ -37,12 +37,12 @@ class DepartureSpec extends AnyFlatSpec with Matchers {
       OffsetDateTime.now(),
       OffsetDateTime.now(),
       Seq(
-        MovementMessage(
-          id = MovementMessageId("999"),
+        Message(
+          id = MessageId("999"),
           received = OffsetDateTime.now(),
           generated = OffsetDateTime.now(),
           messageType = MessageType.ReleaseForTransit,
-          triggerId = Some(MovementMessageId("888")),
+          triggerId = Some(MessageId("888")),
           url = Some(URI.create("xyz")),
           body = Some("body")
         )

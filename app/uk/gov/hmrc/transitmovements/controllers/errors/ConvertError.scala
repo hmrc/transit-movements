@@ -18,13 +18,8 @@ package uk.gov.hmrc.transitmovements.controllers.errors
 
 import cats.data.EitherT
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
-import uk.gov.hmrc.transitmovements.services.errors.MongoError.InsertNotAcknowledged
-import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
-import uk.gov.hmrc.transitmovements.services.errors.ParseError.BadDateTime
-import uk.gov.hmrc.transitmovements.services.errors.ParseError.NoElementFound
-import uk.gov.hmrc.transitmovements.services.errors.ParseError.TooManyElementsFound
-import uk.gov.hmrc.transitmovements.services.errors.ParseError.Unknown
+import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -42,21 +37,31 @@ trait ConvertError {
   }
 
   implicit val parseErrorConverter = new Converter[ParseError] {
+    import uk.gov.hmrc.transitmovements.services.errors.ParseError._
 
     def convert(parseError: ParseError): PresentationError = parseError match {
       case NoElementFound(element)       => PresentationError.badRequestError(s"Element $element not found")
       case TooManyElementsFound(element) => PresentationError.badRequestError(s"Found too many elements of type $element")
       case BadDateTime(element, ex)      => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
-      case Unknown(ex)                   => PresentationError.internalServiceError(cause = ex)
+      case UnexpectedError(ex)           => PresentationError.internalServiceError(cause = ex)
     }
 
   }
 
   implicit val mongoErrorConverter = new Converter[MongoError] {
+    import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 
     def convert(mongoError: MongoError): PresentationError = mongoError match {
       case UnexpectedError(ex)            => PresentationError.internalServiceError(cause = ex)
       case InsertNotAcknowledged(message) => PresentationError.internalServiceError(message = message)
+    }
+  }
+
+  implicit val streamErrorConverter = new Converter[StreamError] {
+    import uk.gov.hmrc.transitmovements.services.errors.StreamError._
+
+    def convert(streamError: StreamError): PresentationError = streamError match {
+      case UnexpectedError(ex) => PresentationError.internalServiceError(cause = ex)
     }
   }
 

@@ -87,7 +87,7 @@ class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Material
       source
         .via(declarationFlow)
         .recover {
-          case NonFatal(e) => Left(ParseError.Unknown(Some(e)))
+          case NonFatal(e) => Left(ParseError.UnexpectedError(Some(e)))
         }
         .runWith(Sink.head[Either[ParseError, DeclarationData]])
     )
