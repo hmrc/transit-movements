@@ -43,8 +43,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
-@ImplementedBy(classOf[DeparturesFactoryImpl])
-trait DeparturesFactory {
+@ImplementedBy(classOf[DepartureFactoryImpl])
+trait DepartureFactory {
 
   def create(
     eori: EORINumber,
@@ -53,12 +53,12 @@ trait DeparturesFactory {
   ): EitherT[Future, StreamError, Departure]
 }
 
-class DeparturesFactoryImpl @Inject() (
+class DepartureFactoryImpl @Inject() (
   clock: Clock,
   random: SecureRandom
 )(implicit
   val materializer: Materializer
-) extends DeparturesFactory {
+) extends DepartureFactory {
 
   def create(
     eori: EORINumber,

@@ -33,7 +33,7 @@ import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.services.DeparturesFactory
+import uk.gov.hmrc.transitmovements.services.DepartureFactory
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
 import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
 import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
@@ -45,7 +45,7 @@ import javax.inject.Singleton
 @Singleton
 class DeparturesController @Inject() (
   cc: ControllerComponents,
-  factory: DeparturesFactory,
+  factory: DepartureFactory,
   repo: DeparturesRepository,
   xmlParsingService: DeparturesXmlParsingService,
   val temporaryFileCreator: TemporaryFileCreator

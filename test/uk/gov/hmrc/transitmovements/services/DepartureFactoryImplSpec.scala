@@ -31,7 +31,7 @@ import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-class DeparturesFactoryImplSpec extends SpecBase with ScalaFutures with Matchers with TestActorSystem {
+class DepartureFactoryImplSpec extends SpecBase with ScalaFutures with Matchers with TestActorSystem {
 
   val instant: OffsetDateTime = OffsetDateTime.of(2022, 5, 27, 11, 0, 0, 0, ZoneOffset.UTC)
   val clock: Clock            = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
@@ -40,7 +40,7 @@ class DeparturesFactoryImplSpec extends SpecBase with ScalaFutures with Matchers
   val tempFile = SingletonTemporaryFileCreator.create()
 
   "create" - {
-    val sut = new DeparturesFactoryImpl(clock, random)
+    val sut = new DepartureFactoryImpl(clock, random)
 
     "will create a departure with a message when given a stream" in {
       val stream = FileIO.fromPath(tempFile.path)

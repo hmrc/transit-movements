@@ -60,7 +60,7 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
-import uk.gov.hmrc.transitmovements.services.DeparturesFactory
+import uk.gov.hmrc.transitmovements.services.DepartureFactory
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
@@ -96,7 +96,7 @@ class DeparturesControllerSpec
 
   val mockXmlParsingService    = mock[DeparturesXmlParsingService]
   val mockRepository           = mock[DeparturesRepository]
-  val mockDeparturesFactory    = mock[DeparturesFactory]
+  val mockDeparturesFactory    = mock[DepartureFactory]
   val mockTemporaryFileCreator = mock[TemporaryFileCreator]
 
   lazy val eori            = EORINumber("eori")

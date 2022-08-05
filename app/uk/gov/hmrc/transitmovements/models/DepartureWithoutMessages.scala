@@ -28,7 +28,7 @@ case class DepartureWithoutMessages(
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
   created: OffsetDateTime,
   updated: OffsetDateTime
-) {}
+)
 
 object DepartureWithoutMessages {
 
