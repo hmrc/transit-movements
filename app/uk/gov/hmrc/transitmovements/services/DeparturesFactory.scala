@@ -24,7 +24,6 @@ import akka.util.ByteString
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import com.google.inject.ImplementedBy
-import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.Departure
@@ -33,8 +32,6 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
-import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
 import java.security.SecureRandom
