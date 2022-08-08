@@ -16,16 +16,39 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import cats.data.NonEmptyList
+import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.bson.conversions.Bson
 
 import java.time.OffsetDateTime
 
-case class Departure(
+case class DepartureWithoutMessages(
   _id: DepartureId,
   enrollmentEORINumber: EORINumber,
   movementEORINumber: EORINumber,
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
   created: OffsetDateTime,
-  updated: OffsetDateTime,
-  messages: NonEmptyList[Message]
+  updated: OffsetDateTime
 )
+
+object DepartureWithoutMessages {
+
+  val projection: Bson =
+    BsonDocument(
+      "_id"                     -> 1,
+      "enrollmentEORINumber"    -> 1,
+      "movementEORINumber"      -> 1,
+      "movementReferenceNumber" -> 1,
+      "created"                 -> 1,
+      "updated"                 -> 1
+    )
+
+  def fromDeparture(departure: Departure) =
+    DepartureWithoutMessages(
+      departure._id,
+      departure.enrollmentEORINumber,
+      departure.movementEORINumber,
+      departure.movementReferenceNumber,
+      departure.created,
+      departure.updated
+    )
+}

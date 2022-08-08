@@ -19,12 +19,12 @@ package uk.gov.hmrc.transitmovements.models
 import java.net.URI
 import java.time.OffsetDateTime
 
-case class MovementMessage(
-  id: MovementMessageId,
+case class Message(
+  id: MessageId,
   received: OffsetDateTime,
   generated: OffsetDateTime,
   messageType: MessageType,
-  triggerId: Option[MovementMessageId],
+  triggerId: Option[MessageId],
   url: Option[URI],
   body: Option[String]
 )

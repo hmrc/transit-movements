@@ -24,10 +24,6 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.InternalServerError
-import uk.gov.hmrc.transitmovements.services.errors.MongoError
-import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
-import uk.gov.hmrc.transitmovements.services.errors.ParseError
-import uk.gov.hmrc.transitmovements.services.errors.ParseError.NoElementFound
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -39,6 +35,9 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
   import Harness._
 
   "Parse error" - {
+    import uk.gov.hmrc.transitmovements.services.errors.ParseError
+    import uk.gov.hmrc.transitmovements.services.errors.ParseError._
+
     "for a success" in {
       val input = Right[ParseError, Unit](()).toEitherT[Future]
       whenReady(input.asPresentation.value) {
@@ -55,6 +54,9 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
   }
 
   "Mongo error" - {
+    import uk.gov.hmrc.transitmovements.services.errors.MongoError
+    import uk.gov.hmrc.transitmovements.services.errors.MongoError._
+
     "for a success" in {
       val input = Right[MongoError, Unit](()).toEitherT[Future]
       whenReady(input.asPresentation.value) {
@@ -65,6 +67,26 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
     "for a failure" in {
       val exception = new Exception("mongo failure")
       val input     = Left[MongoError, Unit](UnexpectedError(Some(exception))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
+      }
+    }
+  }
+
+  "Stream error" - {
+    import uk.gov.hmrc.transitmovements.services.errors.StreamError
+    import uk.gov.hmrc.transitmovements.services.errors.StreamError._
+
+    "for a success" in {
+      val input = Right[StreamError, Unit](()).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Right(())
+      }
+    }
+
+    "for a failure" in {
+      val exception = new Exception("stream failure")
+      val input     = Left[StreamError, Unit](UnexpectedError(Some(exception))).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
       }

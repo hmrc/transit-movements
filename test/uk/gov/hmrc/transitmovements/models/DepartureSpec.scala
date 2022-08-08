@@ -16,14 +16,15 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import cats.data.NonEmptyList
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsString
 import play.api.libs.json.Json
-import java.net.URI
 
+import java.net.URI
 import java.time.OffsetDateTime
-import uk.gov.hmrc.transitmovements.models.formats.MongoFormats._
+import uk.gov.hmrc.transitmovements.models.formats.ModelFormats._
 
 class DepartureSpec extends AnyFlatSpec with Matchers {
 
@@ -36,13 +37,13 @@ class DepartureSpec extends AnyFlatSpec with Matchers {
       Some(MovementReferenceNumber("333")),
       OffsetDateTime.now(),
       OffsetDateTime.now(),
-      Seq(
-        MovementMessage(
-          id = MovementMessageId("999"),
+      NonEmptyList.one(
+        Message(
+          id = MessageId("999"),
           received = OffsetDateTime.now(),
           generated = OffsetDateTime.now(),
           messageType = MessageType.ReleaseForTransit,
-          triggerId = Some(MovementMessageId("888")),
+          triggerId = Some(MessageId("888")),
           url = Some(URI.create("xyz")),
           body = Some("body")
         )

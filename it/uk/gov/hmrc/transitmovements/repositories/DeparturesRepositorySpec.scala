@@ -17,6 +17,8 @@
 package uk.gov.hmrc.transitmovements.repositories
 
 import org.mongodb.scala.model.Filters
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -28,12 +30,11 @@ import play.api.test.FutureAwaits
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
+import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.MovementMessage
-import uk.gov.hmrc.transitmovements.models.MovementMessageId
+import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
+import uk.gov.hmrc.transitmovements.models.MessageId
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -46,12 +47,14 @@ class DeparturesRepositorySpec
     with FutureAwaits
     with DefaultAwaitTimeout
     with Logging
-    with DefaultPlayMongoRepositorySupport[Departure] {
+    with DefaultPlayMongoRepositorySupport[Departure]
+    with ModelGenerators
+    with OptionValues {
 
   val instant: OffsetDateTime = OffsetDateTime.of(2022, 5, 25, 16, 0, 0, 0, ZoneOffset.UTC)
 
   override lazy val mongoComponent: MongoComponent = {
-    val databaseName: String = "test-" + this.getClass.getSimpleName
+    val databaseName: String = "test-departures_movements"
     val mongoUri: String     = s"mongodb://localhost:27017/$databaseName?retryWrites=false"
     MongoComponent(mongoUri)
   }
@@ -65,30 +68,11 @@ class DeparturesRepositorySpec
     repository.collectionName shouldBe "departure_movements"
   }
 
-  it should "insert the given departure" in {
+  "insert" should "add the given departure to the database" in {
 
-    val departure =
-      Departure(
-        DepartureId("2"),
-        enrollmentEORINumber = EORINumber("111"),
-        movementEORINumber = EORINumber("222"),
-        movementReferenceNumber = None,
-        created = instant,
-        updated = instant,
-        messages = Seq(
-          MovementMessage(
-            MovementMessageId("100"),
-            instant,
-            instant,
-            messageType = MessageType.DeclarationData,
-            triggerId = Some(MovementMessageId("101")),
-            url = None,
-            body = Some("random-body")
-          )
-        )
-      )
+    val departure = arbitrary[Departure].sample.value.copy(_id = DepartureId("2"))
 
-    val declarationResponse = await(
+    await(
       repository.insert(departure).value
     )
 
@@ -97,5 +81,41 @@ class DeparturesRepositorySpec
     }
 
     firstItem._id.value should be("2")
+  }
+
+  "getDepartureWithoutMessages" should "return DepartureWithoutMessages if it exists" in {
+    val departure = arbitrary[Departure].sample.value
+
+    await(repository.insert(departure).value)
+
+    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, departure._id).value)
+    result.right.get.get should be(DepartureWithoutMessages.fromDeparture(departure))
+  }
+
+  "getDepartureWithoutMessages" should "return none if the departure doesn't exist" in {
+    val departure = arbitrary[Departure].sample.value.copy(_id = DepartureId("1"))
+
+    await(repository.insert(departure).value)
+
+    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, DepartureId("2")).value)
+    result.right.get.isEmpty should be(true)
+  }
+
+  "getMessage" should "return message if it exists" in {
+    val departure = arbitrary[Departure].sample.value
+
+    await(repository.insert(departure).value)
+
+    val result = await(repository.getMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id).value)
+    result.right.get.get should be(departure.messages.head)
+  }
+
+  "getMessage" should "return none if the message doesn't exist" in {
+    val departure = arbitrary[Departure].sample.value
+
+    await(repository.insert(departure).value)
+
+    val result = await(repository.getMessage(departure.enrollmentEORINumber, departure._id, MessageId("X")).value)
+    result.right.get.isEmpty should be(true)
   }
 }

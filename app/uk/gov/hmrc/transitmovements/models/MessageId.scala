@@ -16,4 +16,4 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-case class MovementMessageId(value: String) extends AnyVal
+case class MessageId(value: String) extends AnyVal

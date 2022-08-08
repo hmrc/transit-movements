@@ -19,17 +19,24 @@ package uk.gov.hmrc.transitmovements.repositories
 import akka.pattern.retry
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
+import com.mongodb.client.model.Filters.{and => mAnd}
+import com.mongodb.client.model.Filters.{eq => mEq}
+import org.mongodb.scala.model.Aggregates
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.IndexOptions
 import org.mongodb.scala.model.Indexes
-import org.mongodb.scala.result.InsertOneResult
 import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.Codecs
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.Departure
+import uk.gov.hmrc.transitmovements.models.DepartureId
+import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
+import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.InsertNotAcknowledged
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
@@ -46,6 +53,8 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[DeparturesRepositoryImpl])
 trait DeparturesRepository {
   def insert(departure: Departure): EitherT[Future, MongoError, Unit]
+  def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
+  def getMessage(eoriNumber: EORINumber, departureId: DepartureId, movementId: MessageId): EitherT[Future, MongoError, Option[Message]]
 }
 
 class DeparturesRepositoryImpl @Inject() (
@@ -55,41 +64,76 @@ class DeparturesRepositoryImpl @Inject() (
     extends PlayMongoRepository[Departure](
       mongoComponent = mongoComponent,
       collectionName = "departure_movements",
-      domainFormat = MongoFormats.departureFormat,
+      domainFormat = ModelFormats.departureFormat,
       indexes = Seq(
         IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS))
       ),
       extraCodecs = Seq(
-        Codecs.playFormatCodec(MongoFormats.departureFormat)
+        Codecs.playFormatCodec(ModelFormats.departureFormat),
+        Codecs.playFormatCodec(ModelFormats.messageFormat),
+        Codecs.playFormatCodec(ModelFormats.departureWithoutMessagesFormat)
       )
     )
     with DeparturesRepository
     with Logging {
 
   def insert(departure: Departure): EitherT[Future, MongoError, Unit] =
+    mongoRetry(Try(collection.insertOne(departure)) match {
+      case Success(obs) =>
+        obs.toFuture().map {
+          result =>
+            if (result.wasAcknowledged()) {
+              Right(())
+            } else {
+              Left(InsertNotAcknowledged(s"Insert failed for departure $departure"))
+            }
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+
+  def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]] = {
+
+    val selector   = mAnd(mEq("_id", departureId.value), mEq("enrollmentEORINumber", eoriNumber.value))
+    val projection = DepartureWithoutMessages.projection
+
+    val aggregates = Seq(
+      Aggregates.filter(selector),
+      Aggregates.project(projection)
+    )
+
+    mongoRetry(Try(collection.aggregate[DepartureWithoutMessages](aggregates)) match {
+      case Success(obs) =>
+        obs.headOption().map {
+          opt => Right(opt)
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+  }
+
+  def getMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[Message]] = {
+    val selector          = mAnd(mEq("_id", departureId.value), mEq("messages.id", messageId.value), mEq("enrollmentEORINumber", eoriNumber.value))
+    val secondarySelector = mEq("messages.id", messageId.value)
+    val aggregates =
+      Seq(Aggregates.filter(selector), Aggregates.unwind("$messages"), Aggregates.filter(secondarySelector), Aggregates.replaceRoot("$messages"))
+
+    mongoRetry(Try(collection.aggregate[Message](aggregates)) match {
+      case Success(obs) =>
+        obs.headOption().map {
+          opt => Right(opt)
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+  }
+
+  private def mongoRetry[A](func: Future[Either[MongoError, A]]): EitherT[Future, MongoError, A] =
     EitherT {
       retry(
         attempts = appConfig.mongoRetryAttempts,
-        attempt = () => insertDeparture(departure)
+        attempt = () => func
       )
-    }
-
-  private def insertDeparture(departure: Departure): Future[Either[MongoError, Unit]] =
-    Try(collection.insertOne(departure)) match {
-      case Success(value) =>
-        processReturn(value.head(), departure)
-      case Failure(NonFatal(ex)) =>
-        Future.successful(Left(UnexpectedError(Some(ex))))
-    }
-
-  private def processReturn(returned: Future[InsertOneResult], departure: Departure) =
-    returned.map {
-      result =>
-        if (result.wasAcknowledged()) {
-          Right(())
-        } else {
-          Left(InsertNotAcknowledged(s"Insert failed for departure $departure"))
-        }
     }
 
 }

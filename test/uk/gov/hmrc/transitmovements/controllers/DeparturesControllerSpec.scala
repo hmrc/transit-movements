@@ -21,6 +21,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import akka.util.Timeout
 import cats.data.EitherT
+import cats.data.NonEmptyList
 import org.mockito.ArgumentMatchers.any
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
@@ -33,6 +34,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.http.HeaderNames
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
+import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
@@ -48,16 +50,21 @@ import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
+import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
 import uk.gov.hmrc.transitmovements.models.DeclarationData
+import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
+import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.MovementMessageId
-import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
+import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
-import uk.gov.hmrc.transitmovements.services.DeparturesService
+import uk.gov.hmrc.transitmovements.services.DepartureFactory
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
+import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -65,7 +72,14 @@ import java.time.format.DateTimeParseException
 import scala.concurrent.Future
 import scala.xml.NodeSeq
 
-class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matchers with OptionValues with ScalaFutures with BeforeAndAfterEach {
+class DeparturesControllerSpec
+    extends SpecBase
+    with TestActorSystem
+    with Matchers
+    with OptionValues
+    with ScalaFutures
+    with BeforeAndAfterEach
+    with ModelFormats {
 
   def fakeRequestDepartures[A](
     method: String,
@@ -73,7 +87,7 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
   ): Request[NodeSeq] =
     FakeRequest(
       method = method,
-      uri = routes.DeparturesController.post(eori).url,
+      uri = routes.DeparturesController.createDeparture(eori).url,
       headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "app/xml")),
       body = body
     )
@@ -81,8 +95,8 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
   implicit val timeout: Timeout = 5.seconds
 
   val mockXmlParsingService    = mock[DeparturesXmlParsingService]
-  val repository               = mock[DeparturesRepository]
-  val mockDeparturesService    = mock[DeparturesService]
+  val mockRepository           = mock[DeparturesRepository]
+  val mockDeparturesFactory    = mock[DepartureFactory]
   val mockTemporaryFileCreator = mock[TemporaryFileCreator]
 
   lazy val eori            = EORINumber("eori")
@@ -91,20 +105,50 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
   lazy val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
     EitherT.rightT(declarationData)
 
-  lazy val declarationResponseEither: EitherT[Future, MongoError, DeclarationResponse] =
-    EitherT.rightT(DeclarationResponse(DepartureId("ABC123"), MovementMessageId("XYZ345")))
+  val now = OffsetDateTime.now
+
+  lazy val departureId = DepartureId("ABC123")
+
+  lazy val eoriNumber = EORINumber("A")
+
+  lazy val messageId = MessageId("XYZ345")
+
+  lazy val message = Message(
+    messageId,
+    now,
+    now,
+    MessageType.DeclarationData,
+    None,
+    None,
+    None
+  )
+
+  lazy val departure = Departure(
+    departureId,
+    eoriNumber,
+    eoriNumber,
+    None,
+    now,
+    now,
+    NonEmptyList.one(
+      message
+    )
+  )
+
+  lazy val departureFactoryEither: EitherT[Future, StreamError, Departure] =
+    EitherT.rightT(departure)
 
   override def afterEach() {
     reset(mockTemporaryFileCreator)
     reset(mockXmlParsingService)
-    reset(mockDeparturesService)
+    reset(mockDeparturesFactory)
     super.afterEach()
   }
 
   val controller =
-    new DeparturesController(stubControllerComponents(), mockDeparturesService, mockXmlParsingService, mockTemporaryFileCreator)
+    new DeparturesController(stubControllerComponents(), mockDeparturesFactory, mockRepository, mockXmlParsingService, mockTemporaryFileCreator)
 
-  "/POST" - {
+  "createDeparture" - {
 
     val validXml: NodeSeq =
       <CC015C>
@@ -120,13 +164,16 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
       when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockDeparturesService.create(any[String].asInstanceOf[EORINumber], any[DeclarationData], any[Source[ByteString, Future[IOResult]]]))
-        .thenReturn(declarationResponseEither)
+      when(mockDeparturesFactory.create(any[String].asInstanceOf[EORINumber], any[DeclarationData], any[Source[ByteString, Future[IOResult]]]))
+        .thenReturn(departureFactoryEither)
+
+      when(mockRepository.insert(any()))
+        .thenReturn(EitherT.rightT(Right(())))
 
       val request = fakeRequestDepartures(POST, validXml)
 
       val result =
-        controller.post(eori)(request)
+        controller.createDeparture(eori)(request)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
@@ -150,7 +197,7 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
         val request = fakeRequestDepartures(POST, elementNotFoundXml)
 
         val result =
-          controller.post(eori)(request)
+          controller.createDeparture(eori)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -175,7 +222,7 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
         val request = fakeRequestDepartures(POST, tooManyFoundXml)
 
         val result =
-          controller.post(eori)(request)
+          controller.createDeparture(eori)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -206,7 +253,7 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
         val request = fakeRequestDepartures(POST, tooManyFoundXml)
 
         val result =
-          controller.post(eori)(request)
+          controller.createDeparture(eori)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -224,19 +271,19 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
           "<CC015C><messageSender>GB1234</messageSender>"
 
         when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
-          .thenReturn(EitherT.leftT(ParseError.Unknown(Some(new IllegalArgumentException()))))
+          .thenReturn(EitherT.leftT(ParseError.UnexpectedError(Some(new IllegalArgumentException()))))
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
 
         val request = FakeRequest(
           method = POST,
-          uri = routes.DeparturesController.post(eori).url,
+          uri = routes.DeparturesController.createDeparture(eori).url,
           headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "app/xml")),
           body = unknownErrorXml
         )
 
         val result =
-          controller.post(eori)(request)
+          controller.createDeparture(eori)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
@@ -252,7 +299,7 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
         val request = fakeRequestDepartures(POST, validXml)
 
         val result =
-          controller.post(eori)(request)
+          controller.createDeparture(eori)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
@@ -260,6 +307,70 @@ class DeparturesControllerSpec extends SpecBase with TestActorSystem with Matche
           "message" -> "Internal server error"
         )
       }
+    }
+  }
+
+  "getDepartureWithoutMessages" - {
+    val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, departureId).url)
+
+    "must return OK if departure found" in {
+      when(mockRepository.getDepartureWithoutMessages(EORINumber(any()), DepartureId(any())))
+        .thenReturn(EitherT.rightT(Some(DepartureWithoutMessages.fromDeparture(departure))))
+
+      val result = controller.getDepartureWithoutMessages(eoriNumber, departureId)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.toJson(DepartureWithoutMessages.fromDeparture(departure))(departureWithoutMessagesFormat)
+    }
+
+    "must return NOT_FOUND if no departure found" in {
+      when(mockRepository.getDepartureWithoutMessages(EORINumber(any()), DepartureId(any())))
+        .thenReturn(EitherT.rightT(None))
+
+      val result = controller.getDepartureWithoutMessages(eoriNumber, departureId)(request)
+
+      status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVER_ERROR if repository has an error" in {
+      when(mockRepository.getDepartureWithoutMessages(EORINumber(any()), DepartureId(any())))
+        .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
+
+      val result = controller.getDepartureWithoutMessages(eoriNumber, departureId)(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+  }
+
+  "getMessage" - {
+    val request = FakeRequest("GET", routes.DeparturesController.getMessage(eoriNumber, departureId, messageId).url)
+
+    "must return OK if no message found" in {
+      when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
+        .thenReturn(EitherT.rightT(Some(message)))
+
+      val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.toJson(message)(messageFormat)
+    }
+
+    "must return NOT_FOUND if no message found" in {
+      when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
+        .thenReturn(EitherT.rightT(None))
+
+      val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
+
+      status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
+      when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
+        .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
+
+      val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
     }
   }
 }

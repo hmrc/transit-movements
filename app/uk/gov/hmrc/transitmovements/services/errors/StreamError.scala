@@ -16,13 +16,8 @@
 
 package uk.gov.hmrc.transitmovements.services.errors
 
-import java.time.format.DateTimeParseException
+sealed abstract class StreamError
 
-sealed abstract class ParseError
-
-object ParseError {
-  case class NoElementFound(element: String)                                 extends ParseError
-  case class TooManyElementsFound(element: String)                           extends ParseError
-  case class BadDateTime(element: String, exception: DateTimeParseException) extends ParseError
-  case class UnexpectedError(caughtException: Option[Throwable] = None)      extends ParseError
+object StreamError {
+  case class UnexpectedError(caughtException: Option[Throwable] = None) extends StreamError
 }
