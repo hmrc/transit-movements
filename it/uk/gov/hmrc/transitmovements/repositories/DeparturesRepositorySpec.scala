@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.repositories
 
+import cats.data.NonEmptyList
 import org.mongodb.scala.model.Filters
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.OptionValues
@@ -34,6 +35,7 @@ import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
+import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
 
 import java.time.OffsetDateTime
@@ -116,6 +118,28 @@ class DeparturesRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(repository.getMessage(departure.enrollmentEORINumber, departure._id, MessageId("X")).value)
+    result.right.get.isEmpty should be(true)
+  }
+
+  "getDepartureMessageIds" should "return messageIds if there are messages" in {
+    val messages =
+      NonEmptyList
+        .fromList(List(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value))
+        .value
+    val departure = arbitrary[Departure].sample.value.copy(messages = messages)
+
+    await(repository.insert(departure).value)
+
+    val result = await(repository.getDepartureMessageIds(departure.enrollmentEORINumber, departure._id).value)
+    result.right.get.get should be(
+      departure.messages.map(
+        x => x.id
+      )
+    )
+  }
+
+  "getDepartureMessageIds" should "return none if the departure doesn't exist" in {
+    val result = await(repository.getDepartureMessageIds(EORINumber("ABC"), DepartureId("XYZ")).value)
     result.right.get.isEmpty should be(true)
   }
 }

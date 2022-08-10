@@ -18,14 +18,18 @@ package uk.gov.hmrc.transitmovements.repositories
 
 import akka.pattern.retry
 import cats.data.EitherT
+import cats.data.NonEmptyList
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
+import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.model.Accumulators
 import org.mongodb.scala.model.Aggregates
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.IndexOptions
 import org.mongodb.scala.model.Indexes
 import play.api.Logging
+import play.api.libs.json.Json
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.Codecs
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
@@ -36,6 +40,7 @@ import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.InsertNotAcknowledged
@@ -50,11 +55,19 @@ import scala.util.Success
 import scala.util.Try
 import scala.util.control.NonFatal
 
+case class GetDepartureMessageIdsDTO(result: NonEmptyList[MessageId])
+
+object GetDepartureMessageIdsDTO extends CommonFormats with ModelFormats {
+
+  implicit val format = Json.format[GetDepartureMessageIdsDTO]
+}
+
 @ImplementedBy(classOf[DeparturesRepositoryImpl])
 trait DeparturesRepository {
   def insert(departure: Departure): EitherT[Future, MongoError, Unit]
   def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
   def getMessage(eoriNumber: EORINumber, departureId: DepartureId, movementId: MessageId): EitherT[Future, MongoError, Option[Message]]
+  def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]]
 }
 
 class DeparturesRepositoryImpl @Inject() (
@@ -71,11 +84,14 @@ class DeparturesRepositoryImpl @Inject() (
       extraCodecs = Seq(
         Codecs.playFormatCodec(ModelFormats.departureFormat),
         Codecs.playFormatCodec(ModelFormats.messageFormat),
-        Codecs.playFormatCodec(ModelFormats.departureWithoutMessagesFormat)
+        Codecs.playFormatCodec(ModelFormats.departureWithoutMessagesFormat),
+        Codecs.playFormatCodec(ModelFormats.messageIdFormat),
+        Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format)
       )
     )
     with DeparturesRepository
-    with Logging {
+    with Logging
+    with CommonFormats {
 
   def insert(departure: Departure): EitherT[Future, MongoError, Unit] =
     mongoRetry(Try(collection.insertOne(departure)) match {
@@ -110,6 +126,30 @@ class DeparturesRepositoryImpl @Inject() (
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
+  }
+
+  def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]] = {
+
+    val selector = mAnd(mEq("_id", departureId.value), mEq("enrollmentEORINumber", eoriNumber.value))
+
+    val aggregates =
+      Seq(
+        Aggregates.filter(selector),
+        Aggregates.group(null, Accumulators.push("result", "$messages.id")),
+        Aggregates.unwind("$result"),
+        Aggregates.project(BsonDocument("_id" -> 0, "result" -> 1))
+      )
+
+    mongoRetry(Try(collection.aggregate[GetDepartureMessageIdsDTO](aggregates)) match {
+      case Success(obs) =>
+        obs.headOption.map {
+          case Some(dto) => Right(Some(dto.result))
+          case None      => Right(None)
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+
   }
 
   def getMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[Message]] = {

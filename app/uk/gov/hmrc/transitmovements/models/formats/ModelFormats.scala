@@ -31,9 +31,9 @@ import uk.gov.hmrc.transitmovements.models.MessageType
 
 trait ModelFormats extends CommonFormats with MongoBinaryFormats.Implicits with MongoJavatimeFormats.Implicits with MongoUuidFormats.Implicits {
 
-  implicit val eoriNumberFormat: Format[EORINumber]       = Json.valueFormat[EORINumber]
-  implicit val movementMessageIdFormat: Format[MessageId] = Json.valueFormat[MessageId]
-  implicit val departureIdFormat: Format[DepartureId]     = Json.valueFormat[DepartureId]
+  implicit val eoriNumberFormat: Format[EORINumber]   = Json.valueFormat[EORINumber]
+  implicit val messageIdFormat: Format[MessageId]     = Json.valueFormat[MessageId]
+  implicit val departureIdFormat: Format[DepartureId] = Json.valueFormat[DepartureId]
 
   implicit val messageTypeFormat: Format[MessageType] = enumFormat(MessageType.values)(_.code)
 

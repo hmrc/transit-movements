@@ -16,6 +16,9 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.bson.conversions.Bson
+
 import java.net.URI
 import java.time.OffsetDateTime
 
@@ -28,3 +31,11 @@ case class Message(
   url: Option[URI],
   body: Option[String]
 )
+
+object Message {
+
+  val messageIdProjection: Bson =
+    BsonDocument(
+      "id" -> 1
+    )
+}
