@@ -2,6 +2,8 @@
 
 POST       /traders/:EORI/movements/departures                                      uk.gov.hmrc.transitmovements.controllers.DeparturesController.createDeparture(EORI: EORINumber)
 
+GET        /traders/:EORI/movements                                                 uk.gov.hmrc.transitmovements.controllers.DeparturesController.getDepartureIds(EORI: EORINumber)
+
 GET        /traders/:EORI/movements/departures/:departureId                         uk.gov.hmrc.transitmovements.controllers.DeparturesController.getDepartureWithoutMessages(EORI: EORINumber, departureId: DepartureId)
 
 GET        /traders/:EORI/movements/departures/:departureId/messages                uk.gov.hmrc.transitmovements.controllers.DeparturesController.getDepartureMessageIds(EORI: EORINumber, departureId: DepartureId)

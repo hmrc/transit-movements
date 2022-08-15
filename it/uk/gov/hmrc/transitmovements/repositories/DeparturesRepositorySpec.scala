@@ -36,7 +36,11 @@ import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageType
+import cats.data.NonEmptyList
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -142,4 +146,46 @@ class DeparturesRepositorySpec
     val result = await(repository.getDepartureMessageIds(EORINumber("ABC"), DepartureId("XYZ")).value)
     result.right.get.isEmpty should be(true)
   }
+
+  "getDepartureIds" should "return a list of departure ids for the supplied EORI" in {
+
+    val eoriGB = EORINumber("GB00001")
+    val eoriXI = EORINumber("XI00001")
+
+    val departure1 = Departure(
+      _id = DepartureId("10001"),
+      enrollmentEORINumber = eoriGB,
+      movementEORINumber = EORINumber("20001"),
+      movementReferenceNumber = None,
+      created = OffsetDateTime.now(),
+      updated = OffsetDateTime.now(),
+      messages = NonEmptyList(
+        Message(
+          id = MessageId("00011"),
+          received = OffsetDateTime.now(),
+          generated = OffsetDateTime.now(),
+          messageType = MessageType.DeclarationData,
+          triggerId = None,
+          url = None,
+          body = None
+        ),
+        tail = List.empty
+      )
+    )
+
+    val departure2 = departure1.copy(_id = DepartureId("10002"), enrollmentEORINumber = eoriXI)
+    val departure3 = departure1.copy(_id = DepartureId("10003"), enrollmentEORINumber = eoriXI)
+    val departure4 = departure1.copy(_id = DepartureId("10004"), enrollmentEORINumber = eoriGB)
+
+    //populate db in non-increasing order
+    await(repository.insert(departure3).value)
+    await(repository.insert(departure2).value)
+    await(repository.insert(departure4).value)
+    await(repository.insert(departure1).value)
+
+    val result = await(repository.getDepartureIds(eoriGB).value)
+
+    result.right.get should be(List(DepartureId("10001"), DepartureId("10004")))
+  }
+
 }

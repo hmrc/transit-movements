@@ -115,4 +115,6 @@ class DeparturesController @Inject() (
           }
       )
   }
+
+  def getDepartureIds(eoriNumber: EORINumber): Action[AnyContent] = ???
 }

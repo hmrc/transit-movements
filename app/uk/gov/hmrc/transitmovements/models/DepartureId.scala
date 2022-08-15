@@ -16,4 +16,17 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.bson.conversions.Bson
+
 case class DepartureId(value: String) extends AnyVal
+
+object DepartureId {
+
+  val projection: Bson =
+    BsonDocument(
+      "_id" -> 1
+    )
+
+  def apply(id: String) = new DepartureId(id)
+}

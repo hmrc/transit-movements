@@ -60,6 +60,7 @@ trait DeparturesRepository {
   def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
   def getMessage(eoriNumber: EORINumber, departureId: DepartureId, movementId: MessageId): EitherT[Future, MongoError, Option[Message]]
   def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]]
+  def getDepartureIds(eoriNumber: EORINumber): EitherT[Future, MongoError, List[DepartureId]]
 }
 
 class DeparturesRepositoryImpl @Inject() (
@@ -78,7 +79,9 @@ class DeparturesRepositoryImpl @Inject() (
         Codecs.playFormatCodec(ModelFormats.messageFormat),
         Codecs.playFormatCodec(ModelFormats.departureWithoutMessagesFormat),
         Codecs.playFormatCodec(ModelFormats.messageIdFormat),
-        Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format)
+        Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format),
+        Codecs.playFormatCodec(ModelFormats.departureWithoutMessagesFormat),
+        Codecs.playFormatCodec(ModelFormats.departureIdFormat)
       )
     )
     with DeparturesRepository
@@ -168,4 +171,13 @@ class DeparturesRepositoryImpl @Inject() (
       )
     }
 
+  def getDepartureIds(eoriNumber: EORINumber): EitherT[Future, MongoError, List[DepartureId]] = {
+    val queryResult: Future[List[DepartureId]] = collection
+      .find[DepartureId](mEq("enrollmentEORINumber", eoriNumber.value))
+      .toFuture()
+      .map(_.toList)
+
+    val result: EitherT[Future, MongoError, List[DepartureId]] = EitherT.right(queryResult)
+    result
+  }
 }
