@@ -29,7 +29,6 @@ import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.IndexOptions
 import org.mongodb.scala.model.Indexes
 import play.api.Logging
-import play.api.libs.json.Json
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.Codecs
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
@@ -54,13 +53,6 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 import scala.util.control.NonFatal
-
-case class GetDepartureMessageIdsDTO(result: NonEmptyList[MessageId])
-
-object GetDepartureMessageIdsDTO extends CommonFormats with ModelFormats {
-
-  implicit val format = Json.format[GetDepartureMessageIdsDTO]
-}
 
 @ImplementedBy(classOf[DeparturesRepositoryImpl])
 trait DeparturesRepository {

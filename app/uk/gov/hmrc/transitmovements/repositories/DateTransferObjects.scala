@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.repositories
 
-import java.net.URI
-import java.time.OffsetDateTime
+import cats.data.NonEmptyList
+import play.api.libs.json.Json
+import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
+import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
 
-case class Message(
-  id: MessageId,
-  received: OffsetDateTime,
-  generated: OffsetDateTime,
-  messageType: MessageType,
-  triggerId: Option[MessageId],
-  url: Option[URI],
-  body: Option[String]
-)
+case class GetDepartureMessageIdsDTO(result: NonEmptyList[MessageId])
+
+object GetDepartureMessageIdsDTO extends CommonFormats with ModelFormats {
+
+  implicit val format = Json.format[GetDepartureMessageIdsDTO]
+}
