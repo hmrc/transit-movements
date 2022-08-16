@@ -36,7 +36,6 @@ import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
@@ -125,45 +124,44 @@ class DeparturesRepositorySpec
     result.right.get.isEmpty should be(true)
   }
 
-  "getDepartureMessageIds" should "return messageIds if there are messages" in {
-    val messages =
-      NonEmptyList
-        .fromList(List(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value))
-        .value
-    val departure = arbitrary[Departure].sample.value.copy(messages = messages)
+  "getDepartureIds" should
+    "return a list of departure ids for the supplied EORI sorted by last updated, latest first" in new DBSetup {
+      val result = await(repository.getDepartureIds(eoriGB).value)
 
-    await(repository.insert(departure).value)
+      result.right.get.value should be(NonEmptyList(DepartureId("10004"), List(DepartureId("10001"))))
+    }
 
-    val result = await(repository.getDepartureMessageIds(departure.enrollmentEORINumber, departure._id).value)
-    result.right.get.get should be(
-      departure.messages.map(
-        x => x.id
-      )
-    )
+  it should "return no departure ids for an EORI that doesn't exist" in new DBSetup {
+    val result = await(repository.getDepartureIds(EORINumber("FR999")).value)
+
+    result.right.get should be(None)
   }
 
-  "getDepartureMessageIds" should "return none if the departure doesn't exist" in {
-    val result = await(repository.getDepartureMessageIds(EORINumber("ABC"), DepartureId("XYZ")).value)
-    result.right.get.isEmpty should be(true)
+  it should "return no departure ids when the db is empty" in new DBSetup {
+    await(repository.collection.drop().toFuture())
+    val result = await(repository.getDepartureIds(EORINumber("FR999")).value)
+
+    result.right.get should be(None)
   }
 
-  "getDepartureIds" should "return a list of departure ids for the supplied EORI" in {
+  trait DBSetup {
 
-    val eoriGB = EORINumber("GB00001")
-    val eoriXI = EORINumber("XI00001")
+    val eoriGB  = EORINumber("GB00001")
+    val eoriXI  = EORINumber("XI00001")
+    val timeNow = OffsetDateTime.now()
 
     val departure1 = Departure(
       _id = DepartureId("10001"),
       enrollmentEORINumber = eoriGB,
       movementEORINumber = EORINumber("20001"),
       movementReferenceNumber = None,
-      created = OffsetDateTime.now(),
-      updated = OffsetDateTime.now(),
+      created = timeNow,
+      updated = timeNow,
       messages = NonEmptyList(
         Message(
           id = MessageId("00011"),
-          received = OffsetDateTime.now(),
-          generated = OffsetDateTime.now(),
+          received = timeNow,
+          generated = timeNow,
           messageType = MessageType.DeclarationData,
           triggerId = None,
           url = None,
@@ -173,19 +171,15 @@ class DeparturesRepositorySpec
       )
     )
 
-    val departure2 = departure1.copy(_id = DepartureId("10002"), enrollmentEORINumber = eoriXI, movementEORINumber = EORINumber("20002"))
-    val departure3 = departure1.copy(_id = DepartureId("10003"), enrollmentEORINumber = eoriXI, movementEORINumber = EORINumber("20003"))
-    val departure4 = departure1.copy(_id = DepartureId("10004"), enrollmentEORINumber = eoriGB, movementEORINumber = EORINumber("20004"))
+    val departure2 = departure1.copy(_id = DepartureId("10002"), enrollmentEORINumber = eoriXI, updated = OffsetDateTime.now().plusMinutes(1))
+    val departure3 = departure1.copy(_id = DepartureId("10003"), enrollmentEORINumber = eoriXI, updated = OffsetDateTime.now().minusMinutes(3))
+    val departure4 = departure1.copy(_id = DepartureId("10004"), enrollmentEORINumber = eoriGB, updated = OffsetDateTime.now().plusMinutes(1))
 
-    //populate db in non-increasing order
+    //populate db in non-time order
     await(repository.insert(departure3).value)
     await(repository.insert(departure2).value)
     await(repository.insert(departure4).value)
     await(repository.insert(departure1).value)
 
-    val result = await(repository.getDepartureIds(eoriGB).value)
-
-    result.right.get should be(NonEmptyList(DepartureId("10004"), List(DepartureId("10001"))))
   }
-
 }
