@@ -50,6 +50,7 @@ import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
+import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.Departure
@@ -63,6 +64,7 @@ import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.DepartureFactory
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -79,7 +81,8 @@ class DeparturesControllerSpec
     with OptionValues
     with ScalaFutures
     with BeforeAndAfterEach
-    with ModelFormats {
+    with ModelFormats
+    with ModelGenerators {
 
   def fakeRequestDepartures[A](
     method: String,
@@ -112,6 +115,8 @@ class DeparturesControllerSpec
   lazy val eoriNumber = EORINumber("A")
 
   lazy val messageId = MessageId("XYZ345")
+
+  lazy val messageIdList = NonEmptyList.one(messageId)
 
   lazy val message = Message(
     messageId,
@@ -345,7 +350,7 @@ class DeparturesControllerSpec
   "getMessage" - {
     val request = FakeRequest("GET", routes.DeparturesController.getMessage(eoriNumber, departureId, messageId).url)
 
-    "must return OK if no message found" in {
+    "must return OK if message found" in {
       when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
         .thenReturn(EitherT.rightT(Some(message)))
 
@@ -369,6 +374,39 @@ class DeparturesControllerSpec
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
       val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+  }
+
+  "getDepartureMessageIds" - {
+
+    val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, departureId).url)
+
+    "must return OK and a list of message ids" in {
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+        .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageId))))
+
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.toJson(messageIdList)(nonEmptyListFormat(messageIdFormat))
+    }
+
+    "must return NOT_FOUND if no departure found" in {
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+        .thenReturn(EitherT.rightT(None))
+
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
+
+      status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+        .thenReturn(EitherT.leftT(UnexpectedError(None)))
+
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
     }

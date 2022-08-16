@@ -88,6 +88,20 @@ class DeparturesController @Inject() (
       )
   }
 
+  def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId) = Action.async {
+    repo
+      .getDepartureMessageIds(eoriNumber, departureId)
+      .asPresentation
+      .fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        response =>
+          response match {
+            case Some(departureMessageIds) => Ok(Json.toJson(departureMessageIds))
+            case None                      => NotFound
+          }
+      )
+  }
+
   def getMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): Action[AnyContent] = Action.async {
     repo
       .getMessage(eoriNumber, departureId, messageId)
