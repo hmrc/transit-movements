@@ -173,9 +173,9 @@ class DeparturesRepositorySpec
       )
     )
 
-    val departure2 = departure1.copy(_id = DepartureId("10002"), enrollmentEORINumber = eoriXI)
-    val departure3 = departure1.copy(_id = DepartureId("10003"), enrollmentEORINumber = eoriXI)
-    val departure4 = departure1.copy(_id = DepartureId("10004"), enrollmentEORINumber = eoriGB)
+    val departure2 = departure1.copy(_id = DepartureId("10002"), enrollmentEORINumber = eoriXI, movementEORINumber = EORINumber("20002"))
+    val departure3 = departure1.copy(_id = DepartureId("10003"), enrollmentEORINumber = eoriXI, movementEORINumber = EORINumber("20003"))
+    val departure4 = departure1.copy(_id = DepartureId("10004"), enrollmentEORINumber = eoriGB, movementEORINumber = EORINumber("20004"))
 
     //populate db in non-increasing order
     await(repository.insert(departure3).value)
@@ -185,7 +185,7 @@ class DeparturesRepositorySpec
 
     val result = await(repository.getDepartureIds(eoriGB).value)
 
-    result.right.get should be(List(DepartureId("10001"), DepartureId("10004")))
+    result.right.get should be(NonEmptyList(DepartureId("10004"), List(DepartureId("10001"))))
   }
 
 }
