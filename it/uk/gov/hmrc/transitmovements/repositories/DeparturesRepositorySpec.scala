@@ -146,22 +146,21 @@ class DeparturesRepositorySpec
 
   trait DBSetup {
 
-    val eoriGB  = EORINumber("GB00001")
-    val eoriXI  = EORINumber("XI00001")
-    val timeNow = OffsetDateTime.now()
+    val eoriGB = EORINumber("GB00001")
+    val eoriXI = EORINumber("XI00001")
 
     val departure1 = Departure(
       _id = DepartureId("10001"),
       enrollmentEORINumber = eoriGB,
       movementEORINumber = EORINumber("20001"),
       movementReferenceNumber = None,
-      created = timeNow,
-      updated = timeNow,
+      created = instant,
+      updated = instant,
       messages = NonEmptyList(
         Message(
           id = MessageId("00011"),
-          received = timeNow,
-          generated = timeNow,
+          received = instant,
+          generated = instant,
           messageType = MessageType.DeclarationData,
           triggerId = None,
           url = None,
@@ -171,9 +170,9 @@ class DeparturesRepositorySpec
       )
     )
 
-    val departure2 = departure1.copy(_id = DepartureId("10002"), enrollmentEORINumber = eoriXI, updated = OffsetDateTime.now().plusMinutes(1))
-    val departure3 = departure1.copy(_id = DepartureId("10003"), enrollmentEORINumber = eoriXI, updated = OffsetDateTime.now().minusMinutes(3))
-    val departure4 = departure1.copy(_id = DepartureId("10004"), enrollmentEORINumber = eoriGB, updated = OffsetDateTime.now().plusMinutes(1))
+    val departure2 = departure1.copy(_id = DepartureId("10002"), enrollmentEORINumber = eoriXI, updated = instant.plusMinutes(1))
+    val departure3 = departure1.copy(_id = DepartureId("10003"), enrollmentEORINumber = eoriXI, updated = instant.minusMinutes(3))
+    val departure4 = departure1.copy(_id = DepartureId("10004"), enrollmentEORINumber = eoriGB, updated = instant.plusMinutes(1))
 
     //populate db in non-time order
     await(repository.insert(departure3).value)
