@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovements.repositories
 import cats.data.NonEmptyList
 import org.mongodb.scala.model.Filters
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalatest.BeforeAndAfter
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -36,7 +37,9 @@ import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageType
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -65,6 +68,8 @@ class DeparturesRepositorySpec
   private val appConfig              = app.injector.instanceOf[AppConfig]
 
   override lazy val repository = new DeparturesRepositoryImpl(appConfig, mongoComponent)
+
+  lazy val dbSetup = new DBSetup {}
 
   "DepartureMovementRepository" should "have the correct name" in {
     repository.collectionName shouldBe "departure_movements"
@@ -141,5 +146,61 @@ class DeparturesRepositorySpec
   "getDepartureMessageIds" should "return none if the departure doesn't exist" in {
     val result = await(repository.getDepartureMessageIds(EORINumber("ABC"), DepartureId("XYZ")).value)
     result.right.get.isEmpty should be(true)
+  }
+
+  "getDepartureIds" should
+    "return a list of departure ids for the supplied EORI sorted by last updated, latest first" in {
+      val result = await(repository.getDepartureIds(dbSetup.eoriGB).value)
+
+      result.right.get.value should be(NonEmptyList(DepartureId("10004"), List(DepartureId("10001"))))
+    }
+
+  it should "return no departure ids for an EORI that doesn't exist" in {
+    val result = await(repository.getDepartureIds(EORINumber("FR999")).value)
+
+    result.right.get should be(None)
+  }
+
+  it should "return no departure ids when the db is empty" in {
+    await(repository.collection.drop().toFuture())
+    val result = await(repository.getDepartureIds(EORINumber("FR999")).value)
+    Thread.sleep(10000)
+    result.right.get should be(None)
+  }
+
+  trait DBSetup {
+    val eoriGB = EORINumber("GB00001")
+    val eoriXI = EORINumber("XI00001")
+
+    val departure1 = Departure(
+      _id = DepartureId("10001"),
+      enrollmentEORINumber = eoriGB,
+      movementEORINumber = EORINumber("20001"),
+      movementReferenceNumber = None,
+      created = instant,
+      updated = instant,
+      messages = NonEmptyList(
+        Message(
+          id = MessageId("00011"),
+          received = instant,
+          generated = instant,
+          messageType = MessageType.DeclarationData,
+          triggerId = None,
+          url = None,
+          body = None
+        ),
+        tail = List.empty
+      )
+    )
+
+    val departure2 = departure1.copy(_id = DepartureId("10002"), enrollmentEORINumber = eoriXI, updated = instant.plusMinutes(1))
+    val departure3 = departure1.copy(_id = DepartureId("10003"), enrollmentEORINumber = eoriXI, updated = instant.minusMinutes(3))
+    val departure4 = departure1.copy(_id = DepartureId("10004"), enrollmentEORINumber = eoriGB, updated = instant.plusMinutes(1))
+
+    //populate db in non-time order
+    await(repository.insert(departure3).value)
+    await(repository.insert(departure2).value)
+    await(repository.insert(departure4).value)
+    await(repository.insert(departure1).value)
   }
 }

@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovements.repositories
 
 import cats.data.NonEmptyList
 import play.api.libs.json.Json
+import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
@@ -25,6 +26,11 @@ import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
 case class GetDepartureMessageIdsDTO(result: NonEmptyList[MessageId])
 
 object GetDepartureMessageIdsDTO extends CommonFormats with ModelFormats {
-
   implicit val format = Json.format[GetDepartureMessageIdsDTO]
+}
+
+case class GetDepartureIdsDTO(result: NonEmptyList[DepartureId])
+
+object GetDepartureIdsDTO extends CommonFormats with ModelFormats {
+  implicit val format = Json.format[GetDepartureIdsDTO]
 }

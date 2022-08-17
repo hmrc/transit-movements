@@ -20,18 +20,16 @@ import akka.pattern.retry
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import com.google.inject.ImplementedBy
+import com.mongodb.client.model.Filters.{ne => mNe}
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
 import org.mongodb.scala.bson.BsonDocument
-import org.mongodb.scala.model.Accumulators
-import org.mongodb.scala.model.Aggregates
-import org.mongodb.scala.model.IndexModel
-import org.mongodb.scala.model.IndexOptions
-import org.mongodb.scala.model.Indexes
+import org.mongodb.scala.bson.conversions.Bson
+import org.mongodb.scala.model._
+import org.mongodb.scala.model.Sorts.descending
 import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
-import uk.gov.hmrc.mongo.play.json.Codecs
-import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
+import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
@@ -42,13 +40,11 @@ import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
-import uk.gov.hmrc.transitmovements.services.errors.MongoError.InsertNotAcknowledged
-import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent._
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -60,6 +56,7 @@ trait DeparturesRepository {
   def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
   def getMessage(eoriNumber: EORINumber, departureId: DepartureId, movementId: MessageId): EitherT[Future, MongoError, Option[Message]]
   def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]]
+  def getDepartureIds(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureId]]]
 }
 
 class DeparturesRepositoryImpl @Inject() (
@@ -78,7 +75,10 @@ class DeparturesRepositoryImpl @Inject() (
         Codecs.playFormatCodec(ModelFormats.messageFormat),
         Codecs.playFormatCodec(ModelFormats.departureWithoutMessagesFormat),
         Codecs.playFormatCodec(ModelFormats.messageIdFormat),
-        Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format)
+        Codecs.playFormatCodec(ModelFormats.departureWithoutMessagesFormat),
+        Codecs.playFormatCodec(ModelFormats.departureIdFormat),
+        Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format),
+        Codecs.playFormatCodec(GetDepartureIdsDTO.format)
       )
     )
     with DeparturesRepository
@@ -168,4 +168,26 @@ class DeparturesRepositoryImpl @Inject() (
       )
     }
 
+  def getDepartureIds(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureId]]] = {
+    val selector: Bson = mAnd(mNe("_id", "-1"), mEq("enrollmentEORINumber", eoriNumber.value))
+    //val selector: Bson = mEq("enrollmentEORINumber", eoriNumber.value) // Selector should be this really - but not working!
+
+    val aggregates = Seq(
+      Aggregates.filter(selector),
+      Aggregates.sort(descending("updated")),
+      Aggregates.group(null, Accumulators.push("result", "$_id")),
+      Aggregates.project(BsonDocument("_id" -> 0, "result" -> 1))
+    )
+
+    mongoRetry(Try(collection.aggregate[GetDepartureIdsDTO](aggregates)) match {
+      case Success(obs) =>
+        obs.headOption.map {
+          case Some(opt) => Right(Some(opt.result))
+          case None      => Right(None)
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+
+  }
 }

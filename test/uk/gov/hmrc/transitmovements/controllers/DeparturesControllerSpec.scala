@@ -411,4 +411,36 @@ class DeparturesControllerSpec
       status(result) mustBe INTERNAL_SERVER_ERROR
     }
   }
+
+  "getDepartureIds" - {
+    val request = FakeRequest("GET", routes.DeparturesController.getDepartureIds(eoriNumber).url)
+
+    "must return OK if ids were found" in {
+      when(mockRepository.getDepartureIds(EORINumber(any())))
+        .thenReturn(EitherT.rightT(Some(NonEmptyList(departureId, List.empty))))
+
+      val result = controller.getDepartureIds(eoriNumber)(request)
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.toJson(NonEmptyList(departureId, List.empty))
+    }
+
+    "must return NOT_FOUND if no ids were found" in {
+      when(mockRepository.getDepartureIds(EORINumber(any())))
+        .thenReturn(EitherT.rightT(None))
+
+      val result = controller.getDepartureIds(eoriNumber)(request)
+
+      status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
+      when(mockRepository.getDepartureIds(EORINumber(any())))
+        .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
+
+      val result = controller.getDepartureIds(eoriNumber)(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+  }
+
 }
