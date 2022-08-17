@@ -28,7 +28,6 @@ import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
 import play.api.Logging
-import play.api.libs.json.Json
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
@@ -40,8 +39,6 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
-import uk.gov.hmrc.transitmovements.models._
-import uk.gov.hmrc.transitmovements.models.formats._
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 
@@ -52,12 +49,6 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 import scala.util.control.NonFatal
-
-case class GetDepartureIdsDTO(result: NonEmptyList[DepartureId])
-
-object GetDepartureIdsDTO extends CommonFormats with ModelFormats {
-  implicit val format = Json.format[GetDepartureIdsDTO]
-}
 
 @ImplementedBy(classOf[DeparturesRepositoryImpl])
 trait DeparturesRepository {
@@ -84,10 +75,9 @@ class DeparturesRepositoryImpl @Inject() (
         Codecs.playFormatCodec(ModelFormats.messageFormat),
         Codecs.playFormatCodec(ModelFormats.departureWithoutMessagesFormat),
         Codecs.playFormatCodec(ModelFormats.messageIdFormat),
-        Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format),
         Codecs.playFormatCodec(ModelFormats.departureWithoutMessagesFormat),
         Codecs.playFormatCodec(ModelFormats.departureIdFormat),
-        Codecs.playFormatCodec(ModelFormats.eoriNumberFormat),
+        Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format),
         Codecs.playFormatCodec(GetDepartureIdsDTO.format)
       )
     )

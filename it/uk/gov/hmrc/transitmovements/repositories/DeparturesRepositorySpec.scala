@@ -39,7 +39,6 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
-import cats.data.NonEmptyList
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -124,6 +123,28 @@ class DeparturesRepositorySpec
     result.right.get.isEmpty should be(true)
   }
 
+  "getDepartureMessageIds" should "return messageIds if there are messages" in {
+    val messages =
+      NonEmptyList
+        .fromList(List(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value))
+        .value
+    val departure = arbitrary[Departure].sample.value.copy(messages = messages)
+
+    await(repository.insert(departure).value)
+
+    val result = await(repository.getDepartureMessageIds(departure.enrollmentEORINumber, departure._id).value)
+    result.right.get.get should be(
+      departure.messages.map(
+        x => x.id
+      )
+    )
+  }
+
+  "getDepartureMessageIds" should "return none if the departure doesn't exist" in {
+    val result = await(repository.getDepartureMessageIds(EORINumber("ABC"), DepartureId("XYZ")).value)
+    result.right.get.isEmpty should be(true)
+  }
+
   "getDepartureIds" should
     "return a list of departure ids for the supplied EORI sorted by last updated, latest first" in new DBSetup {
       val result = await(repository.getDepartureIds(eoriGB).value)
@@ -145,7 +166,6 @@ class DeparturesRepositorySpec
   }
 
   trait DBSetup {
-
     val eoriGB = EORINumber("GB00001")
     val eoriXI = EORINumber("XI00001")
 
@@ -179,6 +199,5 @@ class DeparturesRepositorySpec
     await(repository.insert(departure2).value)
     await(repository.insert(departure4).value)
     await(repository.insert(departure1).value)
-
   }
 }

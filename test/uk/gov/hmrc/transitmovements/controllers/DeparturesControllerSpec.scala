@@ -379,6 +379,39 @@ class DeparturesControllerSpec
     }
   }
 
+  "getDepartureMessageIds" - {
+
+    val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, departureId).url)
+
+    "must return OK and a list of message ids" in {
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+        .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageId))))
+
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.toJson(messageIdList)(nonEmptyListFormat(messageIdFormat))
+    }
+
+    "must return NOT_FOUND if no departure found" in {
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+        .thenReturn(EitherT.rightT(None))
+
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
+
+      status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+        .thenReturn(EitherT.leftT(UnexpectedError(None)))
+
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+  }
+
   "getDepartureIds" - {
     val request = FakeRequest("GET", routes.DeparturesController.getDepartureIds(eoriNumber).url)
 
