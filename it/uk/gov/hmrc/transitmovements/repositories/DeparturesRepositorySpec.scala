@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovements.repositories
 import cats.data.NonEmptyList
 import org.mongodb.scala.model.Filters
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalatest.BeforeAndAfter
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -67,6 +68,8 @@ class DeparturesRepositorySpec
   private val appConfig              = app.injector.instanceOf[AppConfig]
 
   override lazy val repository = new DeparturesRepositoryImpl(appConfig, mongoComponent)
+
+  lazy val dbSetup = new DBSetup {}
 
   "DepartureMovementRepository" should "have the correct name" in {
     repository.collectionName shouldBe "departure_movements"
@@ -146,22 +149,22 @@ class DeparturesRepositorySpec
   }
 
   "getDepartureIds" should
-    "return a list of departure ids for the supplied EORI sorted by last updated, latest first" in new DBSetup {
-      val result = await(repository.getDepartureIds(eoriGB).value)
+    "return a list of departure ids for the supplied EORI sorted by last updated, latest first" in {
+      val result = await(repository.getDepartureIds(dbSetup.eoriGB).value)
 
       result.right.get.value should be(NonEmptyList(DepartureId("10004"), List(DepartureId("10001"))))
     }
 
-  it should "return no departure ids for an EORI that doesn't exist" in new DBSetup {
+  it should "return no departure ids for an EORI that doesn't exist" in {
     val result = await(repository.getDepartureIds(EORINumber("FR999")).value)
 
     result.right.get should be(None)
   }
 
-  it should "return no departure ids when the db is empty" in new DBSetup {
+  it should "return no departure ids when the db is empty" in {
     await(repository.collection.drop().toFuture())
     val result = await(repository.getDepartureIds(EORINumber("FR999")).value)
-
+    Thread.sleep(10000)
     result.right.get should be(None)
   }
 
