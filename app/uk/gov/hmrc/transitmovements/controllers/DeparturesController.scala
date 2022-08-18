@@ -35,7 +35,7 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.services.DepartureFactory
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
-import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
+import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 
@@ -57,7 +57,7 @@ class DeparturesController @Inject() (
     with StreamingParsers
     with ConvertError
     with TemporaryFiles
-    with ModelFormats {
+    with PresentationFormats {
 
   def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
     implicit request =>

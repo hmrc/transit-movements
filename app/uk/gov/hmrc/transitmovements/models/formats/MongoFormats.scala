@@ -24,23 +24,13 @@ import uk.gov.hmrc.mongo.play.json.formats.MongoBinaryFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
 import uk.gov.hmrc.transitmovements.models.Departure
-import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
-import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageType
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-trait ModelFormats extends CommonFormats with MongoBinaryFormats.Implicits with MongoJavatimeFormats.Implicits with MongoUuidFormats.Implicits {
-
-  implicit val eoriNumberFormat: Format[EORINumber]   = Json.valueFormat[EORINumber]
-  implicit val messageIdFormat: Format[MessageId]     = Json.valueFormat[MessageId]
-  implicit val departureIdFormat: Format[DepartureId] = Json.valueFormat[DepartureId]
-
-  implicit val messageTypeFormat: Format[MessageType] = enumFormat(MessageType.values)(_.code)
+trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with MongoJavatimeFormats.Implicits with MongoUuidFormats.Implicits {
 
   implicit val offsetDateTimeReads: Reads[OffsetDateTime] = Reads {
     value =>
@@ -55,10 +45,11 @@ trait ModelFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
     value => jatLocalDateTimeFormat.writes(value.toLocalDateTime)
   }
 
-  implicit val messageFormat: Format[Message]     = Json.format[Message]
-  implicit val departureFormat: Format[Departure] = Json.format[Departure]
-
+  // these use the dates above, so need to be here for compile-time macro expansion
+  implicit val messageFormat: Format[Message]                                   = Json.format[Message]
+  implicit val departureFormat: Format[Departure]                               = Json.format[Departure]
   implicit val departureWithoutMessagesFormat: Format[DepartureWithoutMessages] = Json.format[DepartureWithoutMessages]
+
 }
 
-object ModelFormats extends ModelFormats
+object MongoFormats extends MongoFormats

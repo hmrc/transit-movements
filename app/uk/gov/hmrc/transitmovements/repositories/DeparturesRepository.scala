@@ -39,7 +39,7 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
-import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
+import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError._
@@ -80,17 +80,17 @@ class DeparturesRepositoryImpl @Inject() (
     extends PlayMongoRepository[Departure](
       mongoComponent = mongoComponent,
       collectionName = "departure_movements",
-      domainFormat = ModelFormats.departureFormat,
+      domainFormat = MongoFormats.departureFormat,
       indexes = Seq(
         IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS))
       ),
       extraCodecs = Seq(
-        Codecs.playFormatCodec(ModelFormats.departureFormat),
-        Codecs.playFormatCodec(ModelFormats.messageFormat),
-        Codecs.playFormatCodec(ModelFormats.departureWithoutMessagesFormat),
-        Codecs.playFormatCodec(ModelFormats.messageIdFormat),
-        Codecs.playFormatCodec(ModelFormats.departureWithoutMessagesFormat),
-        Codecs.playFormatCodec(ModelFormats.departureIdFormat),
+        Codecs.playFormatCodec(MongoFormats.departureFormat),
+        Codecs.playFormatCodec(MongoFormats.messageFormat),
+        Codecs.playFormatCodec(MongoFormats.departureWithoutMessagesFormat),
+        Codecs.playFormatCodec(MongoFormats.messageIdFormat),
+        Codecs.playFormatCodec(MongoFormats.departureWithoutMessagesFormat),
+        Codecs.playFormatCodec(MongoFormats.departureIdFormat),
         Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format),
         Codecs.playFormatCodec(GetDepartureIdsDTO.format)
       )

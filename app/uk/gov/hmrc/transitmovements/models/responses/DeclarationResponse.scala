@@ -20,9 +20,9 @@ import play.api.libs.json.Json
 import play.api.libs.json.OFormat
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.formats.ModelFormats._
+import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 
-object DeclarationResponse {
+object DeclarationResponse extends PresentationFormats {
   implicit val declarationResponseFormat: OFormat[DeclarationResponse] = Json.format[DeclarationResponse]
 }
 
