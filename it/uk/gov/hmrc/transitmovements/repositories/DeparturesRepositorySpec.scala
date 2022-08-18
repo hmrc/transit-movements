@@ -144,22 +144,24 @@ class DeparturesRepositorySpec
   }
 
   "getDepartureMessageIds" should "return messageIds if there are messages that were received since the given time" in {
+    val dateTime = arbitrary[OffsetDateTime].sample.value
+
     val messages =
       NonEmptyList
         .fromList(
-          List(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value)
-            .sortBy(_.received)
-            .reverse
+          List(
+            arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1)),
+            arbitraryMessage.arbitrary.sample.value.copy(received = dateTime),
+            arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1))
+          )
         )
         .value
-    // get the second time on the list, we should get two back
-    val filterTime = Some(messages.tail.head.received)
 
     val departure = arbitrary[Departure].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getDepartureMessageIds(departure.enrollmentEORINumber, departure._id, filterTime).value)
+    val result = await(repository.getDepartureMessageIds(departure.enrollmentEORINumber, departure._id, Some(dateTime)).value)
     result.right.get.get should be(
       NonEmptyList.fromListUnsafe(
         departure.messages
