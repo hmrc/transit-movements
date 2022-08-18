@@ -196,7 +196,6 @@ class DeparturesRepositorySpec
   it should "return no departure ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
     val result = await(repository.getDepartureIds(EORINumber("FR999")).value)
-    Thread.sleep(10000)
     result.right.get should be(None)
   }
 
