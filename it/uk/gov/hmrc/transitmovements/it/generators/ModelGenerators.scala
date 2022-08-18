@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.generators
+package uk.gov.hmrc.transitmovements.it.generators
 
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
@@ -28,7 +28,9 @@ import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 
 import java.net.URI
+import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 trait ModelGenerators extends BaseGenerators {
 
@@ -70,6 +72,14 @@ trait ModelGenerators extends BaseGenerators {
         country <- Gen.pick(2, 'A' to 'Z')
         serial  <- Gen.pick(13, ('A' to 'Z') ++ ('0' to '9'))
       } yield MovementReferenceNumber(year ++ country.mkString ++ serial.mkString)
+    }
+
+  // Restricts the date times to the range of positive long numbers to avoid overflows.
+  implicit lazy val arbitraryOffsetDateTime: Arbitrary[OffsetDateTime] =
+    Arbitrary {
+      for {
+        millis <- Gen.chooseNum(0, Long.MaxValue / 1000L)
+      } yield OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
     }
 
   implicit lazy val arbitraryMessage: Arbitrary[Message] =

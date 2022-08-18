@@ -14,16 +14,22 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.responses
+package uk.gov.hmrc.transitmovements.models
 
-import play.api.libs.json.Json
-import play.api.libs.json.OFormat
-import uk.gov.hmrc.transitmovements.models.DepartureId
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
+import play.api.mvc.QueryStringBindable
 
-object DeclarationResponse extends PresentationFormats {
-  implicit val declarationResponseFormat: OFormat[DeclarationResponse] = Json.format[DeclarationResponse]
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
+
+object Bindings {
+
+  implicit val offsetDateTimeQueryStringBindable: QueryStringBindable[OffsetDateTime] = {
+    val formatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME
+    new QueryStringBindable.Parsing[OffsetDateTime](
+      OffsetDateTime.parse(_),
+      dt => formatter.format(dt),
+      (param, _) => s"Cannot parse parameter $param as a valid ISO 8601 timestamp, e.g. 2015-09-08T01:55:28+00:00"
+    )
+  }
+
 }
-
-case class DeclarationResponse(departureId: DepartureId, messageId: MessageId)

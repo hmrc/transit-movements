@@ -35,10 +35,11 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.services.DepartureFactory
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
-import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
+import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 
+import java.time.OffsetDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -56,7 +57,7 @@ class DeparturesController @Inject() (
     with StreamingParsers
     with ConvertError
     with TemporaryFiles
-    with ModelFormats {
+    with PresentationFormats {
 
   def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
     implicit request =>
@@ -88,9 +89,9 @@ class DeparturesController @Inject() (
       )
   }
 
-  def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId) = Action.async {
+  def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId, receivedSince: Option[OffsetDateTime] = None) = Action.async {
     repo
-      .getDepartureMessageIds(eoriNumber, departureId)
+      .getDepartureMessageIds(eoriNumber, departureId, receivedSince)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

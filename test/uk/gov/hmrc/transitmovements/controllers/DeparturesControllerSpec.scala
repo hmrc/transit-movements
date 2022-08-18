@@ -23,6 +23,7 @@ import akka.util.Timeout
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.{eq => eqTo}
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
 import org.scalatest.BeforeAndAfterEach
@@ -51,7 +52,6 @@ import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
@@ -60,6 +60,7 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.DepartureFactory
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
@@ -81,7 +82,7 @@ class DeparturesControllerSpec
     with OptionValues
     with ScalaFutures
     with BeforeAndAfterEach
-    with ModelFormats
+    with PresentationFormats
     with ModelGenerators {
 
   def fakeRequestDepartures[A](
@@ -325,7 +326,7 @@ class DeparturesControllerSpec
       val result = controller.getDepartureWithoutMessages(eoriNumber, departureId)(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.toJson(DepartureWithoutMessages.fromDeparture(departure))(departureWithoutMessagesFormat)
+      contentAsJson(result) mustBe Json.toJson(DepartureWithoutMessages.fromDeparture(departure))(PresentationFormats.departureWithoutMessagesFormat)
     }
 
     "must return NOT_FOUND if no departure found" in {
@@ -350,14 +351,14 @@ class DeparturesControllerSpec
   "getMessage" - {
     val request = FakeRequest("GET", routes.DeparturesController.getMessage(eoriNumber, departureId, messageId).url)
 
-    "must return OK if message found" in {
+    "must return OK if message found in the correct format" in {
       when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
         .thenReturn(EitherT.rightT(Some(message)))
 
       val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.toJson(message)(messageFormat)
+      contentAsJson(result) mustBe Json.toJson(message)(PresentationFormats.messageFormat)
     }
 
     "must return NOT_FOUND if no message found" in {
@@ -384,29 +385,29 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, departureId).url)
 
     "must return OK and a list of message ids" in {
-      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any()), eqTo(None)))
         .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageId))))
 
-      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId, None)(request)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.toJson(messageIdList)(nonEmptyListFormat(messageIdFormat))
     }
 
     "must return NOT_FOUND if no departure found" in {
-      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any()), eqTo(None)))
         .thenReturn(EitherT.rightT(None))
 
-      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId, None)(request)
 
       status(result) mustBe NOT_FOUND
     }
 
     "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
-      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any()), eqTo(None)))
         .thenReturn(EitherT.leftT(UnexpectedError(None)))
 
-      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId, None)(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
     }

@@ -17,8 +17,8 @@
 package uk.gov.hmrc.transitmovements.generators
 
 import org.scalacheck.Arbitrary
-import org.scalacheck.Gen
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
@@ -28,7 +28,9 @@ import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 
 import java.net.URI
+import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 trait ModelGenerators extends BaseGenerators {
 
@@ -41,16 +43,12 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryDepartureId: Arbitrary[DepartureId] =
     Arbitrary {
-      for {
-        id <- intWithMaxLength(9)
-      } yield DepartureId(id.toString)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(DepartureId)
     }
 
   implicit lazy val arbitraryMessageId: Arbitrary[MessageId] =
     Arbitrary {
-      for {
-        id <- intWithMaxLength(9)
-      } yield MessageId(id.toString)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MessageId)
     }
 
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
@@ -70,6 +68,14 @@ trait ModelGenerators extends BaseGenerators {
         country <- Gen.pick(2, 'A' to 'Z')
         serial  <- Gen.pick(13, ('A' to 'Z') ++ ('0' to '9'))
       } yield MovementReferenceNumber(year ++ country.mkString ++ serial.mkString)
+    }
+
+  // Restricts the date times to the range of positive long numbers to avoid overflows.
+  implicit lazy val arbitraryOffsetDateTime: Arbitrary[OffsetDateTime] =
+    Arbitrary {
+      for {
+        millis <- Gen.chooseNum(0, Long.MaxValue / 1000L)
+      } yield OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
     }
 
   implicit lazy val arbitraryMessage: Arbitrary[Message] =
