@@ -326,7 +326,7 @@ class DeparturesControllerSpec
       val result = controller.getDepartureWithoutMessages(eoriNumber, departureId)(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.toJson(DepartureWithoutMessages.fromDeparture(departure))(departureWithoutMessagesFormat)
+      contentAsJson(result) mustBe Json.toJson(DepartureWithoutMessages.fromDeparture(departure))(PresentationFormats.departureWithoutMessagesFormat)
     }
 
     "must return NOT_FOUND if no departure found" in {
@@ -351,14 +351,14 @@ class DeparturesControllerSpec
   "getMessage" - {
     val request = FakeRequest("GET", routes.DeparturesController.getMessage(eoriNumber, departureId, messageId).url)
 
-    "must return OK if message found" in {
+    "must return OK if message found in the correct format" in {
       when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
         .thenReturn(EitherT.rightT(Some(message)))
 
       val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.toJson(message)(messageFormat)
+      contentAsJson(result) mustBe Json.toJson(message)(PresentationFormats.messageFormat)
     }
 
     "must return NOT_FOUND if no message found" in {
