@@ -23,6 +23,7 @@ import akka.util.Timeout
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.{eq => eqTo}
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
 import org.scalatest.BeforeAndAfterEach
@@ -384,29 +385,29 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, departureId).url)
 
     "must return OK and a list of message ids" in {
-      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any()), eqTo(None)))
         .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageId))))
 
-      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId, None)(request)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.toJson(messageIdList)(nonEmptyListFormat(messageIdFormat))
     }
 
     "must return NOT_FOUND if no departure found" in {
-      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any()), eqTo(None)))
         .thenReturn(EitherT.rightT(None))
 
-      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId, None)(request)
 
       status(result) mustBe NOT_FOUND
     }
 
     "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
-      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any())))
+      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any()), eqTo(None)))
         .thenReturn(EitherT.leftT(UnexpectedError(None)))
 
-      val result = controller.getDepartureMessageIds(eoriNumber, departureId)(request)
+      val result = controller.getDepartureMessageIds(eoriNumber, departureId, None)(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
     }

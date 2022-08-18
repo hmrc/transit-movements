@@ -23,6 +23,7 @@ import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.{ne => mNe}
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
+import com.mongodb.client.model.Filters.{gte => mGte}
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model._
@@ -39,9 +40,13 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
+import uk.gov.hmrc.transitmovements.repositories.DeparturesRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import scala.concurrent._
@@ -55,8 +60,17 @@ trait DeparturesRepository {
   def insert(departure: Departure): EitherT[Future, MongoError, Unit]
   def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
   def getMessage(eoriNumber: EORINumber, departureId: DepartureId, movementId: MessageId): EitherT[Future, MongoError, Option[Message]]
-  def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]]
+
+  def getDepartureMessageIds(
+    eoriNumber: EORINumber,
+    departureId: DepartureId,
+    received: Option[OffsetDateTime]
+  ): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]]
   def getDepartureIds(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureId]]]
+}
+
+object DeparturesRepositoryImpl {
+  val EPOCH_TIME: LocalDateTime = LocalDateTime.ofEpochSecond(0, 0, ZoneOffset.UTC)
 }
 
 class DeparturesRepositoryImpl @Inject() (
@@ -120,15 +134,26 @@ class DeparturesRepositoryImpl @Inject() (
     })
   }
 
-  def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]] = {
+  def getDepartureMessageIds(
+    eoriNumber: EORINumber,
+    departureId: DepartureId,
+    receivedSince: Option[OffsetDateTime]
+  ): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]] = {
 
-    val selector = mAnd(mEq("_id", departureId.value), mEq("enrollmentEORINumber", eoriNumber.value))
+    val selector = mAnd(
+      mEq("_id", departureId.value),
+      mEq("enrollmentEORINumber", eoriNumber.value)
+    )
+
+    val dateTimeSelector = mGte("messages.received", receivedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME))
 
     val aggregates =
       Seq(
         Aggregates.filter(selector),
+        Aggregates.unwind("$messages"),
+        Aggregates.filter(dateTimeSelector),
+        Aggregates.sort(descending("messages.received")),
         Aggregates.group(null, Accumulators.push("result", "$messages.id")),
-        Aggregates.unwind("$result"),
         Aggregates.project(BsonDocument("_id" -> 0, "result" -> 1))
       )
 

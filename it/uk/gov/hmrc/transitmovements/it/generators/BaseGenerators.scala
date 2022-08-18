@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.generators
+package uk.gov.hmrc.transitmovements.it.generators
 
 import cats.data.NonEmptyList
+import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
 import org.scalacheck.Gen.listOfN
 import org.scalacheck.Gen.numChar
-import org.scalacheck.Arbitrary
-import org.scalacheck.Gen
 
 trait BaseGenerators {
 

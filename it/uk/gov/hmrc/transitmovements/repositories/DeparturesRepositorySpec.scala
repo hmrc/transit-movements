@@ -19,20 +19,19 @@ package uk.gov.hmrc.transitmovements.repositories
 import cats.data.NonEmptyList
 import org.mongodb.scala.model.Filters
 import org.scalacheck.Arbitrary.arbitrary
-import org.scalatest.BeforeAndAfter
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.Application
 import play.api.Logging
+import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.DefaultAwaitTimeout
 import play.api.test.FutureAwaits
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.generators.ModelGenerators
+import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
@@ -69,8 +68,6 @@ class DeparturesRepositorySpec
 
   override lazy val repository = new DeparturesRepositoryImpl(appConfig, mongoComponent)
 
-  lazy val dbSetup = new DBSetup {}
-
   "DepartureMovementRepository" should "have the correct name" in {
     repository.collectionName shouldBe "departure_movements"
   }
@@ -78,7 +75,6 @@ class DeparturesRepositorySpec
   "insert" should "add the given departure to the database" in {
 
     val departure = arbitrary[Departure].sample.value.copy(_id = DepartureId("2"))
-
     await(
       repository.insert(departure).value
     )
@@ -129,13 +125,17 @@ class DeparturesRepositorySpec
   "getDepartureMessageIds" should "return messageIds if there are messages" in {
     val messages =
       NonEmptyList
-        .fromList(List(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value))
+        .fromList(
+          List(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value)
+            .sortBy(_.received)
+            .reverse
+        )
         .value
     val departure = arbitrary[Departure].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getDepartureMessageIds(departure.enrollmentEORINumber, departure._id).value)
+    val result = await(repository.getDepartureMessageIds(departure.enrollmentEORINumber, departure._id, None).value)
     result.right.get.get should be(
       departure.messages.map(
         x => x.id
@@ -143,64 +143,99 @@ class DeparturesRepositorySpec
     )
   }
 
+  "getDepartureMessageIds" should "return messageIds if there are messages that were received since the given time" in {
+    val messages =
+      NonEmptyList
+        .fromList(
+          List(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value)
+            .sortBy(_.received)
+            .reverse
+        )
+        .value
+    // get the second time on the list, we should get two back
+    val filterTime = Some(messages.tail.head.received)
+
+    val departure = arbitrary[Departure].sample.value.copy(messages = messages)
+
+    await(repository.insert(departure).value)
+
+    val result = await(repository.getDepartureMessageIds(departure.enrollmentEORINumber, departure._id, filterTime).value)
+    result.right.get.get should be(
+      NonEmptyList.fromListUnsafe(
+        departure.messages
+          .take(2)
+          .map(
+            x => x.id
+          )
+      )
+    )
+  }
+
   "getDepartureMessageIds" should "return none if the departure doesn't exist" in {
-    val result = await(repository.getDepartureMessageIds(EORINumber("ABC"), DepartureId("XYZ")).value)
+    val result = await(repository.getDepartureMessageIds(EORINumber("ABC"), DepartureId("XYZ"), None).value)
     result.right.get.isEmpty should be(true)
   }
 
   "getDepartureIds" should
     "return a list of departure ids for the supplied EORI sorted by last updated, latest first" in {
-      val result = await(repository.getDepartureIds(dbSetup.eoriGB).value)
+      GetDeparturesSetup.setup()
+      val result = await(repository.getDepartureIds(GetDeparturesSetup.eoriGB).value)
 
       result.right.get.value should be(NonEmptyList(DepartureId("10004"), List(DepartureId("10001"))))
     }
 
   it should "return no departure ids for an EORI that doesn't exist" in {
+    GetDeparturesSetup.setup()
     val result = await(repository.getDepartureIds(EORINumber("FR999")).value)
 
     result.right.get should be(None)
   }
 
   it should "return no departure ids when the db is empty" in {
-    await(repository.collection.drop().toFuture())
+    // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
     val result = await(repository.getDepartureIds(EORINumber("FR999")).value)
     Thread.sleep(10000)
     result.right.get should be(None)
   }
 
-  trait DBSetup {
+  object GetDeparturesSetup {
+
     val eoriGB = EORINumber("GB00001")
     val eoriXI = EORINumber("XI00001")
 
-    val departure1 = Departure(
-      _id = DepartureId("10001"),
-      enrollmentEORINumber = eoriGB,
-      movementEORINumber = EORINumber("20001"),
-      movementReferenceNumber = None,
-      created = instant,
-      updated = instant,
-      messages = NonEmptyList(
-        Message(
-          id = MessageId("00011"),
-          received = instant,
-          generated = instant,
-          messageType = MessageType.DeclarationData,
-          triggerId = None,
-          url = None,
-          body = None
-        ),
-        tail = List.empty
+    def setup() {
+
+      val departure1 = Departure(
+        _id = DepartureId("10001"),
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = EORINumber("20001"),
+        movementReferenceNumber = None,
+        created = instant,
+        updated = instant,
+        messages = NonEmptyList(
+          Message(
+            id = MessageId("00011"),
+            received = instant,
+            generated = instant,
+            messageType = MessageType.DeclarationData,
+            triggerId = None,
+            url = None,
+            body = None
+          ),
+          tail = List.empty
+        )
       )
-    )
 
-    val departure2 = departure1.copy(_id = DepartureId("10002"), enrollmentEORINumber = eoriXI, updated = instant.plusMinutes(1))
-    val departure3 = departure1.copy(_id = DepartureId("10003"), enrollmentEORINumber = eoriXI, updated = instant.minusMinutes(3))
-    val departure4 = departure1.copy(_id = DepartureId("10004"), enrollmentEORINumber = eoriGB, updated = instant.plusMinutes(1))
+      val departure2 = departure1.copy(_id = DepartureId("10002"), enrollmentEORINumber = eoriXI, updated = instant.plusMinutes(1))
+      val departure3 = departure1.copy(_id = DepartureId("10003"), enrollmentEORINumber = eoriXI, updated = instant.minusMinutes(3))
+      val departure4 = departure1.copy(_id = DepartureId("10004"), enrollmentEORINumber = eoriGB, updated = instant.plusMinutes(1))
 
-    //populate db in non-time order
-    await(repository.insert(departure3).value)
-    await(repository.insert(departure2).value)
-    await(repository.insert(departure4).value)
-    await(repository.insert(departure1).value)
+      //populate db in non-time order
+      await(repository.insert(departure3).value)
+      await(repository.insert(departure2).value)
+      await(repository.insert(departure4).value)
+      await(repository.insert(departure1).value)
+    }
+
   }
 }

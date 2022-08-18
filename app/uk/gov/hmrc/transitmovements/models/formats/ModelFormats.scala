@@ -18,6 +18,8 @@ package uk.gov.hmrc.transitmovements.models.formats
 
 import play.api.libs.json.Format
 import play.api.libs.json.Json
+import play.api.libs.json.Reads
+import play.api.libs.json.Writes
 import uk.gov.hmrc.mongo.play.json.formats.MongoBinaryFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
@@ -29,6 +31,9 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+
 trait ModelFormats extends CommonFormats with MongoBinaryFormats.Implicits with MongoJavatimeFormats.Implicits with MongoUuidFormats.Implicits {
 
   implicit val eoriNumberFormat: Format[EORINumber]   = Json.valueFormat[EORINumber]
@@ -36,6 +41,19 @@ trait ModelFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
   implicit val departureIdFormat: Format[DepartureId] = Json.valueFormat[DepartureId]
 
   implicit val messageTypeFormat: Format[MessageType] = enumFormat(MessageType.values)(_.code)
+
+  implicit val offsetDateTimeReads: Reads[OffsetDateTime] = Reads {
+    value =>
+      jatLocalDateTimeFormat
+        .reads(value)
+        .map(
+          localDateTime => localDateTime.atOffset(ZoneOffset.UTC)
+        )
+  }
+
+  implicit val offsetDateTimeWrites: Writes[OffsetDateTime] = Writes {
+    value => jatLocalDateTimeFormat.writes(value.toLocalDateTime)
+  }
 
   implicit val messageFormat: Format[Message]     = Json.format[Message]
   implicit val departureFormat: Format[Departure] = Json.format[Departure]

@@ -39,6 +39,7 @@ import uk.gov.hmrc.transitmovements.models.formats.ModelFormats
 import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 
+import java.time.OffsetDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -88,9 +89,9 @@ class DeparturesController @Inject() (
       )
   }
 
-  def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId) = Action.async {
+  def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId, receivedSince: Option[OffsetDateTime] = None) = Action.async {
     repo
-      .getDepartureMessageIds(eoriNumber, departureId)
+      .getDepartureMessageIds(eoriNumber, departureId, receivedSince)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
