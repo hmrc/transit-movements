@@ -9,3 +9,5 @@ GET        /traders/:EORI/movements/departures/:departureId                     
 GET        /traders/:EORI/movements/departures/:departureId/messages                uk.gov.hmrc.transitmovements.controllers.DeparturesController.getDepartureMessageIds(EORI: EORINumber, departureId: DepartureId, receivedSince: Option[OffsetDateTime] ?= None)
 
 GET        /traders/:EORI/movements/departures/:departureId/messages/:messageId     uk.gov.hmrc.transitmovements.controllers.DeparturesController.getMessage(EORI: EORINumber, departureId: DepartureId, messageId: MessageId)
+
+POST       /traders/movements/:movementId/messages/:triggerId                       uk.gov.hmrc.transitmovements.controllers.MovementsController.updateMovement(movementId: MovementId, triggerId: TriggerId)

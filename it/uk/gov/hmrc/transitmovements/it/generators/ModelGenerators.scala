@@ -26,6 +26,7 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.TriggerId
 
 import java.net.URI
 import java.time.Instant
@@ -53,6 +54,13 @@ trait ModelGenerators extends BaseGenerators {
       for {
         id <- intWithMaxLength(9)
       } yield MessageId(id.toString)
+    }
+
+  implicit lazy val arbitraryTriggerId: Arbitrary[TriggerId] =
+    Arbitrary {
+      for {
+        id <- intWithMaxLength(9)
+      } yield TriggerId(id.toString)
     }
 
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
@@ -89,7 +97,7 @@ trait ModelGenerators extends BaseGenerators {
         received    <- arbitrary[OffsetDateTime]
         generated   <- arbitrary[OffsetDateTime]
         messageType <- arbitrary[MessageType]
-        triggerId   <- arbitrary[Option[MessageId]]
+        triggerId   <- arbitrary[Option[TriggerId]]
         url         <- arbitrary[Option[URI]]
         body        <- arbitrary[Option[String]]
       } yield Message(id, received, generated, messageType, triggerId, url, body)

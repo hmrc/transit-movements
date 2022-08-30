@@ -33,8 +33,10 @@ import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.services.DepartureFactory
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
+import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
@@ -46,7 +48,8 @@ import javax.inject.Singleton
 @Singleton
 class DeparturesController @Inject() (
   cc: ControllerComponents,
-  factory: DepartureFactory,
+  departureFactory: DepartureFactory,
+  messageFactory: MessageFactory,
   repo: DeparturesRepository,
   xmlParsingService: DeparturesXmlParsingService,
   val temporaryFileCreator: TemporaryFileCreator
@@ -66,8 +69,9 @@ class DeparturesController @Inject() (
           (for {
             declarationData <- xmlParsingService.extractDeclarationData(source).asPresentation
             fileSource = FileIO.fromPath(temporaryFile)
-            departure <- factory.create(eori, declarationData, fileSource).asPresentation
-            _         <- repo.insert(departure).asPresentation
+            message <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, None, fileSource).asPresentation
+            departure = departureFactory.create(eori, declarationData, message)
+            _ <- repo.insert(departure).asPresentation
           } yield DeclarationResponse(departure._id, departure.messages.head.id)).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
             response => Ok(Json.toJson(response))

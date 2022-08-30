@@ -24,6 +24,8 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -146,6 +148,39 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
           error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'notadatetime' could not be parsed at index 0"
       }
     }
+  }
+
+  "MessageType parser" - {
+
+    val validMessageType: NodeSeq =
+      <CC015C>
+        <HolderOfTheTransitProcedure>
+          <identificationNumber>GB1234</identificationNumber>
+        </HolderOfTheTransitProcedure>
+      </CC015C>
+
+    val invalidMessageType: NodeSeq =
+      <XYZ>
+      </XYZ>
+
+    "when provided with a valid message type" in {
+      val stream       = createParsingEventStream(validMessageType)
+      val parsedResult = stream.via(XmlParsers.messageTypeExtractor).runWith(Sink.head)
+
+      whenReady(parsedResult) {
+        _ mustBe Right(MessageType.DeclarationData)
+      }
+    }
+
+    "when provided with an invalid message type" in {
+      val stream       = createParsingEventStream(invalidMessageType)
+      val parsedResult = stream.via(XmlParsers.messageTypeExtractor).runWith(Sink.head)
+
+      whenReady(parsedResult) {
+        _ mustBe Left(ParseError.UnexpectedError(None))
+      }
+    }
+
   }
 
 }

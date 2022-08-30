@@ -38,12 +38,14 @@ import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 
+import java.time.Clock
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -59,7 +61,7 @@ import scala.util.control.NonFatal
 trait DeparturesRepository {
   def insert(departure: Departure): EitherT[Future, MongoError, Unit]
   def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
-  def getMessage(eoriNumber: EORINumber, departureId: DepartureId, movementId: MessageId): EitherT[Future, MongoError, Option[Message]]
+  def getMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[Message]]
 
   def getDepartureMessageIds(
     eoriNumber: EORINumber,
@@ -67,6 +69,7 @@ trait DeparturesRepository {
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]]
   def getDepartureIds(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureId]]]
+  def updateMessages(movementId: MovementId, message: Message): EitherT[Future, MongoError, Unit]
 }
 
 object DeparturesRepositoryImpl {
@@ -75,7 +78,8 @@ object DeparturesRepositoryImpl {
 
 class DeparturesRepositoryImpl @Inject() (
   appConfig: AppConfig,
-  mongoComponent: MongoComponent
+  mongoComponent: MongoComponent,
+  clock: Clock
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[Departure](
       mongoComponent = mongoComponent,
@@ -215,4 +219,28 @@ class DeparturesRepositoryImpl @Inject() (
     })
 
   }
+
+  def updateMessages(movementId: MovementId, message: Message): EitherT[Future, MongoError, Unit] = {
+    val idFilter = Aggregates.filter(mEq("_id", movementId.value))
+
+    val update = Seq(
+      Aggregates.group(idFilter, Accumulators.push("messages", message)),
+      Aggregates.set(Field("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC).toString))
+    )
+
+    mongoRetry(Try(collection.updateOne(idFilter, update)) match {
+      case Success(obs) =>
+        obs.toFuture().map {
+          result =>
+            if (result.wasAcknowledged()) {
+              Right(())
+            } else {
+              Left(UpdateNotAcknowledged(s"Message update failed for departure"))
+            }
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+  }
+
 }

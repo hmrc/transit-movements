@@ -16,15 +16,4 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import java.net.URI
-import java.time.OffsetDateTime
-
-case class Message(
-  id: MessageId,
-  received: OffsetDateTime,
-  generated: OffsetDateTime,
-  messageType: MessageType,
-  triggerId: Option[TriggerId],
-  url: Option[URI],
-  body: Option[String]
-)
+case class MovementId(value: String) extends AnyVal

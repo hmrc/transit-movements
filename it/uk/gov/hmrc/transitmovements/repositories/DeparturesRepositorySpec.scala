@@ -40,6 +40,7 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 
+import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -65,8 +66,9 @@ class DeparturesRepositorySpec
 
   implicit lazy val app: Application = GuiceApplicationBuilder().configure().build()
   private val appConfig              = app.injector.instanceOf[AppConfig]
+  private val clockConfig            = app.injector.instanceOf[Clock]
 
-  override lazy val repository = new DeparturesRepositoryImpl(appConfig, mongoComponent)
+  override lazy val repository = new DeparturesRepositoryImpl(appConfig, mongoComponent, clockConfig)
 
   "DepartureMovementRepository" should "have the correct name" in {
     repository.collectionName shouldBe "departure_movements"

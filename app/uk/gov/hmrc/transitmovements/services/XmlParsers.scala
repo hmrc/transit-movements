@@ -21,6 +21,7 @@ import akka.stream.alpakka.xml.ParseEvent
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.scaladsl.Flow
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.LocalDateTime
@@ -47,5 +48,25 @@ object XmlParsers extends XmlParsingServiceHelpers {
     .recover {
       case exception: DateTimeParseException => Left(ParseError.BadDateTime("preparationDateAndTime", exception))
     }
+
+  val messageTypeExtractor: Flow[ParseEvent, ParseResult[MessageType], NotUsed] = {
+    val messageType = for {
+      mType <- MessageType.values
+      if XmlParsing.subtree(mType.rootNode :: Nil).shape.outlets.nonEmpty
+    } yield mType
+
+    XmlParsing
+      .subtree(messageType.head.rootNode :: Nil)
+      .collect {
+        case element if element.getTagName == messageType.head.rootNode =>
+          messageType.head
+      }
+      .single(messageType.head.rootNode)
+      .recover {
+        case _ => Left(ParseError.MessageTypeNotFound())
+
+      }
+
+  }
 
 }
