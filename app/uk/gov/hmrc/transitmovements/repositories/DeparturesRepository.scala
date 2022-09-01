@@ -25,6 +25,7 @@ import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
 import com.mongodb.client.model.Filters.{gte => mGte}
 import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.bson.BsonObjectId
 import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
@@ -221,14 +222,14 @@ class DeparturesRepositoryImpl @Inject() (
   }
 
   def updateMessages(movementId: MovementId, message: Message): EitherT[Future, MongoError, Unit] = {
-    val idFilter = Aggregates.filter(mEq("_id", movementId.value))
+    val idFilter = mAnd(mNe("_id", "-1"), mEq("_id", movementId.value))
 
     val update = Seq(
-      Aggregates.group(idFilter, Accumulators.push("messages", message)),
-      Aggregates.set(Field("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC).toString))
+      Aggregates.set(Field("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC).toString)),
+      Aggregates.group(null, Accumulators.addToSet("$messages", message))
     )
 
-    mongoRetry(Try(collection.updateOne(idFilter, update)) match {
+    mongoRetry(Try(collection.updateOne(Filters.eq("_id", BsonObjectId(movementId.value)), update)) match {
       case Success(obs) =>
         obs.toFuture().map {
           result =>

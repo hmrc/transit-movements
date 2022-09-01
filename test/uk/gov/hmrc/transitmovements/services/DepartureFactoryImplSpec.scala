@@ -45,22 +45,10 @@ class DepartureFactoryImplSpec extends SpecBase with ScalaFutures with Matchers 
   "create" - {
     val sut = new DepartureFactoryImpl(clock, random)
 
-    "will create a departure with a message when given a stream" in {
+    "will create a departure with a message" in {
       val departure = sut.create(EORINumber("1"), DeclarationData(EORINumber("1"), instant), arbitraryMessage.arbitrary.sample.get)
 
       departure.messages.length mustBe 1
     }
-
-//    "will return a Left when a NonFatal exception is thrown as a StreamError" in {
-//      val stream = FileIO.fromPath(tempFile.path)
-//
-//      val result = sut.create(EORINumber("1"), DeclarationData(EORINumber("1"), instant), stream)
-//
-//      whenReady(result.value) {
-//        r =>
-//          r.isLeft mustBe true
-//          r.left.get.isInstanceOf[StreamError] mustBe true
-//      }
-//    }
   }
 }

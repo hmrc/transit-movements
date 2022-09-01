@@ -153,11 +153,11 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
   "MessageType parser" - {
 
     val validMessageType: NodeSeq =
-      <CC015C>
+      <CC007C>
         <HolderOfTheTransitProcedure>
           <identificationNumber>GB1234</identificationNumber>
         </HolderOfTheTransitProcedure>
-      </CC015C>
+      </CC007C>
 
     val invalidMessageType: NodeSeq =
       <XYZ>
@@ -168,7 +168,7 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
       val parsedResult = stream.via(XmlParsers.messageTypeExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _ mustBe Right(MessageType.DeclarationData)
+        _ mustBe Right(MessageType.ArrivalNotification)
       }
     }
 
@@ -177,7 +177,7 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
       val parsedResult = stream.via(XmlParsers.messageTypeExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _ mustBe Left(ParseError.UnexpectedError(None))
+        _ mustBe Left(ParseError.InvalidMessageType())
       }
     }
 

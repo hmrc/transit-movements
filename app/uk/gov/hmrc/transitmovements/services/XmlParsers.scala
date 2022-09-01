@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovements.services
 
 import akka.NotUsed
 import akka.stream.alpakka.xml.ParseEvent
+import akka.stream.alpakka.xml.StartElement
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.scaladsl.Flow
 import uk.gov.hmrc.transitmovements.models.EORINumber
@@ -49,24 +50,20 @@ object XmlParsers extends XmlParsingServiceHelpers {
       case exception: DateTimeParseException => Left(ParseError.BadDateTime("preparationDateAndTime", exception))
     }
 
-  val messageTypeExtractor: Flow[ParseEvent, ParseResult[MessageType], NotUsed] = {
-    val messageType = for {
-      mType <- MessageType.values
-      if XmlParsing.subtree(mType.rootNode :: Nil).shape.outlets.nonEmpty
-    } yield mType
-
-    XmlParsing
-      .subtree(messageType.head.rootNode :: Nil)
-      .collect {
-        case element if element.getTagName == messageType.head.rootNode =>
-          messageType.head
-      }
-      .single(messageType.head.rootNode)
-      .recover {
-        case _ => Left(ParseError.MessageTypeNotFound())
-
-      }
-
-  }
+  val messageTypeExtractor: Flow[ParseEvent, ParseResult[MessageType], NotUsed] = Flow[ParseEvent]
+    .statefulMapConcat {
+      () =>
+        _ match {
+          case s: StartElement if MessageType.values.exists(_.rootNode == s.localName) =>
+            Seq(MessageType.values.find(_.rootNode == s.localName).get)
+          case _ => Seq.empty
+        }
+    }
+    .prefixAndTail(1)
+    .map {
+      messageTypeAndSource =>
+        if (messageTypeAndSource._1.isEmpty) Left(ParseError.InvalidMessageType())
+        else Right(messageTypeAndSource._1.head)
+    }
 
 }

@@ -164,7 +164,7 @@ class MovementsControllerSpec
 
     "must return BAD_REQUEST when XML data extraction fails" - {
 
-      "contains message to indicate message type not found" in {
+      "contains message to indicate an invalid message type" in {
 
         val xml: NodeSeq =
           <ELEM></ELEM>
@@ -175,7 +175,7 @@ class MovementsControllerSpec
         when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]]))
           .thenReturn(
             EitherT.leftT(
-              ParseError.UnexpectedError(Some(new NoSuchElementException("No element found")))
+              ParseError.InvalidMessageType()
             )
           )
 
@@ -190,10 +190,10 @@ class MovementsControllerSpec
         val result =
           controller.updateMovement(movementId, triggerId)(request)
 
-        status(result) mustBe INTERNAL_SERVER_ERROR
+        status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code"    -> "INTERNAL_SERVER_ERROR",
-          "message" -> "Internal server error"
+          "code"    -> "BAD_REQUEST",
+          "message" -> "No valid message type found"
         )
       }
 

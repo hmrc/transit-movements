@@ -17,9 +17,13 @@
 package uk.gov.hmrc.transitmovements.services
 
 import akka.stream.scaladsl.Sink
+import akka.util.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatest.time.Millis
+import org.scalatest.time.Seconds
+import org.scalatest.time.Span
 import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.MessageData
@@ -36,13 +40,16 @@ class MessageXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Ma
   private val testDate      = OffsetDateTime.now(ZoneOffset.UTC)
   private val UTCDateString = testDate.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
 
+  implicit val defaultPatience =
+    PatienceConfig(timeout = Span(6, Seconds))
+
   val validXml: NodeSeq =
-    <CC004C>
+    <CC015C>
       <HolderOfTheTransitProcedure>
         <identificationNumber>GB1234</identificationNumber>
       </HolderOfTheTransitProcedure>
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
-    </CC004C>
+    </CC015C>
 
   val invalidMessageType: NodeSeq =
     <CCInvalid>
@@ -85,17 +92,17 @@ class MessageXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Ma
       val result = service.extractMessageData(source)
 
       whenReady(result.value) {
-        _ mustBe Right(MessageData(MessageType.AmendmentAcceptance, testDate))
+        _ mustBe Right(MessageData(MessageType.DeclarationData, testDate))
       }
     }
 
-    "if it doesn't have a valid message type, return ParseError.MessageTypeNotFound" in {
-      val source = createStream(validXml)
+    "if it doesn't have a valid message type, return ParseError.InvalidMessageType" in {
+      val source = createStream(invalidMessageType)
 
       val result = service.extractMessageData(source)
 
       whenReady(result.value) {
-        _ mustBe Left(ParseError.MessageTypeNotFound())
+        _ mustBe Left(ParseError.InvalidMessageType())
       }
     }
 

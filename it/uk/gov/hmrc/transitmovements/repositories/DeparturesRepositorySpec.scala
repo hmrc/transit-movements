@@ -39,6 +39,8 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.TriggerId
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -240,5 +242,27 @@ class DeparturesRepositorySpec
       await(repository.insert(departure1).value)
     }
 
+  }
+
+  "updateMessages" should "add a message to the movement with the given movement id" in {
+
+    val departure = arbitrary[Departure].sample.value.copy(_id = DepartureId("123"))
+    await(
+      repository.insert(departure).value
+    )
+
+    val triggerId  = departure.messages.head.id.value
+    val movementId = MovementId(departure._id.value)
+    val message    = arbitrary[Message].sample.value.copy(triggerId = Some(TriggerId(triggerId)))
+
+    await(
+      repository.updateMessages(movementId, message).value
+    )
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", "123")).first().toFuture()
+    }
+
+    movement.messages.length should be(2)
   }
 }
