@@ -17,11 +17,10 @@
 package uk.gov.hmrc.transitmovements.services
 
 import akka.stream.scaladsl.Sink
-import akka.util.Timeout
+import com.fasterxml.aalto.WFCException
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
-import org.scalatest.time.Millis
 import org.scalatest.time.Seconds
 import org.scalatest.time.Span
 import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
@@ -83,6 +82,15 @@ class MessageXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Ma
       <preparationDateAndTime>invaliddate</preparationDateAndTime>
     </CC015C>
 
+  val incompleteXml: String =
+    "<CC015C><messageSender>GB1234</messageSender>"
+
+  val missingInnerTag: String =
+    "<CC015C><messageSender>GB1234</CC015C>"
+
+  val mismatchedTags: String =
+    "<CC015C><messageSender>GB1234</messageReceiver></CC015C>"
+
   "When handed an XML stream" - {
     val service = new MessagesXmlParsingServiceImpl
 
@@ -136,6 +144,45 @@ class MessageXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Ma
           error mustBe a[ParseError.BadDateTime]
           error.asInstanceOf[ParseError.BadDateTime].element mustBe "preparationDateAndTime"
           error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'invaliddate' could not be parsed at index 0"
+      }
+    }
+
+    "if it is missing the end tag, return ParseError.Unknown" in {
+      val source = createStream(incompleteXml)
+
+      val result = service.extractMessageData(source)
+
+      whenReady(result.value) {
+        either =>
+          either mustBe a[Left[ParseError, _]]
+          either.left.get mustBe a[ParseError.UnexpectedError]
+          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[IllegalStateException]
+      }
+    }
+
+    "if it is missing the end of an inner tag, return ParseError.Unknown" in {
+      val source = createStream(missingInnerTag)
+
+      val result = service.extractMessageData(source)
+
+      whenReady(result.value) {
+        either =>
+          either mustBe a[Left[ParseError, _]]
+          either.left.get mustBe a[ParseError.UnexpectedError]
+          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
+      }
+    }
+
+    "if it contains mismatched tags, return ParseError.Unknown" in {
+      val source = createStream(mismatchedTags)
+
+      val result = service.extractMessageData(source)
+
+      whenReady(result.value) {
+        either =>
+          either mustBe a[Left[ParseError, _]]
+          either.left.get mustBe a[ParseError.UnexpectedError]
+          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
       }
     }
   }

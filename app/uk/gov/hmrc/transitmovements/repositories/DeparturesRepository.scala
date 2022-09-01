@@ -222,8 +222,6 @@ class DeparturesRepositoryImpl @Inject() (
   }
 
   def updateMessages(movementId: MovementId, message: Message): EitherT[Future, MongoError, Unit] = {
-    val idFilter = mAnd(mNe("_id", "-1"), mEq("_id", movementId.value))
-
     val update = Seq(
       Aggregates.set(Field("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC).toString)),
       Aggregates.group(null, Accumulators.addToSet("$messages", message))

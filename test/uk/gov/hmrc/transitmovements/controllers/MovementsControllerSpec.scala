@@ -63,7 +63,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeParseException
-import java.util.NoSuchElementException
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.xml.NodeSeq
