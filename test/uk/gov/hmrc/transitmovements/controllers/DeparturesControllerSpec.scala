@@ -61,7 +61,6 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.TriggerId
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.DepartureFactory
@@ -184,7 +183,7 @@ class DeparturesControllerSpec
       when(mockDepartureFactory.create(any[String].asInstanceOf[EORINumber], any[DeclarationData], any[Message]))
         .thenReturn(departure)
 
-      when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[TriggerId]], any[Source[ByteString, Future[IOResult]]]))
+      when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
         .thenReturn(messageFactoryEither)
 
       when(mockRepository.insert(any()))

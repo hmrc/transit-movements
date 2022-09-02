@@ -16,16 +16,8 @@
 
 package uk.gov.hmrc.transitmovements.services
 
-import akka.stream.IOResult
-import akka.stream.scaladsl.FileIO
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
-import cats.data.EitherT
-import org.mockito.ArgumentMatchers.any
-import org.mockito.MockitoSugar.when
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
-import play.api.libs.Files.SingletonTemporaryFileCreator
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators

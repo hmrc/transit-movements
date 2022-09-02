@@ -39,7 +39,6 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.TriggerId
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -284,7 +283,7 @@ class DeparturesRepositorySpec
     )
 
     val message2 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(TriggerId(departureID.value)))
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
 
     val result = await(
       repository.updateMessages(departureID, message2).value

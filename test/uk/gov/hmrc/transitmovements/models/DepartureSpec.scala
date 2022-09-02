@@ -43,7 +43,7 @@ class DepartureSpec extends AnyFlatSpec with Matchers with PresentationFormats {
           received = OffsetDateTime.now(),
           generated = OffsetDateTime.now(),
           messageType = MessageType.ReleaseForTransit,
-          triggerId = Some(TriggerId("888")),
+          triggerId = Some(MessageId("888")),
           url = Some(URI.create("xyz")),
           body = Some("body")
         )

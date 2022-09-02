@@ -52,7 +52,6 @@ import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.TriggerId
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
@@ -93,7 +92,7 @@ class MovementsControllerSpec
 
   val movementId = MovementId("12345")
   val messageId  = MessageId("DEF567")
-  val triggerId  = TriggerId("ABC123")
+  val triggerId  = MessageId("ABC123")
 
   val mockXmlParsingService    = mock[MessagesXmlParsingService]
   val mockRepository           = mock[DeparturesRepository]
@@ -148,7 +147,7 @@ class MovementsControllerSpec
       when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]]))
         .thenReturn(messageDataEither)
 
-      when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[TriggerId]], any[Source[ByteString, Future[IOResult]]]))
+      when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
         .thenReturn(messageFactoryEither)
 
       when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message]))
@@ -179,7 +178,7 @@ class MovementsControllerSpec
             )
           )
 
-        when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[TriggerId]], any[Source[ByteString, Future[IOResult]]]))
+        when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
           .thenReturn(messageFactoryEither)
 
         when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message]))
@@ -216,7 +215,7 @@ class MovementsControllerSpec
             )
           )
 
-        when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[TriggerId]], any[Source[ByteString, Future[IOResult]]]))
+        when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
           .thenReturn(messageFactoryEither)
 
         when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message]))

@@ -26,7 +26,6 @@ import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.TriggerId
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -47,7 +46,6 @@ trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
   }
 
   // these use the dates above, so need to be here for compile-time macro expansion
-  implicit val triggerIdFormat: Format[TriggerId]                               = Json.format[TriggerId]
   implicit val messageFormat: Format[Message]                                   = Json.format[Message]
   implicit val departureFormat: Format[Departure]                               = Json.format[Departure]
   implicit val departureWithoutMessagesFormat: Format[DepartureWithoutMessages] = Json.format[DepartureWithoutMessages]

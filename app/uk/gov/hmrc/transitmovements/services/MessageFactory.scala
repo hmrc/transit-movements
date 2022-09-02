@@ -28,7 +28,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.TriggerId
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -46,7 +45,7 @@ trait MessageFactory {
   def create(
     messageType: MessageType,
     generationDate: OffsetDateTime,
-    triggerId: Option[TriggerId],
+    triggerId: Option[MessageId],
     tempFile: Source[ByteString, Future[IOResult]]
   ): EitherT[Future, StreamError, Message]
 }
@@ -61,7 +60,7 @@ class MessageFactoryImpl @Inject() (
   def create(
     messageType: MessageType,
     generationDate: OffsetDateTime,
-    triggerId: Option[TriggerId],
+    triggerId: Option[MessageId],
     tempFile: Source[ByteString, Future[IOResult]]
   ): EitherT[Future, StreamError, Message] =
     getMessageBody(tempFile).map {

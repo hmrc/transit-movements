@@ -26,8 +26,8 @@ import play.api.mvc.ControllerComponents
 import play.api.mvc.Result
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.models.DepartureId
+import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.TriggerId
 import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
@@ -52,7 +52,7 @@ class MovementsController @Inject() (
     with TemporaryFiles
     with ConvertError {
 
-  def updateMovement(movementId: MovementId, triggerId: TriggerId): Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
+  def updateMovement(movementId: MovementId, triggerId: MessageId): Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
     implicit request =>
       withTemporaryFile {
         (temporaryFile, source) =>

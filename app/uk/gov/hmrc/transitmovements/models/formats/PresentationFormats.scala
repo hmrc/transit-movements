@@ -21,13 +21,11 @@ import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.TriggerId
 
 trait PresentationFormats extends CommonFormats {
 
   // as these use the OffsetDateTime times, these need to be here to avoid the macro expansion of
   // OffsetDateTime when used with Mongo.
-  implicit val triggerIdFormat: Format[TriggerId]                               = Json.format[TriggerId]
   implicit val messageFormat: Format[Message]                                   = Json.format[Message]
   implicit val departureFormat: Format[Departure]                               = Json.format[Departure]
   implicit val departureWithoutMessagesFormat: Format[DepartureWithoutMessages] = Json.format[DepartureWithoutMessages]

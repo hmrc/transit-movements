@@ -24,7 +24,7 @@ case class Message(
   received: OffsetDateTime,
   generated: OffsetDateTime,
   messageType: MessageType,
-  triggerId: Option[TriggerId],
+  triggerId: Option[MessageId],
   url: Option[URI],
   body: Option[String]
 )

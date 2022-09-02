@@ -23,9 +23,10 @@ import play.api.libs.Files.SingletonTemporaryFileCreator
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
+
 import java.io.File
+import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.TriggerId
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
 import java.security.SecureRandom
@@ -46,7 +47,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
     "will create a message with a body when given a stream" in {
       val stream = FileIO.fromPath(tempFile.path)
 
-      val result = sut.create(MessageType.DestinationOfficeRejection, instant, Some(TriggerId("123")), stream)
+      val result = sut.create(MessageType.DestinationOfficeRejection, instant, Some(MessageId("123")), stream)
 
       whenReady(result.value) {
         r =>
@@ -57,7 +58,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
     "will return a Left when a NonFatal exception is thrown as a StreamError" in {
       val stream = FileIO.fromFile(new File(""), 5)
 
-      val result = sut.create(MessageType.RequestOfRelease, instant, Some(TriggerId("456")), stream)
+      val result = sut.create(MessageType.RequestOfRelease, instant, Some(MessageId("456")), stream)
 
       whenReady(result.value) {
         r =>
