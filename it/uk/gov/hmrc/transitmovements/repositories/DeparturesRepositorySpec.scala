@@ -244,25 +244,61 @@ class DeparturesRepositorySpec
 
   }
 
-  "updateMessages" should "add a message to the movement with the given movement id" in {
+  "getDeparture" should "return departure inserted with the given movement id" in {
+    val departure =
+      arbitrary[Departure].sample.value
+        .copy(
+          _id = DepartureId("123"),
+          created = instant,
+          updated = instant,
+          messages = NonEmptyList(arbitrary[Message].sample.value, List.empty)
+        )
 
-    val departure = arbitrary[Departure].sample.value.copy(_id = DepartureId("123"))
     await(
       repository.insert(departure).value
-    )
-
-    val triggerId  = departure.messages.head.id.value
-    val movementId = MovementId(departure._id.value)
-    val message    = arbitrary[Message].sample.value.copy(triggerId = Some(TriggerId(triggerId)))
-
-    await(
-      repository.updateMessages(movementId, message).value
     )
 
     val movement = await {
       repository.collection.find(Filters.eq("_id", "123")).first().toFuture()
     }
 
+    movement should be(departure)
+
+  }
+
+  "updateMessages" should "add a message to the matching movement and set updated parameter" in {
+
+    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
+
+    val departure =
+      arbitrary[Departure].sample.value
+        .copy(
+          _id = DepartureId("ABC"),
+          created = instant,
+          updated = instant,
+          messages = NonEmptyList(message1, List.empty)
+        )
+
+    await(
+      repository.insert(departure).value
+    )
+
+    val message2 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(TriggerId("ABC")))
+
+    val result = await(
+      repository.updateMessages(MovementId("ABC"), message2).value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", "ABC")).first().toFuture()
+    }
+
+    movement.updated shouldNot be(instant)
     movement.messages.length should be(2)
+    movement.messages.toList should contain(message1)
+    movement.messages.toList should contain(message2)
+
   }
 }

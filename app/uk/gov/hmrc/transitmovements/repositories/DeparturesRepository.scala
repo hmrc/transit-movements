@@ -25,7 +25,6 @@ import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
 import com.mongodb.client.model.Filters.{gte => mGte}
 import org.mongodb.scala.bson.BsonDocument
-import org.mongodb.scala.bson.BsonObjectId
 import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
@@ -221,25 +220,39 @@ class DeparturesRepositoryImpl @Inject() (
 
   }
 
-  def updateMessages(movementId: MovementId, message: Message): EitherT[Future, MongoError, Unit] = {
-    val update = Seq(
-      Aggregates.set(Field("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC).toString)),
-      Aggregates.group(null, Accumulators.addToSet("$messages", message))
-    )
-
-    mongoRetry(Try(collection.updateOne(Filters.eq("_id", BsonObjectId(movementId.value)), update)) match {
+  def getDeparture(departureId: DepartureId): EitherT[Future, MongoError, Option[Departure]] =
+    mongoRetry(Try(collection.find(Filters.eq("_id", departureId.value))) match {
       case Success(obs) =>
-        obs.toFuture().map {
-          result =>
-            if (result.wasAcknowledged()) {
-              Right(())
-            } else {
-              Left(UpdateNotAcknowledged(s"Message update failed for departure"))
-            }
+        obs.headOption().map {
+          opt => Right(opt)
         }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
-  }
+
+  def updateMessages(movementId: MovementId, message: Message): EitherT[Future, MongoError, Unit] =
+    getDeparture(DepartureId(movementId.value))
+      .map {
+        departureOpt =>
+          departureOpt.map(
+            _.copy(updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC), messages = NonEmptyList(message, departureOpt.get.messages.toList))
+          )
+      }
+      .map {
+        updatedDeparture =>
+          mongoRetry(Try(collection.replaceOne(Filters.eq("_id", movementId.value), updatedDeparture.get)) match {
+            case Success(obs) =>
+              obs.toFuture().map {
+                result =>
+                  if (result.wasAcknowledged()) {
+                    Right(())
+                  } else {
+                    Left(UpdateNotAcknowledged(s"Message update failed for departure"))
+                  }
+              }
+            case Failure(NonFatal(ex)) =>
+              Future.successful(Left(UnexpectedError(Some(ex))))
+          })
+      }
 
 }
