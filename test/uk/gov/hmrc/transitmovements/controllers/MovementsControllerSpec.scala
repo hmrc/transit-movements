@@ -46,6 +46,7 @@ import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
+import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -150,7 +151,7 @@ class MovementsControllerSpec
       when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[TriggerId]], any[Source[ByteString, Future[IOResult]]]))
         .thenReturn(messageFactoryEither)
 
-      when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message]))
+      when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message]))
         .thenReturn(EitherT.rightT(Right(())))
 
       val request = fakeRequest(POST, validXml)
@@ -181,7 +182,7 @@ class MovementsControllerSpec
         when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[TriggerId]], any[Source[ByteString, Future[IOResult]]]))
           .thenReturn(messageFactoryEither)
 
-        when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message]))
+        when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message]))
           .thenReturn(EitherT.rightT(Right(())))
 
         val request = fakeRequest(POST, xml)
@@ -218,7 +219,7 @@ class MovementsControllerSpec
         when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[TriggerId]], any[Source[ByteString, Future[IOResult]]]))
           .thenReturn(messageFactoryEither)
 
-        when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message]))
+        when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message]))
           .thenReturn(EitherT.rightT(Right(())))
 
         val request = fakeRequest(POST, xml)

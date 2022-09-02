@@ -39,7 +39,6 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.TriggerId
 
 import java.time.Clock
@@ -270,10 +269,11 @@ class DeparturesRepositorySpec
 
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
 
+    val departureID = DepartureId("ABC")
     val departure =
       arbitrary[Departure].sample.value
         .copy(
-          _id = DepartureId("ABC"),
+          _id = departureID,
           created = instant,
           updated = instant,
           messages = NonEmptyList(message1, List.empty)
@@ -283,10 +283,11 @@ class DeparturesRepositorySpec
       repository.insert(departure).value
     )
 
-    val message2 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(TriggerId("ABC")))
+    val message2 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(TriggerId(departureID.value)))
 
     val result = await(
-      repository.updateMessages(MovementId("ABC"), message2).value
+      repository.updateMessages(departureID, message2).value
     )
 
     result should be(Right(()))
