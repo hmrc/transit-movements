@@ -38,7 +38,6 @@ import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepositoryImpl.EPOCH_TIME
@@ -69,7 +68,7 @@ trait DeparturesRepository {
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]]
   def getDepartureIds(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureId]]]
-  def updateMessages(movementId: MovementId, message: Message): EitherT[Future, MongoError, Unit]
+  def updateMessages(departureId: DepartureId, message: Message): EitherT[Future, MongoError, Unit]
 }
 
 object DeparturesRepositoryImpl {
@@ -230,8 +229,8 @@ class DeparturesRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def updateMessages(movementId: MovementId, message: Message): EitherT[Future, MongoError, Unit] =
-    getDeparture(DepartureId(movementId.value))
+  def updateMessages(departureId: DepartureId, message: Message): EitherT[Future, MongoError, Unit] =
+    getDeparture(departureId)
       .map {
         departureOpt =>
           departureOpt.map(
@@ -240,7 +239,7 @@ class DeparturesRepositoryImpl @Inject() (
       }
       .map {
         updatedDeparture =>
-          mongoRetry(Try(collection.replaceOne(Filters.eq("_id", movementId.value), updatedDeparture.get)) match {
+          mongoRetry(Try(collection.replaceOne(Filters.eq("_id", departureId.value), updatedDeparture.get)) match {
             case Success(obs) =>
               obs.toFuture().map {
                 result =>

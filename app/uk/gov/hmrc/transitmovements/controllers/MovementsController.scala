@@ -25,6 +25,7 @@ import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
 import play.api.mvc.Result
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
+import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.TriggerId
 import play.api.libs.json.Json
@@ -59,7 +60,7 @@ class MovementsController @Inject() (
             messageData <- xmlParsingService.extractMessageData(source).asPresentation
             fileSource = FileIO.fromPath(temporaryFile)
             message <- factory.create(messageData.messageType, messageData.generationDate, Some(triggerId), fileSource).asPresentation
-            result  <- repo.updateMessages(movementId, message).asPresentation
+            result  <- repo.updateMessages(DepartureId(movementId.value), message).asPresentation
           } yield result).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
             _ => Ok
