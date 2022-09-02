@@ -134,7 +134,7 @@ class MessageXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Ma
       }
     }
 
-    "it it has a preparation date that is unparsable, return ParseError.BadDateTime" in {
+    "if it has a preparation date that is unparsable, return ParseError.BadDateTime" in {
       val stream       = createParsingEventStream(badDate)
       val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor).runWith(Sink.head)
 
