@@ -24,11 +24,15 @@ import com.mongodb.client.model.Filters.{ne => mNe}
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
 import com.mongodb.client.model.Filters.{gte => mGte}
+import com.mongodb.client.model.Updates.{push => mPush}
+import com.mongodb.client.model.Updates.{set => mSet}
+import com.mongodb.client.model.Updates.{combine => mCombine}
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
 import play.api.Logging
+import play.api.libs.json.Json
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
@@ -95,7 +99,8 @@ class DeparturesRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.departureWithoutMessagesFormat),
         Codecs.playFormatCodec(MongoFormats.departureIdFormat),
         Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format),
-        Codecs.playFormatCodec(GetDepartureIdsDTO.format)
+        Codecs.playFormatCodec(GetDepartureIdsDTO.format),
+        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat)
       )
     )
     with DeparturesRepository
@@ -197,8 +202,7 @@ class DeparturesRepositoryImpl @Inject() (
     }
 
   def getDepartureIds(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureId]]] = {
-    val selector: Bson = mAnd(mNe("_id", "-1"), mEq("enrollmentEORINumber", eoriNumber.value))
-    //val selector: Bson = mEq("enrollmentEORINumber", eoriNumber.value) // Selector should be this really - but not working!
+    val selector: Bson = mEq("enrollmentEORINumber", eoriNumber.value)
 
     val aggregates = Seq(
       Aggregates.filter(selector),
@@ -219,39 +223,25 @@ class DeparturesRepositoryImpl @Inject() (
 
   }
 
-  def getDeparture(departureId: DepartureId): EitherT[Future, MongoError, Option[Departure]] =
-    mongoRetry(Try(collection.find(Filters.eq("_id", departureId.value))) match {
+  def updateMessages(departureId: DepartureId, message: Message): EitherT[Future, MongoError, Unit] = {
+
+    val selector: Bson = mEq(departureId)
+
+    val update: Bson = mCombine(mSet("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)), mPush("messages", message))
+
+    mongoRetry(Try(collection.updateOne(selector, update)) match {
       case Success(obs) =>
-        obs.headOption().map {
-          opt => Right(opt)
+        obs.toFuture().map {
+          result =>
+            if (result.wasAcknowledged()) {
+              Right(())
+            } else {
+              Left(UpdateNotAcknowledged(s"Message update failed for departure: $departureId"))
+            }
         }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
-
-  def updateMessages(departureId: DepartureId, message: Message): EitherT[Future, MongoError, Unit] =
-    getDeparture(departureId)
-      .map {
-        departureOpt =>
-          departureOpt.map(
-            _.copy(updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC), messages = NonEmptyList(message, departureOpt.get.messages.toList))
-          )
-      }
-      .map {
-        updatedDeparture =>
-          mongoRetry(Try(collection.replaceOne(Filters.eq("_id", departureId.value), updatedDeparture.get)) match {
-            case Success(obs) =>
-              obs.toFuture().map {
-                result =>
-                  if (result.wasAcknowledged()) {
-                    Right(())
-                  } else {
-                    Left(UpdateNotAcknowledged(s"Message update failed for departure"))
-                  }
-              }
-            case Failure(NonFatal(ex)) =>
-              Future.successful(Left(UnexpectedError(Some(ex))))
-          })
-      }
+  }
 
 }

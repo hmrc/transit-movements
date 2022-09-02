@@ -242,63 +242,42 @@ class DeparturesRepositorySpec
 
   }
 
-  "getDeparture" should "return departure inserted with the given movement id" in {
-    val departure =
-      arbitrary[Departure].sample.value
-        .copy(
-          _id = DepartureId("123"),
-          created = instant,
-          updated = instant,
-          messages = NonEmptyList(arbitrary[Message].sample.value, List.empty)
-        )
+  "updateMessages" should
+    "add a message to the matching movement and set updated parameter" in {
 
-    await(
-      repository.insert(departure).value
-    )
+      val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
 
-    val movement = await {
-      repository.collection.find(Filters.eq("_id", "123")).first().toFuture()
+      val departureID = DepartureId("ABC")
+      val departure =
+        arbitrary[Departure].sample.value
+          .copy(
+            _id = departureID,
+            created = instant,
+            updated = instant,
+            messages = NonEmptyList(message1, List.empty)
+          )
+
+      await(
+        repository.insert(departure).value
+      )
+
+      val message2 =
+        arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
+
+      val result = await(
+        repository.updateMessages(departureID, message2).value
+      )
+
+      result should be(Right(()))
+
+      val movement = await {
+        repository.collection.find(Filters.eq("_id", "ABC")).first().toFuture()
+      }
+
+      movement.updated shouldNot be(instant)
+      movement.messages.length should be(2)
+      movement.messages.toList should contain(message1)
+      movement.messages.toList should contain(message2)
+
     }
-
-    movement should be(departure)
-
-  }
-
-  "updateMessages" should "add a message to the matching movement and set updated parameter" in {
-
-    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
-
-    val departureID = DepartureId("ABC")
-    val departure =
-      arbitrary[Departure].sample.value
-        .copy(
-          _id = departureID,
-          created = instant,
-          updated = instant,
-          messages = NonEmptyList(message1, List.empty)
-        )
-
-    await(
-      repository.insert(departure).value
-    )
-
-    val message2 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
-
-    val result = await(
-      repository.updateMessages(departureID, message2).value
-    )
-
-    result should be(Right(()))
-
-    val movement = await {
-      repository.collection.find(Filters.eq("_id", "ABC")).first().toFuture()
-    }
-
-    movement.updated shouldNot be(instant)
-    movement.messages.length should be(2)
-    movement.messages.toList should contain(message1)
-    movement.messages.toList should contain(message2)
-
-  }
 }

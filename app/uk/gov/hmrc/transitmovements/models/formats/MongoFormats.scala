@@ -45,6 +45,8 @@ trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
     value => jatLocalDateTimeFormat.writes(value.toLocalDateTime)
   }
 
+  implicit val offsetDateTimeFormat: Format[OffsetDateTime] = Format.apply(offsetDateTimeReads, offsetDateTimeWrites)
+
   // these use the dates above, so need to be here for compile-time macro expansion
   implicit val messageFormat: Format[Message]                                   = Json.format[Message]
   implicit val departureFormat: Format[Departure]                               = Json.format[Departure]
