@@ -51,19 +51,13 @@ object XmlParsers extends XmlParsingServiceHelpers {
     }
 
   val messageTypeExtractor: Flow[ParseEvent, ParseResult[MessageType], NotUsed] = Flow[ParseEvent]
-    .statefulMapConcat {
-      () =>
-        _ match {
-          case s: StartElement if MessageType.values.exists(_.rootNode == s.localName) =>
-            Seq(MessageType.values.find(_.rootNode == s.localName).get)
-          case _ => Seq.empty
-        }
+    .mapConcat {
+      case s: StartElement if MessageType.values.exists(_.rootNode == s.localName) =>
+        Seq(MessageType.values.find(_.rootNode == s.localName).get)
+      case _ => Seq.empty
     }
-    .prefixAndTail(1)
-    .map {
-      messageTypeAndSource =>
-        if (messageTypeAndSource._1.isEmpty) Left(ParseError.InvalidMessageType())
-        else Right(messageTypeAndSource._1.head)
-    }
-
+    .take(1)
+    .fold[Either[ParseError, MessageType]](Left(ParseError.InvalidMessageType()))(
+      (_, next) => Right(next)
+    )
 }
