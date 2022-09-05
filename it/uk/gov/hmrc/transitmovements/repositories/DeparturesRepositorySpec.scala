@@ -292,7 +292,7 @@ class DeparturesRepositorySpec
       repository.updateMessages(departureID, message).value
     )
 
-    result should be(Left(MongoError.DocumentNotFound(s"No departure was found with the given id: ${departureID.value}")))
+    result should be(Left(MongoError.DocumentNotFound(s"No departure found with the given id: ${departureID.value}")))
 
   }
 }
