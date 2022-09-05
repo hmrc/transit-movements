@@ -56,6 +56,7 @@ import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -230,6 +231,32 @@ class MovementsControllerSpec
         contentAsJson(result) mustBe Json.obj(
           "code"    -> "BAD_REQUEST",
           "message" -> "Could not parse datetime for preparationDateAndTime: Text 'invalid' could not be parsed at index 0"
+        )
+      }
+
+      "contains message to indicate update failed due to document with given id not found" in {
+
+        val tempFile = SingletonTemporaryFileCreator.create()
+        when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
+
+        when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]]))
+          .thenReturn(messageDataEither)
+
+        when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
+          .thenReturn(messageFactoryEither)
+
+        when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message]))
+          .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(s"No departure found with the given id: ${movementId.value}")))
+
+        val request = fakeRequest(POST, validXml)
+
+        val result =
+          controller.updateMovement(movementId, triggerId)(request)
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "No departure found with the given id: 12345"
         )
       }
     }

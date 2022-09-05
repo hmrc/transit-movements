@@ -234,7 +234,8 @@ class DeparturesRepositoryImpl @Inject() (
         obs.toFuture().map {
           result =>
             if (result.wasAcknowledged()) {
-              Right(())
+              if (result.getModifiedCount == 0) Left(DocumentNotFound(s"No departure found with the given id: $departureId"))
+              else Right(())
             } else {
               Left(UpdateNotAcknowledged(s"Message update failed for departure: $departureId"))
             }
