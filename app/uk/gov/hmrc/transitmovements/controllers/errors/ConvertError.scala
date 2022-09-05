@@ -44,6 +44,7 @@ trait ConvertError {
       case TooManyElementsFound(element) => PresentationError.badRequestError(s"Found too many elements of type $element")
       case BadDateTime(element, ex)      => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
       case UnexpectedError(ex)           => PresentationError.internalServiceError(cause = ex)
+      case InvalidMessageType()          => PresentationError.badRequestError(s"No valid message type found")
     }
 
   }
@@ -54,6 +55,7 @@ trait ConvertError {
     def convert(mongoError: MongoError): PresentationError = mongoError match {
       case UnexpectedError(ex)            => PresentationError.internalServiceError(cause = ex)
       case InsertNotAcknowledged(message) => PresentationError.internalServiceError(message = message)
+      case DocumentNotFound(message)      => PresentationError.badRequestError(message = message)
     }
   }
 

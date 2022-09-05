@@ -16,55 +16,31 @@
 
 package uk.gov.hmrc.transitmovements.services
 
-import akka.stream.scaladsl.FileIO
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
-import play.api.libs.Files.SingletonTemporaryFileCreator
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
+import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.services.errors.StreamError
-import java.io.File
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-class DepartureFactoryImplSpec extends SpecBase with ScalaFutures with Matchers with TestActorSystem {
+class DepartureFactoryImplSpec extends SpecBase with ScalaFutures with Matchers with TestActorSystem with ModelGenerators {
 
   val instant: OffsetDateTime = OffsetDateTime.of(2022, 5, 27, 11, 0, 0, 0, ZoneOffset.UTC)
   val clock: Clock            = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
   val random                  = new SecureRandom
 
-  val tempFile = SingletonTemporaryFileCreator.create()
-
   "create" - {
     val sut = new DepartureFactoryImpl(clock, random)
 
-    "will create a departure with a message when given a stream" in {
-      val stream = FileIO.fromPath(tempFile.path)
+    "will create a departure with a message" in {
+      val departure = sut.create(EORINumber("1"), DeclarationData(EORINumber("1"), instant), arbitraryMessage.arbitrary.sample.get)
 
-      val result = sut.create(EORINumber("1"), DeclarationData(EORINumber("1"), instant), stream)
-
-      whenReady(result.value) {
-        r =>
-          r.isRight mustBe true
-          r.right.get.messages.length mustBe 1
-      }
-
-    }
-
-    "will return a Left when a NonFatal exception is thrown as a StreamError" in {
-      val stream = FileIO.fromFile(new File(""), 5)
-
-      val result = sut.create(EORINumber("1"), DeclarationData(EORINumber("1"), instant), stream)
-
-      whenReady(result.value) {
-        r =>
-          r.isLeft mustBe true
-          r.left.get.isInstanceOf[StreamError] mustBe true
-      }
+      departure.messages.length mustBe 1
     }
   }
 }

@@ -33,6 +33,7 @@ import org.scalatest.matchers.must.Matchers
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.http.HeaderNames
+import play.api.http.MimeTypes
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
@@ -64,6 +65,7 @@ import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.DepartureFactory
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
+import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
@@ -92,7 +94,7 @@ class DeparturesControllerSpec
     FakeRequest(
       method = method,
       uri = routes.DeparturesController.createDeparture(eori).url,
-      headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "app/xml")),
+      headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
       body = body
     )
 
@@ -100,7 +102,8 @@ class DeparturesControllerSpec
 
   val mockXmlParsingService    = mock[DeparturesXmlParsingService]
   val mockRepository           = mock[DeparturesRepository]
-  val mockDeparturesFactory    = mock[DepartureFactory]
+  val mockDepartureFactory     = mock[DepartureFactory]
+  val mockMessageFactory       = mock[MessageFactory]
   val mockTemporaryFileCreator = mock[TemporaryFileCreator]
 
   lazy val eori            = EORINumber("eori")
@@ -141,18 +144,22 @@ class DeparturesControllerSpec
     )
   )
 
-  lazy val departureFactoryEither: EitherT[Future, StreamError, Departure] =
-    EitherT.rightT(departure)
-
   override def afterEach() {
     reset(mockTemporaryFileCreator)
     reset(mockXmlParsingService)
-    reset(mockDeparturesFactory)
+    reset(mockDepartureFactory)
     super.afterEach()
   }
 
   val controller =
-    new DeparturesController(stubControllerComponents(), mockDeparturesFactory, mockRepository, mockXmlParsingService, mockTemporaryFileCreator)
+    new DeparturesController(
+      stubControllerComponents(),
+      mockDepartureFactory,
+      mockMessageFactory,
+      mockRepository,
+      mockXmlParsingService,
+      mockTemporaryFileCreator
+    )
 
   "createDeparture" - {
 
@@ -162,6 +169,9 @@ class DeparturesControllerSpec
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
       </CC015C>
 
+    lazy val messageFactoryEither: EitherT[Future, StreamError, Message] =
+      EitherT.rightT(message)
+
     "must return OK if XML data extraction is successful" in {
 
       val tempFile = SingletonTemporaryFileCreator.create()
@@ -170,8 +180,11 @@ class DeparturesControllerSpec
       when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockDeparturesFactory.create(any[String].asInstanceOf[EORINumber], any[DeclarationData], any[Source[ByteString, Future[IOResult]]]))
-        .thenReturn(departureFactoryEither)
+      when(mockDepartureFactory.create(any[String].asInstanceOf[EORINumber], any[DeclarationData], any[Message]))
+        .thenReturn(departure)
+
+      when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
+        .thenReturn(messageFactoryEither)
 
       when(mockRepository.insert(any()))
         .thenReturn(EitherT.rightT(Right(())))
@@ -284,7 +297,7 @@ class DeparturesControllerSpec
         val request = FakeRequest(
           method = POST,
           uri = routes.DeparturesController.createDeparture(eori).url,
-          headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "app/xml")),
+          headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
           body = unknownErrorXml
         )
 

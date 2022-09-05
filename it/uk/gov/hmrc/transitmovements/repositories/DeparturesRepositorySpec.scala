@@ -39,7 +39,9 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
+import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -65,8 +67,9 @@ class DeparturesRepositorySpec
 
   implicit lazy val app: Application = GuiceApplicationBuilder().configure().build()
   private val appConfig              = app.injector.instanceOf[AppConfig]
+  private val clockConfig            = app.injector.instanceOf[Clock]
 
-  override lazy val repository = new DeparturesRepositoryImpl(appConfig, mongoComponent)
+  override lazy val repository = new DeparturesRepositoryImpl(appConfig, mongoComponent, clockConfig)
 
   "DepartureMovementRepository" should "have the correct name" in {
     repository.collectionName shouldBe "departure_movements"
@@ -237,6 +240,59 @@ class DeparturesRepositorySpec
       await(repository.insert(departure4).value)
       await(repository.insert(departure1).value)
     }
+
+  }
+
+  "updateMessages" should "add a message to the matching movement and set updated parameter" in {
+
+    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
+
+    val departureID = DepartureId("ABC")
+    val departure =
+      arbitrary[Departure].sample.value
+        .copy(
+          _id = departureID,
+          created = instant,
+          updated = instant,
+          messages = NonEmptyList(message1, List.empty)
+        )
+
+    await(
+      repository.insert(departure).value
+    )
+
+    val message2 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
+
+    val result = await(
+      repository.updateMessages(departureID, message2).value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", "ABC")).first().toFuture()
+    }
+
+    movement.updated shouldNot be(instant)
+    movement.messages.length should be(2)
+    movement.messages.toList should contain(message1)
+    movement.messages.toList should contain(message2)
+
+  }
+
+  "updateMessages" should "return error if there is no matching movement with the given id" in {
+
+    val departureID = DepartureId("ABC")
+
+    val message =
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
+
+    val result = await(
+      repository.updateMessages(departureID, message).value
+    )
+
+    result should be(Left(MongoError.DocumentNotFound(s"No departure found with the given id: ${departureID.value}")))
 
   }
 }

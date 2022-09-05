@@ -24,11 +24,15 @@ import com.mongodb.client.model.Filters.{ne => mNe}
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
 import com.mongodb.client.model.Filters.{gte => mGte}
+import com.mongodb.client.model.Updates.{push => mPush}
+import com.mongodb.client.model.Updates.{set => mSet}
+import com.mongodb.client.model.Updates.{combine => mCombine}
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
 import play.api.Logging
+import play.api.libs.json.Json
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
@@ -44,6 +48,7 @@ import uk.gov.hmrc.transitmovements.repositories.DeparturesRepositoryImpl.EPOCH_
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 
+import java.time.Clock
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -59,7 +64,7 @@ import scala.util.control.NonFatal
 trait DeparturesRepository {
   def insert(departure: Departure): EitherT[Future, MongoError, Unit]
   def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
-  def getMessage(eoriNumber: EORINumber, departureId: DepartureId, movementId: MessageId): EitherT[Future, MongoError, Option[Message]]
+  def getMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[Message]]
 
   def getDepartureMessageIds(
     eoriNumber: EORINumber,
@@ -67,6 +72,7 @@ trait DeparturesRepository {
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]]
   def getDepartureIds(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureId]]]
+  def updateMessages(departureId: DepartureId, message: Message): EitherT[Future, MongoError, Unit]
 }
 
 object DeparturesRepositoryImpl {
@@ -75,7 +81,8 @@ object DeparturesRepositoryImpl {
 
 class DeparturesRepositoryImpl @Inject() (
   appConfig: AppConfig,
-  mongoComponent: MongoComponent
+  mongoComponent: MongoComponent,
+  clock: Clock
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[Departure](
       mongoComponent = mongoComponent,
@@ -92,7 +99,8 @@ class DeparturesRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.departureWithoutMessagesFormat),
         Codecs.playFormatCodec(MongoFormats.departureIdFormat),
         Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format),
-        Codecs.playFormatCodec(GetDepartureIdsDTO.format)
+        Codecs.playFormatCodec(GetDepartureIdsDTO.format),
+        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat)
       )
     )
     with DeparturesRepository
@@ -194,8 +202,7 @@ class DeparturesRepositoryImpl @Inject() (
     }
 
   def getDepartureIds(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureId]]] = {
-    val selector: Bson = mAnd(mNe("_id", "-1"), mEq("enrollmentEORINumber", eoriNumber.value))
-    //val selector: Bson = mEq("enrollmentEORINumber", eoriNumber.value) // Selector should be this really - but not working!
+    val selector: Bson = mEq("enrollmentEORINumber", eoriNumber.value)
 
     val aggregates = Seq(
       Aggregates.filter(selector),
@@ -215,4 +222,27 @@ class DeparturesRepositoryImpl @Inject() (
     })
 
   }
+
+  def updateMessages(departureId: DepartureId, message: Message): EitherT[Future, MongoError, Unit] = {
+
+    val selector: Bson = mEq(departureId)
+
+    val update: Bson = mCombine(mSet("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)), mPush("messages", message))
+
+    mongoRetry(Try(collection.updateOne(selector, update)) match {
+      case Success(obs) =>
+        obs.toFuture().map {
+          result =>
+            if (result.wasAcknowledged()) {
+              if (result.getModifiedCount == 0) Left(DocumentNotFound(s"No departure found with the given id: ${departureId.value}"))
+              else Right(())
+            } else {
+              Left(UpdateNotAcknowledged(s"Message update failed for departure: $departureId"))
+            }
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+  }
+
 }

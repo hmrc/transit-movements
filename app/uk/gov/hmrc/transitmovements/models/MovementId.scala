@@ -14,13 +14,6 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.services.errors
+package uk.gov.hmrc.transitmovements.models
 
-sealed abstract class MongoError
-
-object MongoError {
-  case class UnexpectedError(exception: Option[Throwable] = None) extends MongoError
-  case class InsertNotAcknowledged(message: String)               extends MongoError
-  case class UpdateNotAcknowledged(message: String)               extends MongoError
-  case class DocumentNotFound(message: String)                    extends MongoError
-}
+case class MovementId(value: String) extends AnyVal
