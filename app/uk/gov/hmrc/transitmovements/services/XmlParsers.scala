@@ -18,11 +18,11 @@ package uk.gov.hmrc.transitmovements.services
 
 import akka.NotUsed
 import akka.stream.alpakka.xml.ParseEvent
-import akka.stream.alpakka.xml.StartElement
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.scaladsl.Flow
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.LocalDateTime
@@ -39,8 +39,8 @@ object XmlParsers extends XmlParsingServiceHelpers {
     }
     .single("identificationNumber")
 
-  val preparationDateTimeExtractor: Flow[ParseEvent, ParseResult[OffsetDateTime], NotUsed] = XmlParsing
-    .subtree("CC015C" :: "preparationDateAndTime" :: Nil)
+  def preparationDateTimeExtractor(messageType: MessageType): Flow[ParseEvent, ParseResult[OffsetDateTime], NotUsed] = XmlParsing
+    .subtree(messageType.rootNode :: "preparationDateAndTime" :: Nil)
     .collect {
       case element if element.getTextContent.nonEmpty =>
         LocalDateTime.parse(element.getTextContent).atOffset(ZoneOffset.UTC)
@@ -50,14 +50,12 @@ object XmlParsers extends XmlParsingServiceHelpers {
       case exception: DateTimeParseException => Left(ParseError.BadDateTime("preparationDateAndTime", exception))
     }
 
-  val messageTypeExtractor: Flow[ParseEvent, ParseResult[MessageType], NotUsed] = Flow[ParseEvent]
-    .mapConcat {
-      case s: StartElement if MessageType.values.exists(_.rootNode == s.localName) =>
-        Seq(MessageType.values.find(_.rootNode == s.localName).get)
-      case _ => Seq.empty
-    }
-    .take(1)
-    .fold[Either[ParseError, MessageType]](Left(ParseError.InvalidMessageType()))(
-      (_, next) => Right(next)
-    )
+  def movementReferenceNumberExtractor: Flow[ParseEvent, ParseResult[MovementReferenceNumber], NotUsed] =
+    XmlParsing
+      .subtree("CC028C" :: "TransitOperation" :: "MRN" :: Nil)
+      .collect {
+        case element if element.getTextContent.nonEmpty => MovementReferenceNumber(element.getTextContent)
+      }
+      .single("MRN")
+
 }

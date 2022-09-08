@@ -14,15 +14,11 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.services.errors
+package uk.gov.hmrc.transitmovements.controllers.errors
 
-import java.time.format.DateTimeParseException
+sealed abstract class HeaderExtractError
 
-sealed abstract class ParseError
-
-object ParseError {
-  case class NoElementFound(element: String)                                 extends ParseError
-  case class TooManyElementsFound(element: String)                           extends ParseError
-  case class BadDateTime(element: String, exception: DateTimeParseException) extends ParseError
-  case class UnexpectedError(caughtException: Option[Throwable] = None)      extends ParseError
+object HeaderExtractError {
+  case class NoHeaderFound(element: String)      extends HeaderExtractError
+  case class InvalidMessageType(element: String) extends HeaderExtractError
 }

@@ -25,6 +25,7 @@ import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -147,7 +148,7 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
 
     "it it has a preparation date that is unparsable, return ParseError.BadDateTime" in {
       val stream       = createParsingEventStream(badDate)
-      val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor).runWith(Sink.head)
+      val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor(MessageType.DeclarationData)).runWith(Sink.head)
 
       whenReady(parsedResult) {
         result =>

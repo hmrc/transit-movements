@@ -18,4 +18,4 @@ package uk.gov.hmrc.transitmovements.models
 
 import java.time.OffsetDateTime
 
-case class MessageData(messageType: MessageType, generationDate: OffsetDateTime)
+case class MessageData(generationDate: OffsetDateTime, mrn: Option[MovementReferenceNumber])

@@ -204,4 +204,6 @@ object MessageType {
 
   def withCode(name: String): Option[MessageType] =
     values.find(_.code == name)
+
+  def fromHeaderValue(headerValue: String): Option[MessageType] = values.find(_.code == headerValue)
 }
