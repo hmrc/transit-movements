@@ -149,37 +149,4 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
     }
   }
 
-  "MessageType parser" ignore {
-
-    val validMessageType: NodeSeq =
-      <CC007C>
-        <HolderOfTheTransitProcedure>
-          <identificationNumber>GB1234</identificationNumber>
-        </HolderOfTheTransitProcedure>
-      </CC007C>
-
-    val invalidMessageType: NodeSeq =
-      <XYZ>
-      </XYZ>
-
-//    "when provided with a valid message type" in {
-//      val stream       = createParsingEventStream(validMessageType)
-//      val parsedResult = stream.via(XmlParsers.messageTypeExtractor).runWith(Sink.head)
-//
-//      whenReady(parsedResult) {
-//        _ mustBe Right(MessageType.ArrivalNotification)
-//      }
-//    }
-
-//    "when provided with an invalid message type" in {
-//      val stream       = createParsingEventStream(invalidMessageType)
-//      val parsedResult = stream.via(XmlParsers.messageTypeExtractor).runWith(Sink.head)
-//
-//      whenReady(parsedResult) {
-//        _ mustBe Left(ParseError.InvalidMessageType())
-//      }
-//    }
-
-  }
-
 }

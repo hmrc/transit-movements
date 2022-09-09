@@ -58,18 +58,13 @@ class MessagesXmlParsingServiceImpl @Inject() (implicit materializer: Materializ
 
   def buildMessageData(
     dateMaybe: ParseResult[OffsetDateTime],
-    mrnMaybe: ParseResult[MovementReferenceNumber],
+    mrnMaybe: ParseResult[Option[MovementReferenceNumber]],
     messageType: MessageType
   ): ParseResult[MessageData] =
-    if (messageType == MrnAllocated)
-      for {
-        generationDate <- dateMaybe
-        mrn            <- mrnMaybe
-      } yield MessageData(generationDate, Some(mrn))
-    else
-      dateMaybe.map(
-        generationDate => MessageData(generationDate, None)
-      )
+    for {
+      generationDate <- dateMaybe
+      mrn            <- mrnMaybe
+    } yield MessageData(generationDate, mrn)
 
   def messageFlow(messageType: MessageType) = Flow.fromGraph(
     GraphDSL.create() {
@@ -79,25 +74,30 @@ class MessagesXmlParsingServiceImpl @Inject() (implicit materializer: Materializ
         val broadcastXml = builder.add(Broadcast[ParseEvent](2))
         val combiner =
           builder.add(
-            ZipWith[ParseResult[OffsetDateTime], ParseResult[MovementReferenceNumber], ParseResult[MessageData]](
+            ZipWith[ParseResult[OffsetDateTime], ParseResult[Option[MovementReferenceNumber]], ParseResult[MessageData]](
               (date, mrn) => buildMessageData(date, mrn, messageType)
             )
           )
 
         val xmlParsing = builder.add(XmlParsing.parser)
-        val mrnFlow    = builder.add(XmlParsers.movementReferenceNumberExtractor)
         val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor(messageType))
-        val partition  = builder.add(Partition[ParseEvent](2, _ => if (messageType == MrnAllocated) 0 else 1))
 
         xmlParsing.out ~> broadcastXml.in
 
         broadcastXml.out(0) ~> dateFlow ~> combiner.in0
 
-        broadcastXml.out(1) ~> partition.in
+        if (messageType == MrnAllocated) {
+          val mrnFlow = builder.add(XmlParsers.movementReferenceNumberExtractor)
+          val toOptionFlow = builder.add(Flow[ParseResult[MovementReferenceNumber]].map[ParseResult[Option[MovementReferenceNumber]]] {
+            case Right(mrn) => Right(Some(mrn))
+            case Left(x)    => Left(x)
+          })
 
-        partition.out(0) ~> mrnFlow ~> combiner.in1
-
-        partition.out(1).to(Sink.head)
+          broadcastXml.out(1) ~> mrnFlow ~> toOptionFlow ~> combiner.in1
+        } else {
+          broadcastXml.out(1) ~> Sink.ignore
+          Source.single(Right(None)) ~> combiner.in1
+        }
 
         FlowShape(xmlParsing.in, combiner.out)
     }
