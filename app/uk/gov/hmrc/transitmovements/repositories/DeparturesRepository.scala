@@ -100,7 +100,8 @@ class DeparturesRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.departureIdFormat),
         Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format),
         Codecs.playFormatCodec(GetDepartureIdsDTO.format),
-        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat)
+        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
+        Codecs.playFormatCodec(MongoFormats.mrnFormat)
       )
     )
     with DeparturesRepository

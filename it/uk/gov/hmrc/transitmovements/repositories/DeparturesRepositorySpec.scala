@@ -284,7 +284,7 @@ class DeparturesRepositorySpec
 
   "updateMessages" should "update MRN field when message type is MRNAllocated, as well as messages and updated field" in {
 
-    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
+    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = None)
 
     val departureID = DepartureId("EFG123")
     val departure =
@@ -319,7 +319,7 @@ class DeparturesRepositorySpec
     movement.messages.length should be(2)
     movement.messages.toList should contain(message1)
     movement.messages.toList should contain(message2)
-    movement.movementReferenceNumber should be(mrn)
+    movement.movementReferenceNumber should be(Some(mrn))
 
   }
 
@@ -331,7 +331,7 @@ class DeparturesRepositorySpec
       arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
 
     val result = await(
-      repository.updateMessages(departureID, message, None).value
+      repository.updateMessages(departureID, message, Some(MovementReferenceNumber("REF123"))).value
     )
 
     result should be(Left(MongoError.DocumentNotFound(s"No departure found with the given id: ${departureID.value}")))

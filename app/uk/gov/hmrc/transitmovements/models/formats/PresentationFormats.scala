@@ -21,6 +21,7 @@ import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 
 trait PresentationFormats extends CommonFormats {
 
