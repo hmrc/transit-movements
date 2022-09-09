@@ -40,7 +40,6 @@ import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
@@ -226,19 +225,18 @@ class DeparturesRepositoryImpl @Inject() (
 
   def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit] = {
 
-    val selector: Bson = mEq(departureId)
+    val filter: Bson = mEq(departureId)
 
     val setUpdated   = mSet("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
     val pushMessages = mPush("messages", message)
 
-    //See if can extend combine with instruction to set mrn
+    val combined = Seq(setUpdated, pushMessages) ++ mrn
+      .map(
+        x => Seq(mSet("movementReferenceNumber", x))
+      )
+      .getOrElse(Seq())
 
-    val update =
-      if (message.messageType == MessageType.MrnAllocated)
-        mCombine(setUpdated, pushMessages, mSet("movementReferenceNumber", mrn.get))
-      else mCombine(setUpdated, pushMessages)
-
-    mongoRetry(Try(collection.updateOne(selector, update)) match {
+    mongoRetry(Try(collection.updateOne(filter, mCombine(combined: _*))) match {
       case Success(obs) =>
         obs.toFuture().map {
           result =>
