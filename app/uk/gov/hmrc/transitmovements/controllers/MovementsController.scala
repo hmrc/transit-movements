@@ -58,7 +58,7 @@ class MovementsController @Inject() (
       withTemporaryFile {
         (temporaryFile, source) =>
           (for {
-            messageType <- extract(request.headers).asPresentation // need to write unit test for this
+            messageType <- extract(request.headers).asPresentation
             messageData <- xmlParsingService.extractMessageData(source, messageType).asPresentation
             fileSource = FileIO.fromPath(temporaryFile)
             message <- factory.create(messageType, messageData.generationDate, Some(triggerId), fileSource).asPresentation

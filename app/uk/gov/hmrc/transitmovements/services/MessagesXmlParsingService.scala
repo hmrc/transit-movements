@@ -56,117 +56,52 @@ class MessagesXmlParsingServiceImpl @Inject() (implicit materializer: Materializ
   // we don't want to starve the Play pool
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
-  def messageFlow(messageType: MessageType): Flow[ByteString, ParseResult[MessageData], NotUsed] = {
+  def buildMessageData(
+    dateMaybe: ParseResult[OffsetDateTime],
+    mrnMaybe: ParseResult[MovementReferenceNumber],
+    messageType: MessageType
+  ): ParseResult[MessageData] =
+    if (messageType == MrnAllocated)
+      for {
+        generationDate <- dateMaybe
+        mrn            <- mrnMaybe
+      } yield MessageData(generationDate, Some(mrn))
+    else
+      dateMaybe.map(
+        generationDate => MessageData(generationDate, None)
+      )
 
-    def buildMessageData(
-      dateMaybe: ParseResult[OffsetDateTime],
-      mrnMaybe: ParseResult[MovementReferenceNumber]
-    ): ParseResult[MessageData] =
-      if (messageType == MrnAllocated)
-        for {
-          generationDate <- dateMaybe
-          mrn            <- mrnMaybe
-        } yield MessageData(generationDate, Some(mrn))
-      else
-        dateMaybe.map(
-          generationDate => MessageData(generationDate, None)
-        )
+  def messageFlow(messageType: MessageType) = Flow.fromGraph(
+    GraphDSL.create() {
+      implicit builder =>
+        import GraphDSL.Implicits._
 
-    Flow.fromGraph(
-      GraphDSL.create() {
-        implicit builder =>
-          import GraphDSL.Implicits._
-
-          val broadcastXml = builder.add(Broadcast[ParseEvent](2))
-          val combiner =
-            builder.add(
-              ZipWith[ParseResult[OffsetDateTime], ParseResult[MovementReferenceNumber], ParseResult[MessageData]](buildMessageData)
+        val broadcastXml = builder.add(Broadcast[ParseEvent](2))
+        val combiner =
+          builder.add(
+            ZipWith[ParseResult[OffsetDateTime], ParseResult[MovementReferenceNumber], ParseResult[MessageData]](
+              (date, mrn) => buildMessageData(date, mrn, messageType)
             )
+          )
 
-          val xmlParsing = builder.add(XmlParsing.parser)
-          val mrnFlow    = builder.add(XmlParsers.movementReferenceNumberExtractor)
-          val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor(messageType))
-          val partition  = builder.add(Partition[ParseEvent](2, _ => if (messageType == MrnAllocated) 0 else 1))
+        val xmlParsing = builder.add(XmlParsing.parser)
+        val mrnFlow    = builder.add(XmlParsers.movementReferenceNumberExtractor)
+        val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor(messageType))
+        val partition  = builder.add(Partition[ParseEvent](2, _ => if (messageType == MrnAllocated) 0 else 1))
 
-          xmlParsing.out ~> broadcastXml.in
+        xmlParsing.out ~> broadcastXml.in
 
-          broadcastXml.out(0) ~> dateFlow ~> combiner.in0
+        broadcastXml.out(0) ~> dateFlow ~> combiner.in0
 
-          broadcastXml.out(1) ~> partition.in
+        broadcastXml.out(1) ~> partition.in
 
-          partition.out(0) ~> mrnFlow ~> combiner.in1
+        partition.out(0) ~> mrnFlow ~> combiner.in1
 
-          partition.out(1).to(Sink.head)
+        partition.out(1).to(Sink.head)
 
-          FlowShape(xmlParsing.in, combiner.out)
-      }
-    )
-  }
-
-//  private val mrnAllocationFlow: Flow[ByteString, ParseResult[MessageData], NotUsed] =
-//    Flow.fromGraph(
-//      GraphDSL.create() {
-//        implicit builder =>
-//          import GraphDSL.Implicits._
-//
-//          val broadcast = builder.add(Broadcast[ParseEvent](2))
-//          val combiner  = builder.add(ZipWith[ParseResult[MovementReferenceNumber], ParseResult[OffsetDateTime], ParseResult[MessageData]](buildMessageData))
-//
-//          val xmlParsing = builder.add(XmlParsing.parser)
-//          val mrnFlow    = builder.add(XmlParsers.movementReferenceNumberExtractor)
-//          val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor(MrnAllocated))
-//
-//          xmlParsing.out ~> broadcast.in
-//          broadcast.out(0) ~> mrnFlow ~> combiner.in0
-//          broadcast.out(1) ~> dateFlow ~> combiner.in1
-//
-//          FlowShape(xmlParsing.in, combiner.out)
-//      }
-//    )
-
-//  private def messageFlow(messageType: MessageType): Flow[ByteString, ParseResult[MessageData], NotUsed] =
-//    Flow.fromGraph(
-//      GraphDSL.create() {
-//        implicit builder =>
-//          import GraphDSL.Implicits._
-//
-//          val xmlParsing = builder.add(XmlParsing.parser)
-//          val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor(messageType))
-//          val convertToMessageDataFlow = builder.add(Flow[ParseResult[OffsetDateTime]].map {
-//            _.map(
-//              date => MessageData(date, None)
-//            )
-//          })
-//
-//          xmlParsing.out ~> dateFlow ~> convertToMessageDataFlow
-//
-//          FlowShape(xmlParsing.in, convertToMessageDataFlow.out)
-//      }
-//    )
-
-//  private def extractMrnAllocationMessageData(source: Source[ByteString, _]): EitherT[Future, ParseError, MessageData] =
-//    EitherT(
-//      source
-//        .via(mrnAllocationFlow)
-//        .recover {
-//          case NonFatal(e) => Left(ParseError.UnexpectedError(Some(e)))
-//        }
-//        .runWith(Sink.head[Either[ParseError, MessageData]])
-//    )
-
-//  override def extractMessageData(source: Source[ByteString, _], messageType: MessageType): EitherT[Future, ParseError, MessageData] =
-//    messageType match {
-//      case MrnAllocated => extractMrnAllocationMessageData(source)
-//      case _ =>
-//        EitherT(
-//          source
-//            .via(messageFlow(messageType))
-//            .recover {
-//              case NonFatal(e) => Left(ParseError.UnexpectedError(Some(e)))
-//            }
-//            .runWith(Sink.head[Either[ParseError, MessageData]])
-//        )
-//    }
+        FlowShape(xmlParsing.in, combiner.out)
+    }
+  )
 
   override def extractMessageData(source: Source[ByteString, _], messageType: MessageType): EitherT[Future, ParseError, MessageData] =
     EitherT(

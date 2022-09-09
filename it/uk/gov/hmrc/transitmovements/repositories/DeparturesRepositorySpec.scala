@@ -244,7 +244,7 @@ class DeparturesRepositorySpec
 
   }
 
-  "updateMessages" should "add a message to the matching movement and set updated parameter" in {
+  "updateMessages" should "if not MrnAllocated, add a message to the matching movement and set updated parameter" in {
 
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
 
@@ -282,7 +282,7 @@ class DeparturesRepositorySpec
 
   }
 
-  "updateMessages" should "update MRN field when message type is MRNAllocated, as well as messages and updated field" in {
+  "updateMessages" should "if MrnAllocated, update MRN field when message type is MRNAllocated, as well as messages and updated field" in {
 
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = None)
 
