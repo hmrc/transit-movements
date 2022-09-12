@@ -20,7 +20,6 @@ import akka.pattern.retry
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import com.google.inject.ImplementedBy
-import com.mongodb.client.model.Filters.{ne => mNe}
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
 import com.mongodb.client.model.Filters.{gte => mGte}
@@ -32,7 +31,6 @@ import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
 import play.api.Logging
-import play.api.libs.json.Json
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
@@ -42,6 +40,7 @@ import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepositoryImpl.EPOCH_TIME
@@ -72,7 +71,7 @@ trait DeparturesRepository {
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageId]]]
   def getDepartureIds(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureId]]]
-  def updateMessages(departureId: DepartureId, message: Message): EitherT[Future, MongoError, Unit]
+  def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit]
 }
 
 object DeparturesRepositoryImpl {
@@ -100,7 +99,8 @@ class DeparturesRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.departureIdFormat),
         Codecs.playFormatCodec(GetDepartureMessageIdsDTO.format),
         Codecs.playFormatCodec(GetDepartureIdsDTO.format),
-        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat)
+        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
+        Codecs.playFormatCodec(MongoFormats.mrnFormat)
       )
     )
     with DeparturesRepository
@@ -223,13 +223,20 @@ class DeparturesRepositoryImpl @Inject() (
 
   }
 
-  def updateMessages(departureId: DepartureId, message: Message): EitherT[Future, MongoError, Unit] = {
+  def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit] = {
 
-    val selector: Bson = mEq(departureId)
+    val filter: Bson = mEq(departureId)
 
-    val update: Bson = mCombine(mSet("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)), mPush("messages", message))
+    val setUpdated   = mSet("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
+    val pushMessages = mPush("messages", message)
 
-    mongoRetry(Try(collection.updateOne(selector, update)) match {
+    val combined = Seq(setUpdated, pushMessages) ++ mrn
+      .map(
+        x => Seq(mSet("movementReferenceNumber", x))
+      )
+      .getOrElse(Seq())
+
+    mongoRetry(Try(collection.updateOne(filter, mCombine(combined: _*))) match {
       case Success(obs) =>
         obs.toFuture().map {
           result =>

@@ -44,7 +44,6 @@ trait ConvertError {
       case TooManyElementsFound(element) => PresentationError.badRequestError(s"Found too many elements of type $element")
       case BadDateTime(element, ex)      => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
       case UnexpectedError(ex)           => PresentationError.internalServiceError(cause = ex)
-      case InvalidMessageType()          => PresentationError.badRequestError(s"No valid message type found")
     }
 
   }
@@ -55,6 +54,7 @@ trait ConvertError {
     def convert(mongoError: MongoError): PresentationError = mongoError match {
       case UnexpectedError(ex)            => PresentationError.internalServiceError(cause = ex)
       case InsertNotAcknowledged(message) => PresentationError.internalServiceError(message = message)
+      case UpdateNotAcknowledged(message) => PresentationError.internalServiceError(message = message)
       case DocumentNotFound(message)      => PresentationError.badRequestError(message = message)
     }
   }
@@ -64,6 +64,15 @@ trait ConvertError {
 
     def convert(streamError: StreamError): PresentationError = streamError match {
       case UnexpectedError(ex) => PresentationError.internalServiceError(cause = ex)
+    }
+  }
+
+  implicit val headerExtractErrorConverter = new Converter[HeaderExtractError] {
+    import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError._
+
+    def convert(headerExtractError: HeaderExtractError): PresentationError = headerExtractError match {
+      case NoHeaderFound(message)      => PresentationError.badRequestError(message)
+      case InvalidMessageType(message) => PresentationError.badRequestError(message)
     }
   }
 

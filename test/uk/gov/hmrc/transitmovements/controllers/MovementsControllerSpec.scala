@@ -36,6 +36,7 @@ import play.api.http.Status.OK
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
+import play.api.mvc.Headers
 import play.api.mvc.Request
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
@@ -45,6 +46,8 @@ import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
+import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
+import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.Message
@@ -52,6 +55,7 @@ import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
@@ -78,14 +82,19 @@ class MovementsControllerSpec
     with PresentationFormats
     with ModelGenerators {
 
+  val mrn = MovementReferenceNumber("MRN123")
+
+  val messageType = MessageType.DeclarationData
+
   def fakeRequest[A](
     method: String,
-    body: NodeSeq
+    body: NodeSeq,
+    headers: FakeHeaders = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code))
   ): Request[NodeSeq] =
     FakeRequest(
       method = method,
       uri = routes.MovementsController.updateMovement(movementId, triggerId).url,
-      headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
+      headers = headers,
       body = body
     )
 
@@ -95,14 +104,13 @@ class MovementsControllerSpec
   val messageId  = MessageId("DEF567")
   val triggerId  = MessageId("ABC123")
 
-  val mockXmlParsingService    = mock[MessagesXmlParsingService]
-  val mockRepository           = mock[DeparturesRepository]
-  val mockMessageFactory       = mock[MessageFactory]
-  val mockTemporaryFileCreator = mock[TemporaryFileCreator]
+  val mockXmlParsingService          = mock[MessagesXmlParsingService]
+  val mockRepository                 = mock[DeparturesRepository]
+  val mockMessageFactory             = mock[MessageFactory]
+  val mockTemporaryFileCreator       = mock[TemporaryFileCreator]
+  val mockMessageTypeHeaderExtractor = mock[MessageTypeHeaderExtractor]
 
-  val messageType = MessageType.AmendmentAcceptance
-
-  lazy val messageData: MessageData = MessageData(MessageType.AmendmentAcceptance, OffsetDateTime.now(ZoneId.of("UTC")))
+  lazy val messageData: MessageData = MessageData(OffsetDateTime.now(ZoneId.of("UTC")), None)
 
   lazy val messageDataEither: EitherT[Future, ParseError, MessageData] =
     EitherT.rightT(messageData)
@@ -132,10 +140,10 @@ class MovementsControllerSpec
   "updateMovement" - {
 
     val validXml: NodeSeq =
-      <CC009C>
+      <CC015C>
         <messageSender>ABC123</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-      </CC009C>
+      </CC015C>
 
     lazy val messageFactoryEither: EitherT[Future, StreamError, Message] =
       EitherT.rightT(message)
@@ -145,13 +153,16 @@ class MovementsControllerSpec
       val tempFile = SingletonTemporaryFileCreator.create()
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
-      when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]]))
+      when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
+        .thenReturn(EitherT.rightT(messageType))
+
+      when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
         .thenReturn(messageDataEither)
 
       when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
         .thenReturn(messageFactoryEither)
 
-      when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message]))
+      when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message], any[Option[MovementReferenceNumber]]))
         .thenReturn(EitherT.rightT(Right(())))
 
       val request = fakeRequest(POST, validXml)
@@ -163,39 +174,6 @@ class MovementsControllerSpec
     }
 
     "must return BAD_REQUEST when XML data extraction fails" - {
-
-      "contains message to indicate an invalid message type" in {
-
-        val xml: NodeSeq =
-          <ELEM></ELEM>
-
-        val tempFile = SingletonTemporaryFileCreator.create()
-        when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
-
-        when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]]))
-          .thenReturn(
-            EitherT.leftT(
-              ParseError.InvalidMessageType()
-            )
-          )
-
-        when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
-          .thenReturn(messageFactoryEither)
-
-        when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message]))
-          .thenReturn(EitherT.rightT(Right(())))
-
-        val request = fakeRequest(POST, xml)
-
-        val result =
-          controller.updateMovement(movementId, triggerId)(request)
-
-        status(result) mustBe BAD_REQUEST
-        contentAsJson(result) mustBe Json.obj(
-          "code"    -> "BAD_REQUEST",
-          "message" -> "No valid message type found"
-        )
-      }
 
       "contains message to indicate date time failure" in {
 
@@ -209,7 +187,10 @@ class MovementsControllerSpec
         val tempFile = SingletonTemporaryFileCreator.create()
         when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
-        when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]]))
+        when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
+          .thenReturn(EitherT.rightT(MessageType.InvalidationDecision))
+
+        when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
           .thenReturn(
             EitherT.leftT(
               ParseError.BadDateTime("preparationDateAndTime", new DateTimeParseException("Text 'invalid' could not be parsed at index 0", cs, 0))
@@ -219,7 +200,7 @@ class MovementsControllerSpec
         when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
           .thenReturn(messageFactoryEither)
 
-        when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message]))
+        when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message], any[Option[MovementReferenceNumber]]))
           .thenReturn(EitherT.rightT(Right(())))
 
         val request = fakeRequest(POST, xml)
@@ -239,13 +220,16 @@ class MovementsControllerSpec
         val tempFile = SingletonTemporaryFileCreator.create()
         when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
-        when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]]))
+        when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
+          .thenReturn(EitherT.rightT(messageType))
+
+        when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
           .thenReturn(messageDataEither)
 
         when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
           .thenReturn(messageFactoryEither)
 
-        when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message]))
+        when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message], any[Option[MovementReferenceNumber]]))
           .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(s"No departure found with the given id: ${movementId.value}")))
 
         val request = fakeRequest(POST, validXml)
@@ -259,6 +243,47 @@ class MovementsControllerSpec
           "message" -> "No departure found with the given id: 12345"
         )
       }
+
+      "contains message to indicate message type header not supplied" in {
+
+        val tempFile = SingletonTemporaryFileCreator.create()
+        when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
+
+        when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
+          .thenReturn(EitherT.leftT(NoHeaderFound("Missing X-Message-Type header value")))
+
+        val request = fakeRequest(POST, validXml, FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)))
+
+        val result =
+          controller.updateMovement(movementId, triggerId)(request)
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Missing X-Message-Type header value"
+        )
+      }
+
+      "contains message to indicate the given message type is invalid" in {
+
+        val tempFile = SingletonTemporaryFileCreator.create()
+        when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
+
+        when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
+          .thenReturn(EitherT.leftT(InvalidMessageType(s"Invalid X-Message-Type header value: invalid")))
+
+        val request = fakeRequest(POST, validXml, FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> "invalid")))
+
+        val result =
+          controller.updateMovement(movementId, triggerId)(request)
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Invalid X-Message-Type header value: invalid"
+        )
+      }
+
     }
 
     "must return INTERNAL_SERVICE_ERROR" - {
@@ -266,9 +291,12 @@ class MovementsControllerSpec
       "when an invalid xml causes an unknown ParseError to be thrown" in {
 
         val unknownErrorXml: String =
-          "<CC007CC><messageSender/>GB1234"
+          "<CC007C><messageSender/>GB1234"
 
-        when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]]))
+        when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
+          .thenReturn(EitherT.rightT(MessageType.MrnAllocated))
+
+        when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
           .thenReturn(EitherT.leftT(ParseError.UnexpectedError(Some(new IllegalArgumentException()))))
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
@@ -276,7 +304,7 @@ class MovementsControllerSpec
         val request = FakeRequest(
           method = POST,
           uri = routes.MovementsController.updateMovement(movementId, triggerId).url,
-          headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
+          headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code)),
           body = unknownErrorXml
         )
 

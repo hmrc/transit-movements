@@ -39,6 +39,7 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.time.Clock
@@ -243,7 +244,7 @@ class DeparturesRepositorySpec
 
   }
 
-  "updateMessages" should "add a message to the matching movement and set updated parameter" in {
+  "updateMessages" should "if not MrnAllocated, add a message to the matching movement and set updated parameter" in {
 
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
 
@@ -265,7 +266,7 @@ class DeparturesRepositorySpec
       arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
 
     val result = await(
-      repository.updateMessages(departureID, message2).value
+      repository.updateMessages(departureID, message2, None).value
     )
 
     result should be(Right(()))
@@ -281,6 +282,47 @@ class DeparturesRepositorySpec
 
   }
 
+  "updateMessages" should "if MrnAllocated, update MRN field when message type is MRNAllocated, as well as messages and updated field" in {
+
+    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = None)
+
+    val departureID = DepartureId("EFG123")
+    val departure =
+      arbitrary[Departure].sample.value
+        .copy(
+          _id = departureID,
+          created = instant,
+          updated = instant,
+          movementReferenceNumber = None,
+          messages = NonEmptyList(message1, List.empty)
+        )
+
+    await(
+      repository.insert(departure).value
+    )
+
+    val message2 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = Some(MessageId(departureID.value)))
+
+    val mrn = MovementReferenceNumber("REF123")
+    val result = await(
+      repository.updateMessages(departureID, message2, Some(mrn)).value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", "EFG123")).first().toFuture()
+    }
+
+    movement.updated shouldNot be(instant)
+    movement.messages.length should be(2)
+    movement.messages.toList should contain(message1)
+    movement.messages.toList should contain(message2)
+    movement.movementReferenceNumber should be(Some(mrn))
+
+  }
+
   "updateMessages" should "return error if there is no matching movement with the given id" in {
 
     val departureID = DepartureId("ABC")
@@ -289,7 +331,7 @@ class DeparturesRepositorySpec
       arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
 
     val result = await(
-      repository.updateMessages(departureID, message).value
+      repository.updateMessages(departureID, message, Some(MovementReferenceNumber("REF123"))).value
     )
 
     result should be(Left(MongoError.DocumentNotFound(s"No departure found with the given id: ${departureID.value}")))

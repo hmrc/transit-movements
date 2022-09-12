@@ -26,6 +26,7 @@ import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -46,6 +47,8 @@ trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
   }
 
   implicit val offsetDateTimeFormat: Format[OffsetDateTime] = Format.apply(offsetDateTimeReads, offsetDateTimeWrites)
+
+  implicit val mrnFormat: Format[MovementReferenceNumber] = Json.valueFormat[MovementReferenceNumber]
 
   // these use the dates above, so need to be here for compile-time macro expansion
   implicit val messageFormat: Format[Message]                                   = Json.format[Message]

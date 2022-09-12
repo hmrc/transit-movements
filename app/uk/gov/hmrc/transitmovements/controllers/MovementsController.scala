@@ -50,17 +50,19 @@ class MovementsController @Inject() (
 ) extends BackendController(cc)
     with StreamingParsers
     with TemporaryFiles
-    with ConvertError {
+    with ConvertError
+    with MessageTypeHeaderExtractor {
 
   def updateMovement(movementId: MovementId, triggerId: MessageId): Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
     implicit request =>
       withTemporaryFile {
         (temporaryFile, source) =>
           (for {
-            messageData <- xmlParsingService.extractMessageData(source).asPresentation
+            messageType <- extract(request.headers).asPresentation
+            messageData <- xmlParsingService.extractMessageData(source, messageType).asPresentation
             fileSource = FileIO.fromPath(temporaryFile)
-            message <- factory.create(messageData.messageType, messageData.generationDate, Some(triggerId), fileSource).asPresentation
-            result  <- repo.updateMessages(DepartureId(movementId.value), message).asPresentation
+            message <- factory.create(messageType, messageData.generationDate, Some(triggerId), fileSource).asPresentation
+            result  <- repo.updateMessages(DepartureId(movementId.value), message, messageData.mrn).asPresentation
           } yield result).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
             _ => Ok

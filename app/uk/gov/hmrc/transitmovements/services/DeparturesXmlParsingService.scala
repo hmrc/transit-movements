@@ -34,6 +34,7 @@ import com.google.inject.Inject
 import com.google.inject.Singleton
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -72,7 +73,7 @@ class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Material
 
           val xmlParsing = builder.add(XmlParsing.parser)
           val eoriFlow   = builder.add(XmlParsers.movementEORINumberExtractor)
-          val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor)
+          val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor(MessageType.DeclarationData))
 
           xmlParsing.out ~> broadcast.in
           broadcast.out(0) ~> eoriFlow ~> combiner.in0

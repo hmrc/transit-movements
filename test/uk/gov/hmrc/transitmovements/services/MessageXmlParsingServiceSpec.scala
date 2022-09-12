@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovements.services
 
 import akka.stream.scaladsl.Sink
 import com.fasterxml.aalto.WFCException
+import org.scalacheck.Gen
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
@@ -27,6 +28,7 @@ import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -42,45 +44,30 @@ class MessageXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Ma
   implicit val defaultPatience =
     PatienceConfig(timeout = Span(6, Seconds))
 
-  val validXml: NodeSeq =
-    <CC015C>
-      <HolderOfTheTransitProcedure>
+  val validMrnAllocationXml: NodeSeq =
+    <CC028C>
+      <TransitOperation>
         <identificationNumber>GB1234</identificationNumber>
-      </HolderOfTheTransitProcedure>
+        <MRN>MRN123</MRN>
+      </TransitOperation>
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
-    </CC015C>
+    </CC028C>
 
-  val invalidMessageType: NodeSeq =
-    <CCInvalid>
-      <HolderOfTheTransitProcedure>
-        <identificationNumber>GB1234</identificationNumber>
-      </HolderOfTheTransitProcedure>
-      <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
-    </CCInvalid>
+  def noDate(messageType: String, isMrnAllocated: Boolean): String =
+    if (!isMrnAllocated)
+      s"<$messageType><HolderOfTheTransitProcedure><identificationNumber>GB1234</identificationNumber></HolderOfTheTransitProcedure></$messageType>"
+    else s"<$messageType><TransitOperation><MRN>MRN12345</MRN></TransitOperation></$messageType>"
 
-  val noDate: NodeSeq =
-    <CC015C>
-      <HolderOfTheTransitProcedure>
-        <identificationNumber>GB1234</identificationNumber>
-      </HolderOfTheTransitProcedure>
-    </CC015C>
+  def twoDates(messageType: String, isMrnAllocated: Boolean): String =
+    if (!isMrnAllocated)
+      s"<$messageType><HolderOfTheTransitProcedure><identificationNumber>GB1234</identificationNumber></HolderOfTheTransitProcedure><preparationDateAndTime>$UTCDateString</preparationDateAndTime><preparationDateAndTime>$UTCDateString</preparationDateAndTime></$messageType>"
+    else
+      s"<$messageType><TransitOperation><MRN>MRN12345</MRN></TransitOperation><preparationDateAndTime>$UTCDateString</preparationDateAndTime><preparationDateAndTime>$UTCDateString</preparationDateAndTime></$messageType>"
 
-  val twoDates: NodeSeq =
-    <CC015C>
-      <HolderOfTheTransitProcedure>
-        <identificationNumber>GB1234</identificationNumber>
-      </HolderOfTheTransitProcedure>
-      <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
-      <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
-    </CC015C>
-
-  val badDate: NodeSeq =
-    <CC015C>
-      <HolderOfTheTransitProcedure>
-        <identificationNumber>GB1234</identificationNumber>
-      </HolderOfTheTransitProcedure>
-      <preparationDateAndTime>invaliddate</preparationDateAndTime>
-    </CC015C>
+  def badDate(messageType: String, isMrnAllocated: Boolean): String =
+    if (!isMrnAllocated)
+      s"<$messageType><HolderOfTheTransitProcedure><identificationNumber>GB1234</identificationNumber></HolderOfTheTransitProcedure><preparationDateAndTime>invaliddate</preparationDateAndTime></$messageType>"
+    else s"<$messageType><TransitOperation><MRN>MRN12345</MRN></TransitOperation><preparationDateAndTime>invaliddate</preparationDateAndTime></$messageType>"
 
   val incompleteXml: String =
     "<CC015C><messageSender>GB1234</messageSender>"
@@ -94,97 +81,121 @@ class MessageXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Ma
   "When handed an XML stream" - {
     val service = new MessagesXmlParsingServiceImpl
 
-    "if it is valid, return an appropriate Message Data" in {
+    "if it is valid and not MrnAllocated, return an appropriate Message Data" in {
+      val validXml: NodeSeq =
+        <CC029C>
+          <HolderOfTheTransitProcedure>
+            <identificationNumber>GB1234</identificationNumber>
+          </HolderOfTheTransitProcedure>
+          <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
+        </CC029C>
+
       val source = createStream(validXml)
 
-      val result = service.extractMessageData(source)
+      val result = service.extractMessageData(source, MessageType.ReleaseForTransit)
 
       whenReady(result.value) {
-        _ mustBe Right(MessageData(MessageType.DeclarationData, testDate))
+        _ mustBe Right(MessageData(testDate, None))
       }
     }
 
-    "if it doesn't have a valid message type, return ParseError.InvalidMessageType" in {
-      val source = createStream(invalidMessageType)
+    val notMrnMessageType = Gen.oneOf(MessageType.values.filterNot(_ == MessageType.MrnAllocated)).sample.get
 
-      val result = service.extractMessageData(source)
+    Seq(MessageType.MrnAllocated, notMrnMessageType).foreach {
+      messageType =>
+        val isMrnAllocated         = messageType == MessageType.MrnAllocated
+        val messageTypeDescription = if (isMrnAllocated) "is MrnAllocated" else "is not MrnAllocated"
+        val rootNode               = messageType.rootNode
+
+        s"$messageTypeDescription, if it doesn't have a preparation date, return ParseError.NoElementFound" in {
+          val noDateXml = xml.XML.loadString(noDate(rootNode, isMrnAllocated))
+
+          val source = createStream(noDateXml)
+
+          val result = service.extractMessageData(source, messageType)
+
+          whenReady(result.value) {
+            _ mustBe Left(ParseError.NoElementFound("preparationDateAndTime"))
+          }
+        }
+
+        s"$messageTypeDescription, if it has two preparation dates, return ParseError.TooManyElementsFound" in {
+          val twoDatesXml = xml.XML.loadString(twoDates(rootNode, isMrnAllocated))
+
+          val source = createStream(twoDatesXml)
+
+          val result = service.extractMessageData(source, messageType)
+
+          whenReady(result.value) {
+            _ mustBe Left(ParseError.TooManyElementsFound("preparationDateAndTime"))
+          }
+        }
+
+        s"$messageTypeDescription, if it has a preparation date that is unparsable, return ParseError.BadDateTime" in {
+          val badDateXml   = xml.XML.loadString(badDate(rootNode, isMrnAllocated))
+          val stream       = createParsingEventStream(badDateXml)
+          val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor(messageType)).runWith(Sink.head)
+
+          whenReady(parsedResult) {
+            result =>
+              val error = result.left.get
+              error mustBe a[ParseError.BadDateTime]
+              error.asInstanceOf[ParseError.BadDateTime].element mustBe "preparationDateAndTime"
+              error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'invaliddate' could not be parsed at index 0"
+          }
+        }
+
+        s"$messageTypeDescription, if it is missing the end tag, return ParseError.Unknown" in {
+          val source = createStream(incompleteXml)
+
+          val result = service.extractMessageData(source, messageType)
+
+          whenReady(result.value) {
+            either =>
+              either mustBe a[Left[ParseError, _]]
+              either.left.get mustBe a[ParseError.UnexpectedError]
+              either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[IllegalStateException]
+          }
+        }
+
+        s"$messageTypeDescription, if it is missing the end of an inner tag, return ParseError.Unknown" in {
+          val source = createStream(missingInnerTag)
+
+          val result = service.extractMessageData(source, messageType)
+
+          whenReady(result.value) {
+            either =>
+              either mustBe a[Left[ParseError, _]]
+              either.left.get mustBe a[ParseError.UnexpectedError]
+              either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
+          }
+        }
+
+        s"$messageTypeDescription, if it contains mismatched tags, return ParseError.Unknown" in {
+          val source = createStream(mismatchedTags)
+
+          val result = service.extractMessageData(source, messageType)
+
+          whenReady(result.value) {
+            either =>
+              either mustBe a[Left[ParseError, _]]
+              either.left.get mustBe a[ParseError.UnexpectedError]
+              either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
+          }
+        }
+    }
+
+    "if the message type is MrnAllocated, return an appropriate Message Data" in {
+
+      val source = createStream(validMrnAllocationXml)
+
+      val result = service.extractMessageData(source, MessageType.MrnAllocated)
 
       whenReady(result.value) {
-        _ mustBe Left(ParseError.InvalidMessageType())
+        _ mustBe Right(MessageData(testDate, Some(MovementReferenceNumber("MRN123"))))
       }
     }
 
-    "if it doesn't have a preparation date, return ParseError.NoElementFound" in {
-      val source = createStream(noDate)
-
-      val result = service.extractMessageData(source)
-
-      whenReady(result.value) {
-        _ mustBe Left(ParseError.NoElementFound("preparationDateAndTime"))
-      }
-    }
-
-    "if it has two preparation dates, return ParseError.TooManyElementsFound" in {
-      val source = createStream(twoDates)
-
-      val result = service.extractMessageData(source)
-
-      whenReady(result.value) {
-        _ mustBe Left(ParseError.TooManyElementsFound("preparationDateAndTime"))
-      }
-    }
-
-    "if it has a preparation date that is unparsable, return ParseError.BadDateTime" in {
-      val stream       = createParsingEventStream(badDate)
-      val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor).runWith(Sink.head)
-
-      whenReady(parsedResult) {
-        result =>
-          val error = result.left.get
-          error mustBe a[ParseError.BadDateTime]
-          error.asInstanceOf[ParseError.BadDateTime].element mustBe "preparationDateAndTime"
-          error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'invaliddate' could not be parsed at index 0"
-      }
-    }
-
-    "if it is missing the end tag, return ParseError.Unknown" in {
-      val source = createStream(incompleteXml)
-
-      val result = service.extractMessageData(source)
-
-      whenReady(result.value) {
-        either =>
-          either mustBe a[Left[ParseError, _]]
-          either.left.get mustBe a[ParseError.UnexpectedError]
-          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[IllegalStateException]
-      }
-    }
-
-    "if it is missing the end of an inner tag, return ParseError.Unknown" in {
-      val source = createStream(missingInnerTag)
-
-      val result = service.extractMessageData(source)
-
-      whenReady(result.value) {
-        either =>
-          either mustBe a[Left[ParseError, _]]
-          either.left.get mustBe a[ParseError.UnexpectedError]
-          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
-      }
-    }
-
-    "if it contains mismatched tags, return ParseError.Unknown" in {
-      val source = createStream(mismatchedTags)
-
-      val result = service.extractMessageData(source)
-
-      whenReady(result.value) {
-        either =>
-          either mustBe a[Left[ParseError, _]]
-          either.left.get mustBe a[ParseError.UnexpectedError]
-          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
-      }
-    }
   }
 
 }

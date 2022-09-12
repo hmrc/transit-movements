@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.controllers.errors
 
-import java.time.OffsetDateTime
+sealed abstract class HeaderExtractError
 
-case class MessageData(generationDate: OffsetDateTime, mrn: Option[MovementReferenceNumber])
+object HeaderExtractError {
+  case class NoHeaderFound(element: String)      extends HeaderExtractError
+  case class InvalidMessageType(element: String) extends HeaderExtractError
+}

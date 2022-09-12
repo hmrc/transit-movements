@@ -24,6 +24,7 @@ import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.scaladsl.Broadcast
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.GraphDSL
+import akka.stream.scaladsl.Partition
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.stream.scaladsl.ZipWith
@@ -33,6 +34,8 @@ import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MessageType.MrnAllocated
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -44,7 +47,7 @@ import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[MessagesXmlParsingServiceImpl])
 trait MessagesXmlParsingService {
-  def extractMessageData(source: Source[ByteString, _]): EitherT[Future, ParseError, MessageData]
+  def extractMessageData(source: Source[ByteString, _], messageType: MessageType): EitherT[Future, ParseError, MessageData]
 }
 
 @Singleton
@@ -53,37 +56,57 @@ class MessagesXmlParsingServiceImpl @Inject() (implicit materializer: Materializ
   // we don't want to starve the Play pool
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
-  private def buildMessageData(messageTypeMaybe: ParseResult[MessageType], dateMaybe: ParseResult[OffsetDateTime]): ParseResult[MessageData] =
+  def buildMessageData(
+    dateMaybe: ParseResult[OffsetDateTime],
+    mrnMaybe: ParseResult[Option[MovementReferenceNumber]],
+    messageType: MessageType
+  ): ParseResult[MessageData] =
     for {
-      messageType    <- messageTypeMaybe
       generationDate <- dateMaybe
-    } yield MessageData(messageType, generationDate)
+      mrn            <- mrnMaybe
+    } yield MessageData(generationDate, mrn)
 
-  private val messageFlow: Flow[ByteString, ParseResult[MessageData], NotUsed] =
-    Flow.fromGraph(
-      GraphDSL.create() {
-        implicit builder =>
-          import GraphDSL.Implicits._
+  def messageFlow(messageType: MessageType) = Flow.fromGraph(
+    GraphDSL.create() {
+      implicit builder =>
+        import GraphDSL.Implicits._
 
-          val broadcast = builder.add(Broadcast[ParseEvent](2))
-          val combiner  = builder.add(ZipWith[ParseResult[MessageType], ParseResult[OffsetDateTime], ParseResult[MessageData]](buildMessageData))
+        val broadcastXml = builder.add(Broadcast[ParseEvent](2))
+        val combiner =
+          builder.add(
+            ZipWith[ParseResult[OffsetDateTime], ParseResult[Option[MovementReferenceNumber]], ParseResult[MessageData]](
+              (date, mrn) => buildMessageData(date, mrn, messageType)
+            )
+          )
 
-          val xmlParsing      = builder.add(XmlParsing.parser)
-          val messageTypeFlow = builder.add(XmlParsers.messageTypeExtractor)
-          val dateFlow        = builder.add(XmlParsers.preparationDateTimeExtractor)
+        val xmlParsing = builder.add(XmlParsing.parser)
+        val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor(messageType))
 
-          xmlParsing.out ~> broadcast.in
-          broadcast.out(0) ~> messageTypeFlow ~> combiner.in0
-          broadcast.out(1) ~> dateFlow ~> combiner.in1
+        xmlParsing.out ~> broadcastXml.in
 
-          FlowShape(xmlParsing.in, combiner.out)
-      }
-    )
+        broadcastXml.out(0) ~> dateFlow ~> combiner.in0
 
-  override def extractMessageData(source: Source[ByteString, _]): EitherT[Future, ParseError, MessageData] =
+        if (messageType == MrnAllocated) {
+          val mrnFlow = builder.add(XmlParsers.movementReferenceNumberExtractor)
+          val toOptionFlow = builder.add(Flow[ParseResult[MovementReferenceNumber]].map[ParseResult[Option[MovementReferenceNumber]]] {
+            case Right(mrn) => Right(Some(mrn))
+            case Left(x)    => Left(x)
+          })
+
+          broadcastXml.out(1) ~> mrnFlow ~> toOptionFlow ~> combiner.in1
+        } else {
+          broadcastXml.out(1) ~> Sink.ignore
+          Source.single(Right(None)) ~> combiner.in1
+        }
+
+        FlowShape(xmlParsing.in, combiner.out)
+    }
+  )
+
+  override def extractMessageData(source: Source[ByteString, _], messageType: MessageType): EitherT[Future, ParseError, MessageData] =
     EitherT(
       source
-        .via(messageFlow)
+        .via(messageFlow(messageType))
         .recover {
           case NonFatal(e) => Left(ParseError.UnexpectedError(Some(e)))
         }
