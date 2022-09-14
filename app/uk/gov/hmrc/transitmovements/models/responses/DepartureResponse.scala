@@ -14,42 +14,35 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.models.responses
 
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
+import play.api.libs.json.Json
+import play.api.libs.json.OFormat
+import uk.gov.hmrc.transitmovements.models.Departure
+import uk.gov.hmrc.transitmovements.models.DepartureId
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
+import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
+import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 
-import java.time.LocalDateTime
 import java.time.OffsetDateTime
 
-case class DepartureWithoutMessages(
-  _id: DepartureId,
-  enrollmentEORINumber: EORINumber,
-  movementEORINumber: EORINumber,
-  movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
+case class DepartureResponse(
+  id: DepartureId,
+  // movementReferenceNumber: Option[MovementReferenceNumber],
   created: OffsetDateTime,
   updated: OffsetDateTime
 )
 
-object DepartureWithoutMessages {
+object DepartureResponse extends CommonFormats with MongoFormats {
 
   val projection: Bson =
     BsonDocument(
-      "_id"                     -> 1,
-      "enrollmentEORINumber"    -> 1,
-      "movementEORINumber"      -> 1,
-      "movementReferenceNumber" -> 1,
-      "created"                 -> 1,
-      "updated"                 -> 1
-    )
-
-  def fromDeparture(departure: Departure) =
-    DepartureWithoutMessages(
-      departure._id,
-      departure.enrollmentEORINumber,
-      departure.movementEORINumber,
-      departure.movementReferenceNumber,
-      departure.created,
-      departure.updated
+      "_id" -> 1,
+      //   "movementReferenceNumber" -> 1,
+      "created" -> 1,
+      "updated" -> 1
     )
 }
