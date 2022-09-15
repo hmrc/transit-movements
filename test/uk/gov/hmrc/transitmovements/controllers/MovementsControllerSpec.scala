@@ -55,7 +55,6 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
@@ -83,27 +82,15 @@ class MovementsControllerSpec
     with PresentationFormats
     with ModelGenerators {
 
-  val mrn = MovementReferenceNumber("MRN123")
+  val mrn = arbitraryMovementReferenceNumber.arbitrary.sample.get
 
   val messageType = MessageType.DeclarationData
 
-  def fakeRequest[A](
-    method: String,
-    body: NodeSeq,
-    headers: FakeHeaders = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code))
-  ): Request[NodeSeq] =
-    FakeRequest(
-      method = method,
-      uri = routes.MovementsController.updateMovement(movementId, triggerId).url,
-      headers = headers,
-      body = body
-    )
-
   implicit val timeout: Timeout = 5.seconds
 
-  val movementId = MovementId("12345")
-  val messageId  = MessageId("DEF567")
-  val triggerId  = MessageId("ABC123")
+  val movementId = arbitraryMovementId.arbitrary.sample.get
+  val messageId  = arbitraryMessageId.arbitrary.sample.get
+  val triggerId  = arbitraryMessageId.arbitrary.sample.get
 
   val mockXmlParsingService          = mock[MessagesXmlParsingService]
   val mockRepository                 = mock[DeparturesRepository]
@@ -118,15 +105,19 @@ class MovementsControllerSpec
 
   val now = OffsetDateTime.now
 
-  lazy val message = Message(
-    messageId,
-    now,
-    now,
-    messageType,
-    Some(triggerId),
-    None,
-    None
-  )
+  lazy val message = arbitraryMessage.arbitrary.sample.get.copy(id = messageId, generated = now, received = now, triggerId = Some(triggerId))
+
+  def fakeRequest[A](
+    method: String,
+    body: NodeSeq,
+    headers: FakeHeaders = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code))
+  ): Request[NodeSeq] =
+    FakeRequest(
+      method = method,
+      uri = routes.MovementsController.updateMovement(movementId, triggerId).url,
+      headers = headers,
+      body = body
+    )
 
   override def afterEach() {
     reset(mockTemporaryFileCreator)
@@ -164,7 +155,7 @@ class MovementsControllerSpec
         .thenReturn(messageFactoryEither)
 
       when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message], any[Option[MovementReferenceNumber]]))
-        .thenReturn(EitherT.rightT(Right(())))
+        .thenReturn(EitherT.rightT(messageId))
 
       val request = fakeRequest(POST, validXml)
 
@@ -202,7 +193,7 @@ class MovementsControllerSpec
           .thenReturn(messageFactoryEither)
 
         when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message], any[Option[MovementReferenceNumber]]))
-          .thenReturn(EitherT.rightT(Right(())))
+          .thenReturn(EitherT.rightT(messageId))
 
         val request = fakeRequest(POST, xml)
 
@@ -240,8 +231,8 @@ class MovementsControllerSpec
 
         status(result) mustBe NOT_FOUND
         contentAsJson(result) mustBe Json.obj(
-          "code"    -> "NOT_FOUND",
-          "message" -> "No departure found with the given id: 12345"
+          "code"    -> "BAD_REQUEST",
+          "message" -> s"No departure found with the given id: ${movementId.value}"
         )
       }
 
