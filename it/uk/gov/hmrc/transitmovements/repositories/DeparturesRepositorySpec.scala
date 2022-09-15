@@ -85,10 +85,10 @@ class DeparturesRepositorySpec
     )
 
     val firstItem = await {
-      repository.collection.find(Filters.eq("_id", "2")).first().toFuture()
+      repository.collection.find(Filters.eq("_id", departure._id.value)).first().toFuture()
     }
 
-    firstItem._id.value should be("2")
+    firstItem._id.value should be(departure._id.value)
   }
 
   "getDepartureWithoutMessages" should "return DepartureWithoutMessages if it exists" in {
@@ -176,7 +176,7 @@ class DeparturesRepositorySpec
   }
 
   "getMessages" should "return none if the departure doesn't exist" in {
-    val result = await(repository.getMessages(EORINumber("ABC"), DepartureId("XYZ"), None).value)
+    val result = await(repository.getMessages(EORINumber("NONEXISTENT_EORI"), DepartureId("NONEXISTENT_ID"), None).value)
     result.right.get.isEmpty should be(true)
   }
 
@@ -208,50 +208,23 @@ class DeparturesRepositorySpec
 
   object GetDeparturesSetup {
 
-    val eoriGB = EORINumber("GB00001")
-    val eoriXI = EORINumber("XI00001")
+    val eoriGB  = arbitrary[EORINumber].sample.value
+    val eoriXI  = arbitrary[EORINumber].sample.value
+    val message = arbitrary[Message].sample.value
 
-    val departureGB1 = Departure(
-      _id = DepartureId("10001"),
-      enrollmentEORINumber = eoriGB,
-      movementEORINumber = EORINumber("20001"),
-      movementReferenceNumber = Some(MovementReferenceNumber("MRN001GB")),
-      created = instant,
-      updated = instant,
-      messages = NonEmptyList(
-        Message(
-          id = MessageId("00011"),
-          received = instant,
-          generated = instant,
-          messageType = MessageType.DeclarationData,
-          triggerId = None,
-          url = None,
-          body = None
-        ),
-        tail = List.empty
-      )
-    )
+    val departureGB1 =
+      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriGB, created = instant, updated = instant, messages = NonEmptyList(message, List.empty))
 
-    val departureXi1 = departureGB1.copy(
-      _id = DepartureId("10002"),
-      movementReferenceNumber = Some(MovementReferenceNumber("MRN001XI")),
-      enrollmentEORINumber = eoriXI,
-      updated = instant.plusMinutes(1)
-    )
+    val mrnGen = arbitrary[MovementReferenceNumber]
 
-    val departureXi2 = departureGB1.copy(
-      _id = DepartureId("10003"),
-      movementReferenceNumber = Some(MovementReferenceNumber("MRN002XI")),
-      enrollmentEORINumber = eoriXI,
-      updated = instant.minusMinutes(3)
-    )
+    val departureXi1 =
+      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriXI, updated = instant.plusMinutes(1), movementReferenceNumber = mrnGen.sample)
 
-    val departureGB2 = departureGB1.copy(
-      _id = DepartureId("10004"),
-      movementReferenceNumber = Some(MovementReferenceNumber("MRN002GB")),
-      enrollmentEORINumber = eoriGB,
-      updated = instant.plusMinutes(1)
-    )
+    val departureXi2 =
+      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriXI, updated = instant.minusMinutes(3), movementReferenceNumber = mrnGen.sample)
+
+    val departureGB2 =
+      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriGB, updated = instant.plusMinutes(1), movementReferenceNumber = mrnGen.sample)
 
     def setup() {
 
@@ -268,7 +241,7 @@ class DeparturesRepositorySpec
 
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
 
-    val departureID = DepartureId("ABC")
+    val departureID = arbitrary[DepartureId].sample.value
     val departure =
       arbitrary[Departure].sample.value
         .copy(
@@ -292,7 +265,7 @@ class DeparturesRepositorySpec
     result should be(Right(()))
 
     val movement = await {
-      repository.collection.find(Filters.eq("_id", "ABC")).first().toFuture()
+      repository.collection.find(Filters.eq("_id", departureID.value)).first().toFuture()
     }
 
     movement.updated shouldNot be(instant)
@@ -306,11 +279,11 @@ class DeparturesRepositorySpec
 
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = None)
 
-    val departureID = DepartureId("EFG123")
+    val departureId = arbitrary[DepartureId].sample.value
     val departure =
       arbitrary[Departure].sample.value
         .copy(
-          _id = departureID,
+          _id = departureId,
           created = instant,
           updated = instant,
           movementReferenceNumber = None,
@@ -322,17 +295,17 @@ class DeparturesRepositorySpec
     )
 
     val message2 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = Some(MessageId(departureID.value)))
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = Some(MessageId(departureId.value)))
 
-    val mrn = MovementReferenceNumber("REF123")
+    val mrn = arbitrary[MovementReferenceNumber].sample.value
     val result = await(
-      repository.updateMessages(departureID, message2, Some(mrn)).value
+      repository.updateMessages(departureId, message2, Some(mrn)).value
     )
 
     result should be(Right(()))
 
     val movement = await {
-      repository.collection.find(Filters.eq("_id", "EFG123")).first().toFuture()
+      repository.collection.find(Filters.eq("_id", departureId.value)).first().toFuture()
     }
 
     movement.updated shouldNot be(instant)
@@ -345,13 +318,13 @@ class DeparturesRepositorySpec
 
   "updateMessages" should "return error if there is no matching movement with the given id" in {
 
-    val departureID = DepartureId("ABC")
+    val departureID = arbitrary[DepartureId].sample.value
 
     val message =
       arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
 
     val result = await(
-      repository.updateMessages(departureID, message, Some(MovementReferenceNumber("REF123"))).value
+      repository.updateMessages(departureID, message, Some(arbitrary[MovementReferenceNumber].sample.get)).value
     )
 
     result should be(Left(MongoError.DocumentNotFound(s"No departure found with the given id: ${departureID.value}")))

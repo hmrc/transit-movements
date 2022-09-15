@@ -26,6 +26,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.{eq => eqTo}
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
+import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
@@ -89,17 +90,6 @@ class DeparturesControllerSpec
     with PresentationFormats
     with ModelGenerators {
 
-  def fakeRequestDepartures[A](
-    method: String,
-    body: NodeSeq
-  ): Request[NodeSeq] =
-    FakeRequest(
-      method = method,
-      uri = routes.DeparturesController.createDeparture(eori).url,
-      headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
-      body = body
-    )
-
   implicit val timeout: Timeout = 5.seconds
 
   val mockXmlParsingService    = mock[DeparturesXmlParsingService]
@@ -108,50 +98,39 @@ class DeparturesControllerSpec
   val mockMessageFactory       = mock[MessageFactory]
   val mockTemporaryFileCreator = mock[TemporaryFileCreator]
 
-  lazy val eori            = EORINumber("eori")
-  lazy val declarationData = DeclarationData(eori, OffsetDateTime.now(ZoneId.of("UTC")))
+  lazy val now                     = OffsetDateTime.now
+  lazy val instant: OffsetDateTime = OffsetDateTime.of(2022, 3, 14, 1, 0, 0, 0, ZoneOffset.UTC)
+
+  lazy val eoriNumber  = arbitrary[EORINumber].sample.get
+  lazy val departureId = arbitrary[DepartureId].sample.get
+  lazy val messageId   = arbitrary[MessageId].sample.get
+
+  lazy val declarationData = DeclarationData(eoriNumber, OffsetDateTime.now(ZoneId.of("UTC")))
 
   lazy val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
     EitherT.rightT(declarationData)
 
-  val now = OffsetDateTime.now
+  lazy val message = arbitrary[Message].sample.value.copy(id = messageId, generated = now, received = now, messageType = MessageType.DeclarationData)
 
-  lazy val departureId = DepartureId("ABC123")
-
-  lazy val instant: OffsetDateTime = OffsetDateTime.of(2022, 3, 14, 1, 0, 0, 0, ZoneOffset.UTC)
-
-  lazy val eoriNumber = EORINumber("A")
-
-  lazy val messageId = MessageId("XYZ345")
-
-  lazy val message = Message(
-    messageId,
-    now,
-    now,
-    MessageType.DeclarationData,
-    None,
-    None,
-    None
+  lazy val departure = arbitrary[Departure].sample.value.copy(
+    _id = departureId,
+    enrollmentEORINumber = eoriNumber,
+    movementEORINumber = eoriNumber,
+    created = now,
+    updated = now,
+    messages = NonEmptyList.one(message)
   )
 
-  lazy val departure = Departure(
-    departureId,
-    eoriNumber,
-    eoriNumber,
-    None,
-    now,
-    now,
-    NonEmptyList.one(
-      message
+  def fakeRequestDepartures[A](
+    method: String,
+    body: NodeSeq
+  ): Request[NodeSeq] =
+    FakeRequest(
+      method = method,
+      uri = routes.DeparturesController.createDeparture(eoriNumber).url,
+      headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
+      body = body
     )
-  )
-
-  override def afterEach() {
-    reset(mockTemporaryFileCreator)
-    reset(mockXmlParsingService)
-    reset(mockDepartureFactory)
-    super.afterEach()
-  }
 
   val controller =
     new DeparturesController(
@@ -162,6 +141,13 @@ class DeparturesControllerSpec
       mockXmlParsingService,
       mockTemporaryFileCreator
     )
+
+  override def afterEach() {
+    reset(mockTemporaryFileCreator)
+    reset(mockXmlParsingService)
+    reset(mockDepartureFactory)
+    super.afterEach()
+  }
 
   "createDeparture" - {
 
@@ -194,12 +180,12 @@ class DeparturesControllerSpec
       val request = fakeRequestDepartures(POST, validXml)
 
       val result =
-        controller.createDeparture(eori)(request)
+        controller.createDeparture(eoriNumber)(request)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
-        "departureId" -> "ABC123",
-        "messageId"   -> "XYZ345"
+        "departureId" -> departureId.value,
+        "messageId"   -> messageId.value
       )
     }
 
@@ -218,7 +204,7 @@ class DeparturesControllerSpec
         val request = fakeRequestDepartures(POST, elementNotFoundXml)
 
         val result =
-          controller.createDeparture(eori)(request)
+          controller.createDeparture(eoriNumber)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -243,7 +229,7 @@ class DeparturesControllerSpec
         val request = fakeRequestDepartures(POST, tooManyFoundXml)
 
         val result =
-          controller.createDeparture(eori)(request)
+          controller.createDeparture(eoriNumber)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -274,7 +260,7 @@ class DeparturesControllerSpec
         val request = fakeRequestDepartures(POST, tooManyFoundXml)
 
         val result =
-          controller.createDeparture(eori)(request)
+          controller.createDeparture(eoriNumber)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -298,13 +284,13 @@ class DeparturesControllerSpec
 
         val request = FakeRequest(
           method = POST,
-          uri = routes.DeparturesController.createDeparture(eori).url,
+          uri = routes.DeparturesController.createDeparture(eoriNumber).url,
           headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
           body = unknownErrorXml
         )
 
         val result =
-          controller.createDeparture(eori)(request)
+          controller.createDeparture(eoriNumber)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
@@ -320,7 +306,7 @@ class DeparturesControllerSpec
         val request = fakeRequestDepartures(POST, validXml)
 
         val result =
-          controller.createDeparture(eori)(request)
+          controller.createDeparture(eoriNumber)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
