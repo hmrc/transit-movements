@@ -40,7 +40,6 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.responses.DepartureResponse
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
@@ -110,13 +109,13 @@ class DeparturesRepositorySpec
     result.right.get.isEmpty should be(true)
   }
 
-  "getSingleMessage" should "return message if it exists" in {
+  "getSingleMessage" should "return message response if it exists" in {
     val departure = arbitrary[Departure].sample.value
 
     await(repository.insert(departure).value)
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id).value)
-    result.right.get.get should be(departure.messages.head)
+    result.right.get.get should be(MessageResponse.fromMessage(departure.messages.head))
   }
 
   "getSingleMessage" should "return none if the message doesn't exist" in {
@@ -137,15 +136,14 @@ class DeparturesRepositorySpec
             .reverse
         )
         .value
-    val departure   = arbitrary[Departure].sample.value.copy(messages = messages)
-    val departureID = departure._id
+    val departure = arbitrary[Departure].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, None).value)
     result.right.get.get should be(
       departure.messages.map(
-        message => MessageResponse.fromMessage(departureID, message)
+        message => MessageResponse.fromMessage(message)
       )
     )
   }
@@ -164,8 +162,7 @@ class DeparturesRepositorySpec
         )
         .value
 
-    val departure   = arbitrary[Departure].sample.value.copy(messages = messages)
-    val departureID = departure._id
+    val departure = arbitrary[Departure].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -173,7 +170,7 @@ class DeparturesRepositorySpec
     result.right.get.get should be(
       departure.messages
         .map(
-          message => MessageResponse.fromMessage(departureID, message)
+          message => MessageResponse.fromMessage(message)
         )
     )
   }
@@ -190,8 +187,8 @@ class DeparturesRepositorySpec
 
       result.right.get.value should be(
         NonEmptyList(
-          DepartureResponse.fromDeparture(GetDeparturesSetup.departureGB2),
-          List(DepartureResponse.fromDeparture(GetDeparturesSetup.departureGB1))
+          DepartureWithoutMessages.fromDeparture(GetDeparturesSetup.departureGB2),
+          List(DepartureWithoutMessages.fromDeparture(GetDeparturesSetup.departureGB1))
         )
       )
     }

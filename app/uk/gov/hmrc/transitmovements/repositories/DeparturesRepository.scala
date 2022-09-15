@@ -27,8 +27,6 @@ import com.mongodb.client.model.Updates.{push => mPush}
 import com.mongodb.client.model.Updates.{set => mSet}
 import com.mongodb.client.model.Updates.{combine => mCombine}
 import org.bson.conversions.Bson
-import org.mongodb.scala.bson.BsonDocument
-import org.mongodb.scala.model.Accumulators.mergeObjects
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
 import org.bson.Document
@@ -45,7 +43,6 @@ import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.responses.DepartureResponse
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
@@ -67,14 +64,14 @@ import scala.util.control.NonFatal
 trait DeparturesRepository {
   def insert(departure: Departure): EitherT[Future, MongoError, Unit]
   def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
-  def getSingleMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[Message]]
+  def getSingleMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[MessageResponse]]
 
   def getMessages(
     eoriNumber: EORINumber,
     departureId: DepartureId,
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]]
-  def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureResponse]]]
+  def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]]
   def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit]
 }
 
@@ -98,7 +95,6 @@ class DeparturesRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.departureFormat),
         Codecs.playFormatCodec(MongoFormats.messageFormat),
         Codecs.playFormatCodec(MongoFormats.departureWithoutMessagesFormat),
-        Codecs.playFormatCodec(MongoFormats.departureResponseFormat),
         Codecs.playFormatCodec(MongoFormats.messageResponseFormat),
         Codecs.playFormatCodec(MongoFormats.messageIdFormat),
         Codecs.playFormatCodec(MongoFormats.departureIdFormat),
@@ -183,13 +179,13 @@ class DeparturesRepositoryImpl @Inject() (
 
   }
 
-  def getSingleMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[Message]] = {
+  def getSingleMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[MessageResponse]] = {
     val selector          = mAnd(mEq("_id", departureId.value), mEq("messages.id", messageId.value), mEq("enrollmentEORINumber", eoriNumber.value))
     val secondarySelector = mEq("messages.id", messageId.value)
     val aggregates =
       Seq(Aggregates.filter(selector), Aggregates.unwind("$messages"), Aggregates.filter(secondarySelector), Aggregates.replaceRoot("$messages"))
 
-    mongoRetry(Try(collection.aggregate[Message](aggregates)) match {
+    mongoRetry(Try(collection.aggregate[MessageResponse](aggregates)) match {
       case Success(obs) =>
         obs.headOption().map {
           opt => Right(opt)
@@ -207,9 +203,9 @@ class DeparturesRepositoryImpl @Inject() (
       )
     }
 
-  def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureResponse]]] = {
+  def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]] = {
     val selector: Bson = mEq("enrollmentEORINumber", eoriNumber.value)
-    val projection     = DepartureResponse.projection
+    val projection     = DepartureWithoutMessages.projection
 
     val aggregates = Seq(
       Aggregates.filter(selector),
@@ -217,7 +213,7 @@ class DeparturesRepositoryImpl @Inject() (
       Aggregates.project(projection)
     )
 
-    mongoRetry(Try(collection.aggregate[DepartureResponse](aggregates)) match {
+    mongoRetry(Try(collection.aggregate[DepartureWithoutMessages](aggregates)) match {
       case Success(obs) =>
         obs
           .toFuture()

@@ -61,9 +61,7 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
-import uk.gov.hmrc.transitmovements.models.responses.DepartureResponse
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.DepartureFactory
@@ -369,13 +367,15 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getMessage(eoriNumber, departureId, messageId).url)
 
     "must return OK if message found in the correct format" in {
+      val messageResponse = MessageResponse.fromMessage(departure.messages.head)
+
       when(mockRepository.getSingleMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
-        .thenReturn(EitherT.rightT(Some(message)))
+        .thenReturn(EitherT.rightT(Some(messageResponse)))
 
       val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.toJson(message)(PresentationFormats.messageFormat)
+      contentAsJson(result) mustBe Json.toJson(messageResponse)
     }
 
     "must return NOT_FOUND if no message found" in {
@@ -402,7 +402,7 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, departureId).url)
 
     "must return OK and a list of message ids" in {
-      val messageResponses = MessageResponse(DepartureId("ABC123"), MessageId("DEF456"), instant, instant, MessageType.DeclarationData, None, None, None)
+      val messageResponses = MessageResponse.fromMessage(departure.messages.head)
 
       lazy val messageResponseList = NonEmptyList.one(messageResponses)
 
@@ -438,7 +438,7 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getDeparturesForEori(eoriNumber).url)
 
     "must return OK if departures were found" in {
-      val response = DepartureResponse(DepartureId("10004"), Some(MovementReferenceNumber("MRN001GB")), instant, instant.plusMinutes(2))
+      val response = DepartureWithoutMessages.fromDeparture(departure)
 
       when(mockRepository.getDepartures(EORINumber(any())))
         .thenReturn(EitherT.rightT(Some(NonEmptyList(response, List.empty))))
