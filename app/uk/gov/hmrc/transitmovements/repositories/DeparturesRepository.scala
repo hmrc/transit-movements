@@ -71,7 +71,7 @@ trait DeparturesRepository {
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]]
   def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]]
-  def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit]
+  def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, MessageId]
 }
 
 object DeparturesRepositoryImpl {
@@ -223,7 +223,7 @@ class DeparturesRepositoryImpl @Inject() (
 
   }
 
-  def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit] = {
+  def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, MessageId] = {
 
     val filter: Bson = mEq(departureId)
 
@@ -242,7 +242,7 @@ class DeparturesRepositoryImpl @Inject() (
           result =>
             if (result.wasAcknowledged()) {
               if (result.getModifiedCount == 0) Left(DocumentNotFound(s"No departure found with the given id: ${departureId.value}"))
-              else Right(())
+              else Right(message.id)
             } else {
               Left(UpdateNotAcknowledged(s"Message update failed for departure: $departureId"))
             }

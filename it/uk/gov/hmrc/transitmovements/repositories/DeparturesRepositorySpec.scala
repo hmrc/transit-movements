@@ -262,7 +262,7 @@ class DeparturesRepositorySpec
       repository.updateMessages(departureID, message2, None).value
     )
 
-    result should be(Right(()))
+    result should be(Right(message2.id))
 
     val movement = await {
       repository.collection.find(Filters.eq("_id", departureID.value)).first().toFuture()
@@ -302,7 +302,7 @@ class DeparturesRepositorySpec
       repository.updateMessages(departureId, message2, Some(mrn)).value
     )
 
-    result should be(Right(()))
+    result should be(Right(message2.id))
 
     val movement = await {
       repository.collection.find(Filters.eq("_id", departureId.value)).first().toFuture()

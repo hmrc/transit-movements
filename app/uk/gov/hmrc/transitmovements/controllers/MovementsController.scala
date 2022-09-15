@@ -61,11 +61,11 @@ class MovementsController @Inject() (
             messageType <- extract(request.headers).asPresentation
             messageData <- xmlParsingService.extractMessageData(source, messageType).asPresentation
             fileSource = FileIO.fromPath(temporaryFile)
-            message <- factory.create(messageType, messageData.generationDate, Some(triggerId), fileSource).asPresentation
-            result  <- repo.updateMessages(DepartureId(movementId.value), message, messageData.mrn).asPresentation
-          } yield result).fold[Result](
+            message   <- factory.create(messageType, messageData.generationDate, Some(triggerId), fileSource).asPresentation
+            messageId <- repo.updateMessages(DepartureId(movementId.value), message, messageData.mrn).asPresentation
+          } yield messageId).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-            _ => Ok
+            id => Ok(id.value)
           )
       }.toResult
   }
