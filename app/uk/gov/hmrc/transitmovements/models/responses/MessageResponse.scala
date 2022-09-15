@@ -32,7 +32,7 @@ case class MessageResponse(
 
 object MessageResponse {
 
-  val withoutBodyProjection: Bson =
+  val projection: Bson =
     BsonDocument(
       "id"          -> 1,
       "received"    -> 1,

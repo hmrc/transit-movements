@@ -145,7 +145,7 @@ class DeparturesRepositoryImpl @Inject() (
     receivedSince: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]] = {
 
-    val projection = MessageResponse.withoutBodyProjection
+    val projection = MessageResponse.projection
 
     val selector = mAnd(
       mEq("_id", departureId.value),
@@ -157,8 +157,8 @@ class DeparturesRepositoryImpl @Inject() (
     val aggregates =
       Seq(
         Aggregates.filter(selector),
-        Aggregates.filter(dateTimeSelector),
         Aggregates.unwind("$messages"),
+        Aggregates.filter(dateTimeSelector),
         Aggregates.replaceRoot("$messages"),
         Aggregates.sort(descending("received")),
         Aggregates.project(projection)
