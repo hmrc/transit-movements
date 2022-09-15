@@ -149,16 +149,14 @@ class DeparturesRepositoryImpl @Inject() (
 
     val selector = mAnd(
       mEq("_id", departureId.value),
-      mEq("enrollmentEORINumber", eoriNumber.value)
+      mEq("enrollmentEORINumber", eoriNumber.value),
+      mGte("messages.received", receivedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME))
     )
-
-    val dateTimeSelector = mGte("messages.received", receivedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME))
 
     val aggregates =
       Seq(
         Aggregates.filter(selector),
         Aggregates.unwind("$messages"),
-        Aggregates.filter(dateTimeSelector),
         Aggregates.replaceRoot("$messages"),
         Aggregates.sort(descending("received")),
         Aggregates.project(projection)

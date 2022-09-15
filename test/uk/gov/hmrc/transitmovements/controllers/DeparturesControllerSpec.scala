@@ -399,7 +399,7 @@ class DeparturesControllerSpec
 
   "getDepartureMessages" - {
 
-    val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, departureId).url)
+    val request = FakeRequest("GET", routes.DeparturesController.getDepartureMessages(eoriNumber, departureId).url)
 
     "must return OK and a list of message ids" in {
       val messageResponses = MessageResponse.fromMessageWithoutBody(departure.messages.head)
