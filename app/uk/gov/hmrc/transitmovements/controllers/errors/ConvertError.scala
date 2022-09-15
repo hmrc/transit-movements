@@ -55,7 +55,7 @@ trait ConvertError {
       case UnexpectedError(ex)            => PresentationError.internalServiceError(cause = ex)
       case InsertNotAcknowledged(message) => PresentationError.internalServiceError(message = message)
       case UpdateNotAcknowledged(message) => PresentationError.internalServiceError(message = message)
-      case DocumentNotFound(message)      => PresentationError.badRequestError(message = message)
+      case DocumentNotFound(message)      => PresentationError.notFoundError(message = message)
     }
   }
 

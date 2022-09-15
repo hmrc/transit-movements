@@ -32,6 +32,7 @@ import play.api.http.HeaderNames
 import play.api.http.MimeTypes
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
+import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
@@ -237,9 +238,9 @@ class MovementsControllerSpec
         val result =
           controller.updateMovement(movementId, triggerId)(request)
 
-        status(result) mustBe BAD_REQUEST
+        status(result) mustBe NOT_FOUND
         contentAsJson(result) mustBe Json.obj(
-          "code"    -> "BAD_REQUEST",
+          "code"    -> "NOT_FOUND",
           "message" -> "No departure found with the given id: 12345"
         )
       }
