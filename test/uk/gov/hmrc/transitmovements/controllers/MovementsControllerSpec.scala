@@ -155,7 +155,7 @@ class MovementsControllerSpec
         .thenReturn(messageFactoryEither)
 
       when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message], any[Option[MovementReferenceNumber]]))
-        .thenReturn(EitherT.rightT(messageId))
+        .thenReturn(EitherT.rightT(()))
 
       val request = fakeRequest(POST, validXml)
 
@@ -194,7 +194,7 @@ class MovementsControllerSpec
           .thenReturn(messageFactoryEither)
 
         when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message], any[Option[MovementReferenceNumber]]))
-          .thenReturn(EitherT.rightT(messageId))
+          .thenReturn(EitherT.rightT(()))
 
         val request = fakeRequest(POST, xml)
 
