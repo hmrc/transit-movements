@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.services.errors
+package uk.gov.hmrc.transitmovements.models.responses
 
-import java.time.format.DateTimeParseException
+import play.api.libs.json.Json
+import play.api.libs.json.OFormat
+import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 
-sealed abstract class ParseError
+case class EISResponse(messageId: MessageId)
 
-object ParseError {
-  case class NoElementFound(element: String)                                 extends ParseError
-  case class TooManyElementsFound(element: String)                           extends ParseError
-  case class BadDateTime(element: String, exception: DateTimeParseException) extends ParseError
-  case class UnexpectedError(caughtException: Option[Throwable] = None)      extends ParseError
+object EISResponse extends CommonFormats {
+  implicit val declarationResponseFormat: OFormat[EISResponse] = Json.format[EISResponse]
 }

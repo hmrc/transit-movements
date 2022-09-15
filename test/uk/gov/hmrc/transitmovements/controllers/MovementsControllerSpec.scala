@@ -163,6 +163,7 @@ class MovementsControllerSpec
         controller.updateMovement(movementId, triggerId)(request)
 
       status(result) mustBe OK
+      contentAsJson(result) mustBe Json.obj("messageId" -> messageId.value)
     }
 
     "must return BAD_REQUEST when XML data extraction fails" - {
@@ -231,7 +232,7 @@ class MovementsControllerSpec
 
         status(result) mustBe NOT_FOUND
         contentAsJson(result) mustBe Json.obj(
-          "code"    -> "BAD_REQUEST",
+          "code"    -> "NOT_FOUND",
           "message" -> s"No departure found with the given id: ${movementId.value}"
         )
       }

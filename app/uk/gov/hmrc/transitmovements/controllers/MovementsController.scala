@@ -31,6 +31,7 @@ import uk.gov.hmrc.transitmovements.models.MovementId
 import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovements.models.responses.EISResponse
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
@@ -65,7 +66,7 @@ class MovementsController @Inject() (
             messageId <- repo.updateMessages(DepartureId(movementId.value), message, messageData.mrn).asPresentation
           } yield messageId).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-            id => Ok(id.value)
+            id => Ok(Json.toJson(EISResponse(id)))
           )
       }.toResult
   }
