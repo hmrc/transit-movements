@@ -19,24 +19,46 @@ package uk.gov.hmrc.transitmovements.models.responses
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
 import uk.gov.hmrc.transitmovements.models.DepartureId
+import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
-
+import java.net.URI
 import java.time.OffsetDateTime
 
 case class MessageResponse(
-  departureId: DepartureId,
-  messageId: MessageId,
+  _id: DepartureId,
+  id: MessageId,
   received: OffsetDateTime,
-  messageType: MessageType
+  generated: OffsetDateTime,
+  messageType: MessageType,
+  triggerId: Option[MessageId],
+  url: Option[URI],
+  body: Option[String]
 )
 
 object MessageResponse {
 
   val projection: Bson =
     BsonDocument(
+      "_id"         -> 1,
       "id"          -> 1,
       "received"    -> 1,
-      "messageType" -> 1
+      "generated"   -> 1,
+      "messageType" -> 1,
+      "triggerId"   -> 1,
+      "url"         -> 1,
+      "body"        -> 1
+    )
+
+  def fromMessage(departureId: DepartureId, message: Message) =
+    MessageResponse(
+      departureId,
+      message.id,
+      message.received,
+      message.generated,
+      message.messageType,
+      message.triggerId,
+      message.url,
+      message.body
     )
 }

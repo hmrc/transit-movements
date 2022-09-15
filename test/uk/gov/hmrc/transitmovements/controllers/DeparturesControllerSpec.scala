@@ -369,7 +369,7 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getMessage(eoriNumber, departureId, messageId).url)
 
     "must return OK if message found in the correct format" in {
-      when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
+      when(mockRepository.getSingleMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
         .thenReturn(EitherT.rightT(Some(message)))
 
       val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
@@ -379,7 +379,7 @@ class DeparturesControllerSpec
     }
 
     "must return NOT_FOUND if no message found" in {
-      when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
+      when(mockRepository.getSingleMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
         .thenReturn(EitherT.rightT(None))
 
       val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
@@ -388,7 +388,7 @@ class DeparturesControllerSpec
     }
 
     "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
-      when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
+      when(mockRepository.getSingleMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
       val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
@@ -402,11 +402,11 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, departureId).url)
 
     "must return OK and a list of message ids" in {
-      val messageResponses = MessageResponse(DepartureId("ABC123"), MessageId("DEF456"), instant, "IE015C")
+      val messageResponses = MessageResponse(DepartureId("ABC123"), MessageId("DEF456"), instant, instant, MessageType.DeclarationData, None, None, None)
 
       lazy val messageResponseList = NonEmptyList.one(messageResponses)
 
-      when(mockRepository.getDepartureMessages(EORINumber(any()), DepartureId(any()), eqTo(None)))
+      when(mockRepository.getMessages(EORINumber(any()), DepartureId(any()), eqTo(None)))
         .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageResponses))))
 
       val result = controller.getDepartureMessages(eoriNumber, departureId, None)(request)
@@ -416,7 +416,7 @@ class DeparturesControllerSpec
     }
 
     "must return NOT_FOUND if no departure found" in {
-      when(mockRepository.getDepartureMessages(EORINumber(any()), DepartureId(any()), eqTo(None)))
+      when(mockRepository.getMessages(EORINumber(any()), DepartureId(any()), eqTo(None)))
         .thenReturn(EitherT.rightT(None))
 
       val result = controller.getDepartureMessages(eoriNumber, departureId, None)(request)
@@ -425,7 +425,7 @@ class DeparturesControllerSpec
     }
 
     "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
-      when(mockRepository.getDepartureMessages(EORINumber(any()), DepartureId(any()), eqTo(None)))
+      when(mockRepository.getMessages(EORINumber(any()), DepartureId(any()), eqTo(None)))
         .thenReturn(EitherT.leftT(UnexpectedError(None)))
 
       val result = controller.getDepartureMessages(eoriNumber, departureId, None)(request)

@@ -22,6 +22,7 @@ import play.api.libs.json.Json
 import play.api.libs.json.OFormat
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
+import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
@@ -30,8 +31,8 @@ import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import java.time.OffsetDateTime
 
 case class DepartureResponse(
-  id: DepartureId,
-  // movementReferenceNumber: Option[MovementReferenceNumber],
+  _id: DepartureId,
+  movementReferenceNumber: Option[MovementReferenceNumber],
   created: OffsetDateTime,
   updated: OffsetDateTime
 )
@@ -40,9 +41,17 @@ object DepartureResponse extends CommonFormats with MongoFormats {
 
   val projection: Bson =
     BsonDocument(
-      "_id" -> 1,
-      //   "movementReferenceNumber" -> 1,
-      "created" -> 1,
-      "updated" -> 1
+      "_id"                     -> 1,
+      "movementReferenceNumber" -> 1,
+      "created"                 -> 1,
+      "updated"                 -> 1
+    )
+
+  def fromDeparture(departure: Departure) =
+    DepartureResponse(
+      departure._id,
+      departure.movementReferenceNumber,
+      departure.created,
+      departure.updated
     )
 }

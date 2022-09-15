@@ -94,7 +94,7 @@ class DeparturesController @Inject() (
 
   def getDepartureMessages(eoriNumber: EORINumber, departureId: DepartureId, receivedSince: Option[OffsetDateTime] = None) = Action.async {
     repo
-      .getDepartureMessages(eoriNumber, departureId, receivedSince)
+      .getMessages(eoriNumber, departureId, receivedSince)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
@@ -107,7 +107,7 @@ class DeparturesController @Inject() (
 
   def getMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): Action[AnyContent] = Action.async {
     repo
-      .getMessage(eoriNumber, departureId, messageId)
+      .getSingleMessage(eoriNumber, departureId, messageId)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
