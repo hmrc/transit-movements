@@ -148,7 +148,7 @@ class DeparturesRepositorySpec
     )
   }
 
-  "getDepartureMessages" should "return message responses if there are messages that were received since the given time" in {
+  "getMessages" should "return message responses if there are messages that were received since the given time" in {
     val dateTime = arbitrary[OffsetDateTime].sample.value
 
     val messages =
@@ -175,7 +175,7 @@ class DeparturesRepositorySpec
     )
   }
 
-  "getDepartureMessages" should "return none if the departure doesn't exist" in {
+  "getMessages" should "return none if the departure doesn't exist" in {
     val result = await(repository.getMessages(EORINumber("ABC"), DepartureId("XYZ"), None).value)
     result.right.get.isEmpty should be(true)
   }
