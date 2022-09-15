@@ -32,19 +32,26 @@ case class MessageResponse(
 
 object MessageResponse {
 
-  val projection: Bson =
+  val withoutBodyProjection: Bson =
     BsonDocument(
       "id"          -> 1,
       "received"    -> 1,
-      "messageType" -> 1,
-      "body"        -> 1
+      "messageType" -> 1
     )
 
-  def fromMessage(message: Message) =
+  def fromMessageWithBody(message: Message) =
     MessageResponse(
       message.id,
       message.received,
       message.messageType,
       message.body
+    )
+
+  def fromMessageWithoutBody(message: Message) =
+    MessageResponse(
+      message.id,
+      message.received,
+      message.messageType,
+      None
     )
 }

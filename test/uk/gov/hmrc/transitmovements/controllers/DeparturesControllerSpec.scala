@@ -367,7 +367,7 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getMessage(eoriNumber, departureId, messageId).url)
 
     "must return OK if message found in the correct format" in {
-      val messageResponse = MessageResponse.fromMessage(departure.messages.head)
+      val messageResponse = MessageResponse.fromMessageWithBody(departure.messages.head)
 
       when(mockRepository.getSingleMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
         .thenReturn(EitherT.rightT(Some(messageResponse)))
@@ -402,7 +402,7 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, departureId).url)
 
     "must return OK and a list of message ids" in {
-      val messageResponses = MessageResponse.fromMessage(departure.messages.head)
+      val messageResponses = MessageResponse.fromMessageWithoutBody(departure.messages.head)
 
       lazy val messageResponseList = NonEmptyList.one(messageResponses)
 

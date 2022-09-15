@@ -115,7 +115,7 @@ class DeparturesRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id).value)
-    result.right.get.get should be(MessageResponse.fromMessage(departure.messages.head))
+    result.right.get.get should be(MessageResponse.fromMessageWithBody(departure.messages.head))
   }
 
   "getSingleMessage" should "return none if the message doesn't exist" in {
@@ -143,7 +143,7 @@ class DeparturesRepositorySpec
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, None).value)
     result.right.get.get should be(
       departure.messages.map(
-        message => MessageResponse.fromMessage(message)
+        message => MessageResponse.fromMessageWithoutBody(message)
       )
     )
   }
@@ -170,7 +170,7 @@ class DeparturesRepositorySpec
     result.right.get.get should be(
       departure.messages
         .map(
-          message => MessageResponse.fromMessage(message)
+          message => MessageResponse.fromMessageWithoutBody(message)
         )
     )
   }
