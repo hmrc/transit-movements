@@ -29,7 +29,6 @@ import com.mongodb.client.model.Updates.{combine => mCombine}
 import org.bson.conversions.Bson
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
-import org.bson.Document
 import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
@@ -93,13 +92,12 @@ class DeparturesRepositoryImpl @Inject() (
       ),
       extraCodecs = Seq(
         Codecs.playFormatCodec(MongoFormats.departureFormat),
-        Codecs.playFormatCodec(MongoFormats.messageFormat),
         Codecs.playFormatCodec(MongoFormats.departureWithoutMessagesFormat),
         Codecs.playFormatCodec(MongoFormats.messageResponseFormat),
-        Codecs.playFormatCodec(MongoFormats.messageIdFormat),
+        Codecs.playFormatCodec(MongoFormats.messageFormat),
         Codecs.playFormatCodec(MongoFormats.departureIdFormat),
-        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
-        Codecs.playFormatCodec(MongoFormats.mrnFormat)
+        Codecs.playFormatCodec(MongoFormats.mrnFormat),
+        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat)
       )
     )
     with DeparturesRepository
@@ -161,7 +159,7 @@ class DeparturesRepositoryImpl @Inject() (
         Aggregates.filter(selector),
         Aggregates.filter(dateTimeSelector),
         Aggregates.unwind("$messages"),
-        Aggregates.replaceWith(Document.parse("""{$mergeObjects: ["$messages", {_id: "$_id"}]}""")),
+        Aggregates.replaceRoot("$messages"),
         Aggregates.sort(descending("received")),
         Aggregates.project(projection)
       )
