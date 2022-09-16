@@ -94,7 +94,7 @@ class MovementsControllerSpec
   ): Request[NodeSeq] =
     FakeRequest(
       method = method,
-      uri = routes.MovementsController.updateMovement(movementId, triggerId).url,
+      uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
       headers = headers,
       body = body
     )
@@ -169,7 +169,7 @@ class MovementsControllerSpec
       val request = fakeRequest(POST, validXml)
 
       val result =
-        controller.updateMovement(movementId, triggerId)(request)
+        controller.updateMovement(movementId, Some(triggerId))(request)
 
       status(result) mustBe OK
     }
@@ -207,7 +207,7 @@ class MovementsControllerSpec
         val request = fakeRequest(POST, xml)
 
         val result =
-          controller.updateMovement(movementId, triggerId)(request)
+          controller.updateMovement(movementId, Some(triggerId))(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -236,7 +236,7 @@ class MovementsControllerSpec
         val request = fakeRequest(POST, validXml)
 
         val result =
-          controller.updateMovement(movementId, triggerId)(request)
+          controller.updateMovement(movementId, Some(triggerId))(request)
 
         status(result) mustBe NOT_FOUND
         contentAsJson(result) mustBe Json.obj(
@@ -256,7 +256,7 @@ class MovementsControllerSpec
         val request = fakeRequest(POST, validXml, FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)))
 
         val result =
-          controller.updateMovement(movementId, triggerId)(request)
+          controller.updateMovement(movementId, Some(triggerId))(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -276,7 +276,7 @@ class MovementsControllerSpec
         val request = fakeRequest(POST, validXml, FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> "invalid")))
 
         val result =
-          controller.updateMovement(movementId, triggerId)(request)
+          controller.updateMovement(movementId, Some(triggerId))(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -304,13 +304,13 @@ class MovementsControllerSpec
 
         val request = FakeRequest(
           method = POST,
-          uri = routes.MovementsController.updateMovement(movementId, triggerId).url,
+          uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
           headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code)),
           body = unknownErrorXml
         )
 
         val result =
-          controller.updateMovement(movementId, triggerId)(request)
+          controller.updateMovement(movementId, Some(triggerId))(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
@@ -326,7 +326,7 @@ class MovementsControllerSpec
         val request = fakeRequest(POST, validXml)
 
         val result =
-          controller.updateMovement(movementId, triggerId)(request)
+          controller.updateMovement(movementId, Some(triggerId))(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(

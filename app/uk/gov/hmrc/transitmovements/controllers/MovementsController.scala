@@ -21,6 +21,7 @@ import akka.stream.scaladsl.FileIO
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import play.api.libs.Files.TemporaryFileCreator
+import play.api.libs.Files.logger
 import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
 import play.api.mvc.Result
@@ -53,21 +54,31 @@ class MovementsController @Inject() (
     with ConvertError
     with MessageTypeHeaderExtractor {
 
-  def updateMovement(movementId: MovementId, triggerId: MessageId): Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
-    implicit request =>
-      withTemporaryFile {
-        (temporaryFile, source) =>
-          (for {
-            messageType <- extract(request.headers).asPresentation
-            messageData <- xmlParsingService.extractMessageData(source, messageType).asPresentation
-            fileSource = FileIO.fromPath(temporaryFile)
-            message <- factory.create(messageType, messageData.generationDate, Some(triggerId), fileSource).asPresentation
-            result  <- repo.updateMessages(DepartureId(movementId.value), message, messageData.mrn).asPresentation
-          } yield result).fold[Result](
-            baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-            _ => Ok
-          )
-      }.toResult
-  }
+  def updateMovement(movementId: MovementId, triggerId: Option[String] = None): Action[Source[ByteString, _]] =
+    Action.async(streamFromMemory) {
+      implicit request =>
+        withTemporaryFile {
+          (temporaryFile, source) =>
+            (for {
+              messageType <- extract(request.headers).asPresentation
+              messageData <- xmlParsingService.extractMessageData(source, messageType).asPresentation
+              fileSource = FileIO.fromPath(temporaryFile)
+              message <- factory
+                .create(
+                  messageType,
+                  messageData.generationDate,
+                  triggerId.map(
+                    x => MessageId(x)
+                  ),
+                  fileSource
+                )
+                .asPresentation
+              result <- repo.updateMessages(DepartureId(movementId.value), message, messageData.mrn).asPresentation
+            } yield result).fold[Result](
+              baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+              _ => Ok
+            )
+        }.toResult
+    }
 
 }

@@ -16,7 +16,9 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import play.api.mvc.PathBindable
 import play.api.mvc.QueryStringBindable
+import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -31,5 +33,12 @@ object Bindings {
       (param, _) => s"Cannot parse parameter $param as a valid ISO 8601 timestamp, e.g. 2015-09-08T01:55:28+00:00"
     )
   }
+
+  implicit def triggerIdQueryStringBindable: QueryStringBindable[MessageId] =
+    new QueryStringBindable.Parsing[MessageId](
+      triggerId => MessageId(triggerId),
+      triggerId => triggerId.value,
+      (param, _) => s"Cannot parse parameter $param as a valid string"
+    )
 
 }
