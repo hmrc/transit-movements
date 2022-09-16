@@ -21,8 +21,8 @@ import play.api.libs.json.OFormat
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 
-case class EISResponse(messageId: MessageId)
+case class UpdateMovementResponse(messageId: MessageId)
 
-object EISResponse extends CommonFormats {
-  implicit val declarationResponseFormat: OFormat[EISResponse] = Json.format[EISResponse]
+object UpdateMovementResponse extends CommonFormats {
+  implicit val declarationResponseFormat: OFormat[UpdateMovementResponse] = Json.format[UpdateMovementResponse]
 }
