@@ -25,6 +25,7 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 
 import java.net.URI
@@ -44,6 +45,11 @@ trait ModelGenerators extends BaseGenerators {
   implicit lazy val arbitraryDepartureId: Arbitrary[DepartureId] =
     Arbitrary {
       Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(DepartureId)
+    }
+
+  implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =
+    Arbitrary {
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MovementId)
     }
 
   implicit lazy val arbitraryMessageId: Arbitrary[MessageId] =
