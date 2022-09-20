@@ -21,7 +21,6 @@ import akka.stream.scaladsl.FileIO
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import play.api.libs.Files.TemporaryFileCreator
-import play.api.libs.Files.logger
 import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
 import play.api.mvc.Result
