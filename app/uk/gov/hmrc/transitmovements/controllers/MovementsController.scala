@@ -54,7 +54,7 @@ class MovementsController @Inject() (
     with ConvertError
     with MessageTypeHeaderExtractor {
 
-  def updateMovement(movementId: MessageId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
+  def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
     Action.async(streamFromMemory) {
       implicit request =>
         withTemporaryFile {
