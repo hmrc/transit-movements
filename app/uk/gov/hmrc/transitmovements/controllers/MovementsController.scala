@@ -54,7 +54,7 @@ class MovementsController @Inject() (
     with ConvertError
     with MessageTypeHeaderExtractor {
 
-  def updateMovement(movementId: MovementId, triggerId: Option[String] = None): Action[Source[ByteString, _]] =
+  def updateMovement(movementId: MessageId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
     Action.async(streamFromMemory) {
       implicit request =>
         withTemporaryFile {
@@ -67,9 +67,7 @@ class MovementsController @Inject() (
                 .create(
                   messageType,
                   messageData.generationDate,
-                  triggerId.map(
-                    x => MessageId(x)
-                  ),
+                  triggerId,
                   fileSource
                 )
                 .asPresentation
