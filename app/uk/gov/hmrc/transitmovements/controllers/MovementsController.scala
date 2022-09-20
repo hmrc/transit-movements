@@ -31,6 +31,7 @@ import uk.gov.hmrc.transitmovements.models.MovementId
 import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
@@ -62,10 +63,10 @@ class MovementsController @Inject() (
             messageData <- xmlParsingService.extractMessageData(source, messageType).asPresentation
             fileSource = FileIO.fromPath(temporaryFile)
             message <- factory.create(messageType, messageData.generationDate, Some(triggerId), fileSource).asPresentation
-            result  <- repo.updateMessages(DepartureId(movementId.value), message, messageData.mrn).asPresentation
-          } yield result).fold[Result](
+            _       <- repo.updateMessages(DepartureId(movementId.value), message, messageData.mrn).asPresentation
+          } yield message.id).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-            _ => Ok
+            id => Ok(Json.toJson(UpdateMovementResponse(id)))
           )
       }.toResult
   }
