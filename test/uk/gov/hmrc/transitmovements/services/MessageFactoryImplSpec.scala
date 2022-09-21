@@ -23,8 +23,10 @@ import play.api.libs.Files.SingletonTemporaryFileCreator
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
+import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 
 import java.io.File
+import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
@@ -45,20 +47,24 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
     val sut = new MessageFactoryImpl(clock, random)
 
     "will create a message with a body when given a stream" in {
-      val stream = FileIO.fromPath(tempFile.path)
+      val stream    = FileIO.fromPath(tempFile.path)
+      val triggerId = Some(MessageId("123"))
 
-      val result = sut.create(MessageType.DestinationOfficeRejection, instant, Some(MessageId("123")), stream)
+      val result = sut.create(MessageType.DestinationOfficeRejection, instant, triggerId, stream)
 
       whenReady(result.value) {
         r =>
           r.isRight mustBe true
+          val message = r.right.get
+          message mustBe Message(message.id, message.received, instant, MessageType.DestinationOfficeRejection, triggerId, None, Some(""))
       }
     }
 
     "will return a Left when a NonFatal exception is thrown as a StreamError" in {
-      val stream = FileIO.fromFile(new File(""), 5)
+      val stream    = FileIO.fromFile(new File(""), 5)
+      val triggerId = Some(MessageId("456"))
 
-      val result = sut.create(MessageType.RequestOfRelease, instant, Some(MessageId("456")), stream)
+      val result = sut.create(MessageType.RequestOfRelease, instant, triggerId, stream)
 
       whenReady(result.value) {
         r =>
