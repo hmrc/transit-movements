@@ -85,11 +85,10 @@ class DeparturesController @Inject() (
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        response =>
-          response match {
-            case Some(departureWithoutMessages) => Ok(Json.toJson(departureWithoutMessages))
-            case None                           => NotFound
-          }
+        {
+          case Some(departureWithoutMessages) => Ok(Json.toJson(departureWithoutMessages))
+          case None                           => NotFound
+        }
       )
   }
 
@@ -99,11 +98,10 @@ class DeparturesController @Inject() (
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        response =>
-          response match {
-            case Some(departureMessageIds) => Ok(Json.toJson(departureMessageIds))
-            case None                      => NotFound
-          }
+        {
+          case Some(departureMessageIds) => Ok(Json.toJson(departureMessageIds))
+          case None                      => NotFound
+        }
       )
   }
 
@@ -113,11 +111,10 @@ class DeparturesController @Inject() (
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        response =>
-          response match {
-            case Some(message) => Ok(Json.toJson(message))
-            case None          => NotFound
-          }
+        {
+          case Some(message) => Ok(Json.toJson(message))
+          case None          => NotFound
+        }
       )
   }
 
@@ -127,11 +124,10 @@ class DeparturesController @Inject() (
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        response =>
-          response match {
-            case Some(message) => Ok(Json.toJson(message))
-            case None          => NotFound
-          }
+        {
+          case Some(message) => Ok(Json.toJson(message))
+          case None          => NotFound
+        }
       )
   }
 }
