@@ -31,6 +31,7 @@ import uk.gov.hmrc.transitmovements.models.MovementId
 import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
@@ -53,21 +54,29 @@ class MovementsController @Inject() (
     with ConvertError
     with MessageTypeHeaderExtractor {
 
-  def updateMovement(movementId: MovementId, triggerId: MessageId): Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
-    implicit request =>
-      withTemporaryFile {
-        (temporaryFile, source) =>
-          (for {
-            messageType <- extract(request.headers).asPresentation
-            messageData <- xmlParsingService.extractMessageData(source, messageType).asPresentation
-            fileSource = FileIO.fromPath(temporaryFile)
-            message <- factory.create(messageType, messageData.generationDate, Some(triggerId), fileSource).asPresentation
-            result  <- repo.updateMessages(DepartureId(movementId.value), message, messageData.mrn).asPresentation
-          } yield result).fold[Result](
-            baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-            _ => Ok
-          )
-      }.toResult
-  }
+  def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
+    Action.async(streamFromMemory) {
+      implicit request =>
+        withTemporaryFile {
+          (temporaryFile, source) =>
+            (for {
+              messageType <- extract(request.headers).asPresentation
+              messageData <- xmlParsingService.extractMessageData(source, messageType).asPresentation
+              fileSource = FileIO.fromPath(temporaryFile)
+              message <- factory
+                .create(
+                  messageType,
+                  messageData.generationDate,
+                  triggerId,
+                  fileSource
+                )
+                .asPresentation
+              _ <- repo.updateMessages(DepartureId(movementId.value), message, messageData.mrn).asPresentation
+            } yield message.id).fold[Result](
+              baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+              id => Ok(Json.toJson(UpdateMovementResponse(id)))
+            )
+        }.toResult
+    }
 
 }

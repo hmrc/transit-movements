@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.transitmovements.services
 
-import akka.NotUsed
 import akka.stream.FlowShape
 import akka.stream.Materializer
 import akka.stream.alpakka.xml.ParseEvent
@@ -24,7 +23,6 @@ import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.scaladsl.Broadcast
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.GraphDSL
-import akka.stream.scaladsl.Partition
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.stream.scaladsl.ZipWith
@@ -58,8 +56,7 @@ class MessagesXmlParsingServiceImpl @Inject() (implicit materializer: Materializ
 
   def buildMessageData(
     dateMaybe: ParseResult[OffsetDateTime],
-    mrnMaybe: ParseResult[Option[MovementReferenceNumber]],
-    messageType: MessageType
+    mrnMaybe: ParseResult[Option[MovementReferenceNumber]]
   ): ParseResult[MessageData] =
     for {
       generationDate <- dateMaybe
@@ -75,7 +72,7 @@ class MessagesXmlParsingServiceImpl @Inject() (implicit materializer: Materializ
         val combiner =
           builder.add(
             ZipWith[ParseResult[OffsetDateTime], ParseResult[Option[MovementReferenceNumber]], ParseResult[MessageData]](
-              (date, mrn) => buildMessageData(date, mrn, messageType)
+              (date, mrn) => buildMessageData(date, mrn)
             )
           )
 
