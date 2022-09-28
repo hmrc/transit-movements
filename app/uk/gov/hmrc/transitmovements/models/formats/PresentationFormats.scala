@@ -21,6 +21,7 @@ import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
 trait PresentationFormats extends CommonFormats {
 
@@ -29,6 +30,7 @@ trait PresentationFormats extends CommonFormats {
   implicit val messageFormat: Format[Message]                                   = Json.format[Message]
   implicit val departureFormat: Format[Departure]                               = Json.format[Departure]
   implicit val departureWithoutMessagesFormat: Format[DepartureWithoutMessages] = Json.format[DepartureWithoutMessages]
+  implicit val messageResponseFormat: Format[MessageResponse]                   = Json.format[MessageResponse]
 
 }
 

@@ -26,6 +26,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.{eq => eqTo}
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
+import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
@@ -62,6 +63,7 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
+import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
 import uk.gov.hmrc.transitmovements.services.DepartureFactory
 import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
@@ -73,6 +75,7 @@ import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
 import java.time.OffsetDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
 import scala.concurrent.Future
 import scala.xml.NodeSeq
@@ -87,17 +90,6 @@ class DeparturesControllerSpec
     with PresentationFormats
     with ModelGenerators {
 
-  def fakeRequestDepartures[A](
-    method: String,
-    body: NodeSeq
-  ): Request[NodeSeq] =
-    FakeRequest(
-      method = method,
-      uri = routes.DeparturesController.createDeparture(eori).url,
-      headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
-      body = body
-    )
-
   implicit val timeout: Timeout = 5.seconds
 
   val mockXmlParsingService    = mock[DeparturesXmlParsingService]
@@ -106,50 +98,39 @@ class DeparturesControllerSpec
   val mockMessageFactory       = mock[MessageFactory]
   val mockTemporaryFileCreator = mock[TemporaryFileCreator]
 
-  lazy val eori            = EORINumber("eori")
-  lazy val declarationData = DeclarationData(eori, OffsetDateTime.now(ZoneId.of("UTC")))
+  lazy val now                     = OffsetDateTime.now
+  lazy val instant: OffsetDateTime = OffsetDateTime.of(2022, 3, 14, 1, 0, 0, 0, ZoneOffset.UTC)
+
+  lazy val eoriNumber  = arbitrary[EORINumber].sample.get
+  lazy val departureId = arbitrary[DepartureId].sample.get
+  lazy val messageId   = arbitrary[MessageId].sample.get
+
+  lazy val declarationData = DeclarationData(eoriNumber, OffsetDateTime.now(ZoneId.of("UTC")))
 
   lazy val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
     EitherT.rightT(declarationData)
 
-  val now = OffsetDateTime.now
+  lazy val message = arbitrary[Message].sample.value.copy(id = messageId, generated = now, received = now, messageType = MessageType.DeclarationData)
 
-  lazy val departureId = DepartureId("ABC123")
-
-  lazy val eoriNumber = EORINumber("A")
-
-  lazy val messageId = MessageId("XYZ345")
-
-  lazy val messageIdList = NonEmptyList.one(messageId)
-
-  lazy val message = Message(
-    messageId,
-    now,
-    now,
-    MessageType.DeclarationData,
-    None,
-    None,
-    None
+  lazy val departure = arbitrary[Departure].sample.value.copy(
+    _id = departureId,
+    enrollmentEORINumber = eoriNumber,
+    movementEORINumber = eoriNumber,
+    created = now,
+    updated = now,
+    messages = NonEmptyList.one(message)
   )
 
-  lazy val departure = Departure(
-    departureId,
-    eoriNumber,
-    eoriNumber,
-    None,
-    now,
-    now,
-    NonEmptyList.one(
-      message
+  def fakeRequestDepartures[A](
+    method: String,
+    body: NodeSeq
+  ): Request[NodeSeq] =
+    FakeRequest(
+      method = method,
+      uri = routes.DeparturesController.createDeparture(eoriNumber).url,
+      headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
+      body = body
     )
-  )
-
-  override def afterEach() {
-    reset(mockTemporaryFileCreator)
-    reset(mockXmlParsingService)
-    reset(mockDepartureFactory)
-    super.afterEach()
-  }
 
   val controller =
     new DeparturesController(
@@ -160,6 +141,13 @@ class DeparturesControllerSpec
       mockXmlParsingService,
       mockTemporaryFileCreator
     )
+
+  override def afterEach() {
+    reset(mockTemporaryFileCreator)
+    reset(mockXmlParsingService)
+    reset(mockDepartureFactory)
+    super.afterEach()
+  }
 
   "createDeparture" - {
 
@@ -192,12 +180,12 @@ class DeparturesControllerSpec
       val request = fakeRequestDepartures(POST, validXml)
 
       val result =
-        controller.createDeparture(eori)(request)
+        controller.createDeparture(eoriNumber)(request)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
-        "departureId" -> "ABC123",
-        "messageId"   -> "XYZ345"
+        "departureId" -> departureId.value,
+        "messageId"   -> messageId.value
       )
     }
 
@@ -216,7 +204,7 @@ class DeparturesControllerSpec
         val request = fakeRequestDepartures(POST, elementNotFoundXml)
 
         val result =
-          controller.createDeparture(eori)(request)
+          controller.createDeparture(eoriNumber)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -241,7 +229,7 @@ class DeparturesControllerSpec
         val request = fakeRequestDepartures(POST, tooManyFoundXml)
 
         val result =
-          controller.createDeparture(eori)(request)
+          controller.createDeparture(eoriNumber)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -272,7 +260,7 @@ class DeparturesControllerSpec
         val request = fakeRequestDepartures(POST, tooManyFoundXml)
 
         val result =
-          controller.createDeparture(eori)(request)
+          controller.createDeparture(eoriNumber)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -296,13 +284,13 @@ class DeparturesControllerSpec
 
         val request = FakeRequest(
           method = POST,
-          uri = routes.DeparturesController.createDeparture(eori).url,
+          uri = routes.DeparturesController.createDeparture(eoriNumber).url,
           headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
           body = unknownErrorXml
         )
 
         val result =
-          controller.createDeparture(eori)(request)
+          controller.createDeparture(eoriNumber)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
@@ -318,7 +306,7 @@ class DeparturesControllerSpec
         val request = fakeRequestDepartures(POST, validXml)
 
         val result =
-          controller.createDeparture(eori)(request)
+          controller.createDeparture(eoriNumber)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
@@ -365,17 +353,19 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getMessage(eoriNumber, departureId, messageId).url)
 
     "must return OK if message found in the correct format" in {
-      when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
-        .thenReturn(EitherT.rightT(Some(message)))
+      val messageResponse = MessageResponse.fromMessageWithBody(departure.messages.head)
+
+      when(mockRepository.getSingleMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
+        .thenReturn(EitherT.rightT(Some(messageResponse)))
 
       val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.toJson(message)(PresentationFormats.messageFormat)
+      contentAsJson(result) mustBe Json.toJson(messageResponse)
     }
 
     "must return NOT_FOUND if no message found" in {
-      when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
+      when(mockRepository.getSingleMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
         .thenReturn(EitherT.rightT(None))
 
       val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
@@ -384,7 +374,7 @@ class DeparturesControllerSpec
     }
 
     "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
-      when(mockRepository.getMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
+      when(mockRepository.getSingleMessage(EORINumber(any()), DepartureId(any()), MessageId(any())))
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
       val result = controller.getMessage(eoriNumber, departureId, messageId)(request)
@@ -393,65 +383,71 @@ class DeparturesControllerSpec
     }
   }
 
-  "getDepartureMessageIds" - {
+  "getDepartureMessages" - {
 
-    val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, departureId).url)
+    val request = FakeRequest("GET", routes.DeparturesController.getDepartureMessages(eoriNumber, departureId).url)
 
     "must return OK and a list of message ids" in {
-      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any()), eqTo(None)))
-        .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageId))))
+      val messageResponses = MessageResponse.fromMessageWithoutBody(departure.messages.head)
 
-      val result = controller.getDepartureMessageIds(eoriNumber, departureId, None)(request)
+      lazy val messageResponseList = NonEmptyList.one(messageResponses)
+
+      when(mockRepository.getMessages(EORINumber(any()), DepartureId(any()), eqTo(None)))
+        .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageResponses))))
+
+      val result = controller.getDepartureMessages(eoriNumber, departureId, None)(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.toJson(messageIdList)(nonEmptyListFormat(messageIdFormat))
+      contentAsJson(result) mustBe Json.toJson(messageResponseList)
     }
 
     "must return NOT_FOUND if no departure found" in {
-      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any()), eqTo(None)))
+      when(mockRepository.getMessages(EORINumber(any()), DepartureId(any()), eqTo(None)))
         .thenReturn(EitherT.rightT(None))
 
-      val result = controller.getDepartureMessageIds(eoriNumber, departureId, None)(request)
+      val result = controller.getDepartureMessages(eoriNumber, departureId, None)(request)
 
       status(result) mustBe NOT_FOUND
     }
 
     "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
-      when(mockRepository.getDepartureMessageIds(EORINumber(any()), DepartureId(any()), eqTo(None)))
+      when(mockRepository.getMessages(EORINumber(any()), DepartureId(any()), eqTo(None)))
         .thenReturn(EitherT.leftT(UnexpectedError(None)))
 
-      val result = controller.getDepartureMessageIds(eoriNumber, departureId, None)(request)
+      val result = controller.getDepartureMessages(eoriNumber, departureId, None)(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
     }
   }
 
-  "getDepartureIds" - {
-    val request = FakeRequest("GET", routes.DeparturesController.getDepartureIds(eoriNumber).url)
+  "getDeparturesForEori" - {
+    val request = FakeRequest("GET", routes.DeparturesController.getDeparturesForEori(eoriNumber).url)
 
-    "must return OK if ids were found" in {
-      when(mockRepository.getDepartureIds(EORINumber(any())))
-        .thenReturn(EitherT.rightT(Some(NonEmptyList(departureId, List.empty))))
+    "must return OK if departures were found" in {
+      val response = DepartureWithoutMessages.fromDeparture(departure)
 
-      val result = controller.getDepartureIds(eoriNumber)(request)
+      when(mockRepository.getDepartures(EORINumber(any())))
+        .thenReturn(EitherT.rightT(Some(NonEmptyList(response, List.empty))))
+
+      val result = controller.getDeparturesForEori(eoriNumber)(request)
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.toJson(NonEmptyList(departureId, List.empty))
+      contentAsJson(result) mustBe Json.toJson(NonEmptyList(response, List.empty))
     }
 
     "must return NOT_FOUND if no ids were found" in {
-      when(mockRepository.getDepartureIds(EORINumber(any())))
+      when(mockRepository.getDepartures(EORINumber(any())))
         .thenReturn(EitherT.rightT(None))
 
-      val result = controller.getDepartureIds(eoriNumber)(request)
+      val result = controller.getDeparturesForEori(eoriNumber)(request)
 
       status(result) mustBe NOT_FOUND
     }
 
     "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
-      when(mockRepository.getDepartureIds(EORINumber(any())))
+      when(mockRepository.getDepartures(EORINumber(any())))
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
-      val result = controller.getDepartureIds(eoriNumber)(request)
+      val result = controller.getDeparturesForEori(eoriNumber)(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
     }

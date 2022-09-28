@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovements.models
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
 
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
 
 case class DepartureWithoutMessages(

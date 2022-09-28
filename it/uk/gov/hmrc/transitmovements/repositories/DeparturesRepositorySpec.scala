@@ -40,6 +40,7 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.time.Clock
@@ -84,10 +85,10 @@ class DeparturesRepositorySpec
     )
 
     val firstItem = await {
-      repository.collection.find(Filters.eq("_id", "2")).first().toFuture()
+      repository.collection.find(Filters.eq("_id", departure._id.value)).first().toFuture()
     }
 
-    firstItem._id.value should be("2")
+    firstItem._id.value should be(departure._id.value)
   }
 
   "getDepartureWithoutMessages" should "return DepartureWithoutMessages if it exists" in {
@@ -108,25 +109,25 @@ class DeparturesRepositorySpec
     result.right.get.isEmpty should be(true)
   }
 
-  "getMessage" should "return message if it exists" in {
+  "getSingleMessage" should "return message response if it exists" in {
     val departure = arbitrary[Departure].sample.value
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id).value)
-    result.right.get.get should be(departure.messages.head)
+    val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id).value)
+    result.right.get.get should be(MessageResponse.fromMessageWithBody(departure.messages.head))
   }
 
-  "getMessage" should "return none if the message doesn't exist" in {
+  "getSingleMessage" should "return none if the message doesn't exist" in {
     val departure = arbitrary[Departure].sample.value
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getMessage(departure.enrollmentEORINumber, departure._id, MessageId("X")).value)
+    val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, MessageId("X")).value)
     result.right.get.isEmpty should be(true)
   }
 
-  "getDepartureMessageIds" should "return messageIds if there are messages" in {
+  "getMessages" should "return message responses if there are messages" in {
     val messages =
       NonEmptyList
         .fromList(
@@ -139,15 +140,15 @@ class DeparturesRepositorySpec
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getDepartureMessageIds(departure.enrollmentEORINumber, departure._id, None).value)
+    val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, None).value)
     result.right.get.get should be(
       departure.messages.map(
-        x => x.id
+        message => MessageResponse.fromMessageWithoutBody(message)
       )
     )
   }
 
-  "getDepartureMessageIds" should "return messageIds if there are messages that were received since the given time" in {
+  "getMessages" should "return message responses if there are messages that were received since the given time" in {
     val dateTime = arbitrary[OffsetDateTime].sample.value
 
     val messages =
@@ -165,81 +166,73 @@ class DeparturesRepositorySpec
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getDepartureMessageIds(departure.enrollmentEORINumber, departure._id, Some(dateTime)).value)
+    val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, Some(dateTime)).value)
     result.right.get.get should be(
-      NonEmptyList.fromListUnsafe(
-        departure.messages
-          .take(2)
-          .map(
-            x => x.id
-          )
-      )
+      departure.messages
+        .map(
+          message => MessageResponse.fromMessageWithoutBody(message)
+        )
     )
   }
 
-  "getDepartureMessageIds" should "return none if the departure doesn't exist" in {
-    val result = await(repository.getDepartureMessageIds(EORINumber("ABC"), DepartureId("XYZ"), None).value)
+  "getMessages" should "return none if the departure doesn't exist" in {
+    val result = await(repository.getMessages(EORINumber("NONEXISTENT_EORI"), DepartureId("NONEXISTENT_ID"), None).value)
     result.right.get.isEmpty should be(true)
   }
 
-  "getDepartureIds" should
-    "return a list of departure ids for the supplied EORI sorted by last updated, latest first" in {
+  "getDepartures" should
+    "return a list of departure responses for the supplied EORI sorted by last updated, latest first" in {
       GetDeparturesSetup.setup()
-      val result = await(repository.getDepartureIds(GetDeparturesSetup.eoriGB).value)
+      val result = await(repository.getDepartures(GetDeparturesSetup.eoriGB).value)
 
-      result.right.get.value should be(NonEmptyList(DepartureId("10004"), List(DepartureId("10001"))))
+      result.right.get.value should be(
+        NonEmptyList(
+          DepartureWithoutMessages.fromDeparture(GetDeparturesSetup.departureGB2),
+          List(DepartureWithoutMessages.fromDeparture(GetDeparturesSetup.departureGB1))
+        )
+      )
     }
 
   it should "return no departure ids for an EORI that doesn't exist" in {
     GetDeparturesSetup.setup()
-    val result = await(repository.getDepartureIds(EORINumber("FR999")).value)
+    val result = await(repository.getDepartures(EORINumber("FR999")).value)
 
     result.right.get should be(None)
   }
 
   it should "return no departure ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getDepartureIds(EORINumber("FR999")).value)
+    val result = await(repository.getDepartures(EORINumber("FR999")).value)
     result.right.get should be(None)
   }
 
   object GetDeparturesSetup {
 
-    val eoriGB = EORINumber("GB00001")
-    val eoriXI = EORINumber("XI00001")
+    val eoriGB  = arbitrary[EORINumber].sample.value
+    val eoriXI  = arbitrary[EORINumber].sample.value
+    val message = arbitrary[Message].sample.value
+
+    val departureGB1 =
+      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriGB, created = instant, updated = instant, messages = NonEmptyList(message, List.empty))
+
+    val mrnGen = arbitrary[MovementReferenceNumber]
+
+    val departureXi1 =
+      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriXI, updated = instant.plusMinutes(1), movementReferenceNumber = mrnGen.sample)
+
+    val departureXi2 =
+      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriXI, updated = instant.minusMinutes(3), movementReferenceNumber = mrnGen.sample)
+
+    val departureGB2 =
+      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriGB, updated = instant.plusMinutes(1), movementReferenceNumber = mrnGen.sample)
 
     def setup() {
 
-      val departure1 = Departure(
-        _id = DepartureId("10001"),
-        enrollmentEORINumber = eoriGB,
-        movementEORINumber = EORINumber("20001"),
-        movementReferenceNumber = None,
-        created = instant,
-        updated = instant,
-        messages = NonEmptyList(
-          Message(
-            id = MessageId("00011"),
-            received = instant,
-            generated = instant,
-            messageType = MessageType.DeclarationData,
-            triggerId = None,
-            url = None,
-            body = None
-          ),
-          tail = List.empty
-        )
-      )
-
-      val departure2 = departure1.copy(_id = DepartureId("10002"), enrollmentEORINumber = eoriXI, updated = instant.plusMinutes(1))
-      val departure3 = departure1.copy(_id = DepartureId("10003"), enrollmentEORINumber = eoriXI, updated = instant.minusMinutes(3))
-      val departure4 = departure1.copy(_id = DepartureId("10004"), enrollmentEORINumber = eoriGB, updated = instant.plusMinutes(1))
-
       //populate db in non-time order
-      await(repository.insert(departure3).value)
-      await(repository.insert(departure2).value)
-      await(repository.insert(departure4).value)
-      await(repository.insert(departure1).value)
+      await(repository.insert(departureXi2).value)
+      await(repository.insert(departureGB2).value)
+      await(repository.insert(departureXi1).value)
+      await(repository.insert(departureGB1).value)
     }
 
   }
@@ -248,7 +241,7 @@ class DeparturesRepositorySpec
 
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
 
-    val departureID = DepartureId("ABC")
+    val departureID = arbitrary[DepartureId].sample.value
     val departure =
       arbitrary[Departure].sample.value
         .copy(
@@ -272,7 +265,7 @@ class DeparturesRepositorySpec
     result should be(Right(()))
 
     val movement = await {
-      repository.collection.find(Filters.eq("_id", "ABC")).first().toFuture()
+      repository.collection.find(Filters.eq("_id", departureID.value)).first().toFuture()
     }
 
     movement.updated shouldNot be(instant)
@@ -286,11 +279,11 @@ class DeparturesRepositorySpec
 
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = None)
 
-    val departureID = DepartureId("EFG123")
+    val departureId = arbitrary[DepartureId].sample.value
     val departure =
       arbitrary[Departure].sample.value
         .copy(
-          _id = departureID,
+          _id = departureId,
           created = instant,
           updated = instant,
           movementReferenceNumber = None,
@@ -302,17 +295,17 @@ class DeparturesRepositorySpec
     )
 
     val message2 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = Some(MessageId(departureID.value)))
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = Some(MessageId(departureId.value)))
 
-    val mrn = MovementReferenceNumber("REF123")
+    val mrn = arbitrary[MovementReferenceNumber].sample.value
     val result = await(
-      repository.updateMessages(departureID, message2, Some(mrn)).value
+      repository.updateMessages(departureId, message2, Some(mrn)).value
     )
 
     result should be(Right(()))
 
     val movement = await {
-      repository.collection.find(Filters.eq("_id", "EFG123")).first().toFuture()
+      repository.collection.find(Filters.eq("_id", departureId.value)).first().toFuture()
     }
 
     movement.updated shouldNot be(instant)
@@ -325,13 +318,13 @@ class DeparturesRepositorySpec
 
   "updateMessages" should "return error if there is no matching movement with the given id" in {
 
-    val departureID = DepartureId("ABC")
+    val departureID = arbitrary[DepartureId].sample.value
 
     val message =
       arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
 
     val result = await(
-      repository.updateMessages(departureID, message, Some(MovementReferenceNumber("REF123"))).value
+      repository.updateMessages(departureID, message, Some(arbitrary[MovementReferenceNumber].sample.get)).value
     )
 
     result should be(Left(MongoError.DocumentNotFound(s"No departure found with the given id: ${departureID.value}")))

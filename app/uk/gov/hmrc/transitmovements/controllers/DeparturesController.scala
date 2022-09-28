@@ -92,22 +92,22 @@ class DeparturesController @Inject() (
       )
   }
 
-  def getDepartureMessageIds(eoriNumber: EORINumber, departureId: DepartureId, receivedSince: Option[OffsetDateTime] = None) = Action.async {
+  def getDepartureMessages(eoriNumber: EORINumber, departureId: DepartureId, receivedSince: Option[OffsetDateTime] = None) = Action.async {
     repo
-      .getDepartureMessageIds(eoriNumber, departureId, receivedSince)
+      .getMessages(eoriNumber, departureId, receivedSince)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         {
-          case Some(departureMessageIds) => Ok(Json.toJson(departureMessageIds))
-          case None                      => NotFound
+          case Some(departureMessages) => Ok(Json.toJson(departureMessages))
+          case None                    => NotFound
         }
       )
   }
 
   def getMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): Action[AnyContent] = Action.async {
     repo
-      .getMessage(eoriNumber, departureId, messageId)
+      .getSingleMessage(eoriNumber, departureId, messageId)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
@@ -118,9 +118,9 @@ class DeparturesController @Inject() (
       )
   }
 
-  def getDepartureIds(eoriNumber: EORINumber): Action[AnyContent] = Action.async {
+  def getDeparturesForEori(eoriNumber: EORINumber): Action[AnyContent] = Action.async {
     repo
-      .getDepartureIds(eoriNumber)
+      .getDepartures(eoriNumber)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
