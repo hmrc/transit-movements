@@ -26,6 +26,7 @@ case class DepartureWithoutMessages(
   _id: DepartureId,
   enrollmentEORINumber: EORINumber,
   movementEORINumber: EORINumber,
+  movementType: MovementType,
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
   created: OffsetDateTime,
   updated: OffsetDateTime
@@ -38,6 +39,7 @@ object DepartureWithoutMessages {
       "_id"                     -> 1,
       "enrollmentEORINumber"    -> 1,
       "movementEORINumber"      -> 1,
+      "movementType"            -> 1,
       "movementReferenceNumber" -> 1,
       "created"                 -> 1,
       "updated"                 -> 1
@@ -48,6 +50,7 @@ object DepartureWithoutMessages {
       departure._id,
       departure.enrollmentEORINumber,
       departure.movementEORINumber,
+      departure.movementType,
       departure.movementReferenceNumber,
       departure.created,
       departure.updated

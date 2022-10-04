@@ -32,6 +32,7 @@ class DepartureSpec extends AnyFlatSpec with Matchers with PresentationFormats {
 
     val movement = Departure(
       DepartureId("1"),
+      MovementType("Departure"),
       EORINumber("222"),
       EORINumber("223"),
       Some(MovementReferenceNumber("333")),

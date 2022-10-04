@@ -16,17 +16,4 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import cats.data.NonEmptyList
-
-import java.time.OffsetDateTime
-
-case class Departure(
-  _id: DepartureId,
-  movementType: MovementType,
-  enrollmentEORINumber: EORINumber,
-  movementEORINumber: EORINumber,
-  movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
-  created: OffsetDateTime,
-  updated: OffsetDateTime,
-  messages: NonEmptyList[Message]
-)
+case class MovementType(value: String) extends AnyVal

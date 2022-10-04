@@ -30,6 +30,7 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MovementType
 
 object CommonFormats extends CommonFormats
 
@@ -45,6 +46,7 @@ trait CommonFormats {
 
   implicit val mrnFormat: Format[MovementReferenceNumber] = Json.valueFormat[MovementReferenceNumber]
   implicit val eoriNumberFormat: Format[EORINumber]       = Json.valueFormat[EORINumber]
+  implicit val movementTypeFormat: Format[MovementType]   = Json.valueFormat[MovementType]
   implicit val messageIdFormat: Format[MessageId]         = Json.valueFormat[MessageId]
   implicit val departureIdFormat: Format[DepartureId]     = Json.valueFormat[DepartureId]
 

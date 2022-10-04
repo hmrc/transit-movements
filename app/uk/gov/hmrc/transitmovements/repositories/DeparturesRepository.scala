@@ -40,6 +40,7 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
@@ -62,15 +63,28 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[DeparturesRepositoryImpl])
 trait DeparturesRepository {
   def insert(departure: Departure): EitherT[Future, MongoError, Unit]
-  def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
-  def getSingleMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[MessageResponse]]
+
+  def getDepartureWithoutMessages(
+    eoriNumber: EORINumber,
+    departureId: DepartureId,
+    movementType: MovementType
+  ): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
+
+  def getSingleMessage(
+    eoriNumber: EORINumber,
+    departureId: DepartureId,
+    messageId: MessageId,
+    movementType: MovementType
+  ): EitherT[Future, MongoError, Option[MessageResponse]]
 
   def getMessages(
     eoriNumber: EORINumber,
     departureId: DepartureId,
+    movementType: MovementType,
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]]
-  def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]]
+
+  def getDepartures(eoriNumber: EORINumber, movementType: MovementType): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]]
   def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit]
 }
 
@@ -85,7 +99,7 @@ class DeparturesRepositoryImpl @Inject() (
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[Departure](
       mongoComponent = mongoComponent,
-      collectionName = "departure_movements",
+      collectionName = "movements",
       domainFormat = MongoFormats.departureFormat,
       indexes = Seq(
         IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS))
@@ -119,9 +133,17 @@ class DeparturesRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]] = {
+  def getDepartureWithoutMessages(
+    eoriNumber: EORINumber,
+    departureId: DepartureId,
+    movementType: MovementType
+  ): EitherT[Future, MongoError, Option[DepartureWithoutMessages]] = {
 
-    val selector   = mAnd(mEq("_id", departureId.value), mEq("enrollmentEORINumber", eoriNumber.value))
+    val selector = mAnd(
+      mEq("_id", departureId.value),
+      mEq("enrollmentEORINumber", eoriNumber.value),
+      mEq("movementType", movementType.value)
+    )
     val projection = DepartureWithoutMessages.projection
 
     val aggregates = Seq(
@@ -142,6 +164,7 @@ class DeparturesRepositoryImpl @Inject() (
   def getMessages(
     eoriNumber: EORINumber,
     departureId: DepartureId,
+    movementType: MovementType,
     receivedSince: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]] = {
 
@@ -150,6 +173,7 @@ class DeparturesRepositoryImpl @Inject() (
     val selector = mAnd(
       mEq("_id", departureId.value),
       mEq("enrollmentEORINumber", eoriNumber.value),
+      mEq("movementType", movementType.value),
       mGte("messages.received", receivedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME))
     )
 
@@ -175,8 +199,19 @@ class DeparturesRepositoryImpl @Inject() (
 
   }
 
-  def getSingleMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[MessageResponse]] = {
-    val selector          = mAnd(mEq("_id", departureId.value), mEq("messages.id", messageId.value), mEq("enrollmentEORINumber", eoriNumber.value))
+  def getSingleMessage(
+    eoriNumber: EORINumber,
+    departureId: DepartureId,
+    messageId: MessageId,
+    movementType: MovementType
+  ): EitherT[Future, MongoError, Option[MessageResponse]] = {
+
+    val selector = mAnd(
+      mEq("_id", departureId.value),
+      mEq("messages.id", messageId.value),
+      mEq("enrollmentEORINumber", eoriNumber.value),
+      mEq("movementType", movementType.value)
+    )
     val secondarySelector = mEq("messages.id", messageId.value)
     val aggregates =
       Seq(Aggregates.filter(selector), Aggregates.unwind("$messages"), Aggregates.filter(secondarySelector), Aggregates.replaceRoot("$messages"))
@@ -199,9 +234,12 @@ class DeparturesRepositoryImpl @Inject() (
       )
     }
 
-  def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]] = {
-    val selector: Bson = mEq("enrollmentEORINumber", eoriNumber.value)
-    val projection     = DepartureWithoutMessages.projection
+  def getDepartures(eoriNumber: EORINumber, movementType: MovementType): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]] = {
+    val selector: Bson = mAnd(
+      mEq("enrollmentEORINumber", eoriNumber.value),
+      mEq("movementType", movementType.value)
+    )
+    val projection = DepartureWithoutMessages.projection
 
     val aggregates = Seq(
       Aggregates.filter(selector),

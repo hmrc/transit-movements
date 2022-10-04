@@ -25,6 +25,7 @@ import uk.gov.hmrc.transitmovements.models.Departure
 import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.MovementType
 
 import java.security.SecureRandom
 import java.time.Clock
@@ -37,6 +38,7 @@ trait DepartureFactory {
 
   def create(
     eori: EORINumber,
+    movementType: MovementType,
     declarationData: DeclarationData,
     message: Message
   ): Departure
@@ -51,12 +53,14 @@ class DepartureFactoryImpl @Inject() (
 
   def create(
     eori: EORINumber,
+    movementType: MovementType,
     declarationData: DeclarationData,
     message: Message
   ): Departure =
     Departure(
       _id = DepartureId(ShortUUID.next(clock, random)),
       enrollmentEORINumber = eori,
+      movementType = movementType,
       movementEORINumber = declarationData.movementEoriNumber,
       movementReferenceNumber = None,
       created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
