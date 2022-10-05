@@ -43,11 +43,7 @@ trait ModelGenerators extends BaseGenerators {
     }
 
   implicit lazy val arbitraryMovementType: Arbitrary[MovementType] =
-    Arbitrary {
-      for {
-        id <- intWithMaxLength(9)
-      } yield MovementType(id.toString)
-    }
+    Arbitrary(Gen.oneOf(MovementType.movementTypes))
 
   implicit lazy val arbitraryDepartureId: Arbitrary[DepartureId] =
     Arbitrary {

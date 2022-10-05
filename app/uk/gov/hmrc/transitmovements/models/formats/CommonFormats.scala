@@ -46,7 +46,7 @@ trait CommonFormats {
 
   implicit val mrnFormat: Format[MovementReferenceNumber] = Json.valueFormat[MovementReferenceNumber]
   implicit val eoriNumberFormat: Format[EORINumber]       = Json.valueFormat[EORINumber]
-  implicit val movementTypeFormat: Format[MovementType]   = Json.valueFormat[MovementType]
+  implicit val movementTypeFormat: Format[MovementType]   = enumFormat(MovementType.movementTypes)(_.value)
   implicit val messageIdFormat: Format[MessageId]         = Json.valueFormat[MessageId]
   implicit val departureIdFormat: Format[DepartureId]     = Json.valueFormat[DepartureId]
 

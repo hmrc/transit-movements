@@ -16,4 +16,12 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-case class MovementType(value: String) extends AnyVal
+sealed abstract class MovementType(val value: String) extends Product with Serializable
+
+object MovementType {
+  case object Arrival   extends MovementType("arrival")
+  case object Departure extends MovementType("departure")
+
+  lazy val movementTypes: Set[MovementType] = Set(Arrival, Departure)
+
+}

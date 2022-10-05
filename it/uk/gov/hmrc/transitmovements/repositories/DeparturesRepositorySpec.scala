@@ -106,7 +106,7 @@ class DeparturesRepositorySpec
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, DepartureId("2"), MovementType("Departure")).value)
+    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, DepartureId("2"), MovementType.Departure).value)
     result.right.get.isEmpty should be(true)
   }
 
@@ -177,7 +177,7 @@ class DeparturesRepositorySpec
   }
 
   "getMessages" should "return none if the departure doesn't exist" in {
-    val result = await(repository.getMessages(EORINumber("NONEXISTENT_EORI"), DepartureId("NONEXISTENT_ID"), MovementType("Departure"), None).value)
+    val result = await(repository.getMessages(EORINumber("NONEXISTENT_EORI"), DepartureId("NONEXISTENT_ID"), MovementType.Departure, None).value)
     result.right.get.isEmpty should be(true)
   }
 
@@ -196,14 +196,14 @@ class DeparturesRepositorySpec
 
   it should "return no departure ids for an EORI that doesn't exist" in {
     GetDeparturesSetup.setup()
-    val result = await(repository.getDepartures(EORINumber("FR999"), MovementType("Departures")).value)
+    val result = await(repository.getDepartures(EORINumber("FR999"), MovementType.Departure).value)
 
     result.right.get should be(None)
   }
 
   it should "return no departure ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getDepartures(EORINumber("FR999"), MovementType("Departures")).value)
+    val result = await(repository.getDepartures(EORINumber("FR999"), MovementType.Departure).value)
     result.right.get should be(None)
   }
 
