@@ -97,7 +97,7 @@ class DeparturesRepositorySpec
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, departure._id, departure.movementType).value)
+    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, departure._id).value)
     result.right.get.get should be(DepartureWithoutMessages.fromDeparture(departure))
   }
 
@@ -106,7 +106,7 @@ class DeparturesRepositorySpec
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, DepartureId("2"), MovementType.Departure).value)
+    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, DepartureId("2")).value)
     result.right.get.isEmpty should be(true)
   }
 
@@ -184,7 +184,7 @@ class DeparturesRepositorySpec
   "getDepartures" should
     "return a list of departure responses for the supplied EORI sorted by last updated, latest first" in {
       GetDeparturesSetup.setup()
-      val result = await(repository.getDepartures(GetDeparturesSetup.eoriGB, GetDeparturesSetup.movementType).value)
+      val result = await(repository.getDepartures(GetDeparturesSetup.eoriGB).value)
 
       result.right.get.value should be(
         NonEmptyList(
@@ -196,28 +196,27 @@ class DeparturesRepositorySpec
 
   it should "return no departure ids for an EORI that doesn't exist" in {
     GetDeparturesSetup.setup()
-    val result = await(repository.getDepartures(EORINumber("FR999"), MovementType.Departure).value)
+    val result = await(repository.getDepartures(EORINumber("FR999")).value)
 
     result.right.get should be(None)
   }
 
   it should "return no departure ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getDepartures(EORINumber("FR999"), MovementType.Departure).value)
+    val result = await(repository.getDepartures(EORINumber("FR999")).value)
     result.right.get should be(None)
   }
 
   object GetDeparturesSetup {
 
-    val eoriGB       = arbitrary[EORINumber].sample.value
-    val eoriXI       = arbitrary[EORINumber].sample.value
-    val message      = arbitrary[Message].sample.value
-    val movementType = arbitrary[MovementType].sample.value
+    val eoriGB  = arbitrary[EORINumber].sample.value
+    val eoriXI  = arbitrary[EORINumber].sample.value
+    val message = arbitrary[Message].sample.value
 
     val departureGB1 =
       arbitrary[Departure].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementType = movementType,
+        movementType = MovementType.Departure,
         created = instant,
         updated = instant,
         messages = NonEmptyList(message, List.empty)
@@ -234,7 +233,7 @@ class DeparturesRepositorySpec
     val departureGB2 =
       arbitrary[Departure].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementType = movementType,
+        movementType = MovementType.Departure,
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample
       )

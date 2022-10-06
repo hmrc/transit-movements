@@ -66,8 +66,7 @@ trait DeparturesRepository {
 
   def getDepartureWithoutMessages(
     eoriNumber: EORINumber,
-    departureId: DepartureId,
-    movementType: MovementType
+    departureId: DepartureId
   ): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
 
   def getSingleMessage(
@@ -84,7 +83,7 @@ trait DeparturesRepository {
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]]
 
-  def getDepartures(eoriNumber: EORINumber, movementType: MovementType): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]]
+  def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]]
   def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit]
 }
 
@@ -135,14 +134,13 @@ class DeparturesRepositoryImpl @Inject() (
 
   def getDepartureWithoutMessages(
     eoriNumber: EORINumber,
-    departureId: DepartureId,
-    movementType: MovementType
+    departureId: DepartureId
   ): EitherT[Future, MongoError, Option[DepartureWithoutMessages]] = {
 
     val selector = mAnd(
       mEq("_id", departureId.value),
       mEq("enrollmentEORINumber", eoriNumber.value),
-      mEq("movementType", movementType.value)
+      mEq("movementType", MovementType.Departure.value)
     )
     val projection = DepartureWithoutMessages.projection
 
@@ -234,10 +232,10 @@ class DeparturesRepositoryImpl @Inject() (
       )
     }
 
-  def getDepartures(eoriNumber: EORINumber, movementType: MovementType): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]] = {
+  def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]] = {
     val selector: Bson = mAnd(
       mEq("enrollmentEORINumber", eoriNumber.value),
-      mEq("movementType", movementType.value)
+      mEq("movementType", MovementType.Departure.value)
     )
     val projection = DepartureWithoutMessages.projection
 
