@@ -23,7 +23,7 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 
 case class DepartureWithoutMessages(
-  _id: DepartureId,
+  _id: MovementId,
   enrollmentEORINumber: EORINumber,
   movementEORINumber: EORINumber,
   movementType: MovementType,
@@ -45,14 +45,14 @@ object DepartureWithoutMessages {
       "updated"                 -> 1
     )
 
-  def fromDeparture(departure: Departure) =
+  def fromDeparture(movement: Movement) =
     DepartureWithoutMessages(
-      departure._id,
-      departure.enrollmentEORINumber,
-      departure.movementEORINumber,
-      departure.movementType,
-      departure.movementReferenceNumber,
-      departure.created,
-      departure.updated
+      movement._id,
+      movement.enrollmentEORINumber,
+      movement.movementEORINumber,
+      movement.movementType,
+      movement.movementReferenceNumber,
+      movement.created,
+      movement.updated
     )
 }

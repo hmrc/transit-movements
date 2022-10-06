@@ -25,14 +25,13 @@ import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
 import play.api.mvc.Result
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
-import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MovementId
 import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
-import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
+import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
 
@@ -43,7 +42,7 @@ import javax.inject.Singleton
 class MovementsController @Inject() (
   cc: ControllerComponents,
   factory: MessageFactory,
-  repo: DeparturesRepository,
+  repo: MovementsRepository,
   xmlParsingService: MessagesXmlParsingService,
   val temporaryFileCreator: TemporaryFileCreator
 )(implicit
@@ -71,7 +70,7 @@ class MovementsController @Inject() (
                   fileSource
                 )
                 .asPresentation
-              _ <- repo.updateMessages(DepartureId(movementId.value), message, messageData.mrn).asPresentation
+              _ <- repo.updateMessages(MovementId(movementId.value), message, messageData.mrn).asPresentation
             } yield message.id).fold[Result](
               baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
               id => Ok(Json.toJson(UpdateMovementResponse(id)))

@@ -30,17 +30,17 @@ import play.api.libs.json.Json
 import play.api.libs.Files.TemporaryFileCreator
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
-import uk.gov.hmrc.transitmovements.services.DepartureFactory
-import uk.gov.hmrc.transitmovements.services.DeparturesXmlParsingService
+import uk.gov.hmrc.transitmovements.services.MovementFactory
+import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
-import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
+import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 
 import java.time.OffsetDateTime
 import javax.inject.Inject
@@ -49,10 +49,10 @@ import javax.inject.Singleton
 @Singleton
 class DeparturesController @Inject() (
   cc: ControllerComponents,
-  departureFactory: DepartureFactory,
+  movementFactory: MovementFactory,
   messageFactory: MessageFactory,
-  repo: DeparturesRepository,
-  xmlParsingService: DeparturesXmlParsingService,
+  repo: MovementsRepository,
+  xmlParsingService: MovementsXmlParsingService,
   val temporaryFileCreator: TemporaryFileCreator
 )(implicit
   val materializer: Materializer
@@ -71,18 +71,18 @@ class DeparturesController @Inject() (
             declarationData <- xmlParsingService.extractDeclarationData(source).asPresentation
             fileSource = FileIO.fromPath(temporaryFile)
             message <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, None, fileSource).asPresentation
-            departure = departureFactory.create(eori, MovementType.Departure, declarationData, message)
-            _ <- repo.insert(departure).asPresentation
-          } yield DeclarationResponse(departure._id, departure.messages.head.id)).fold[Result](
+            movement = movementFactory.create(eori, MovementType.Departure, declarationData, message)
+            _ <- repo.insert(movement).asPresentation
+          } yield DeclarationResponse(movement._id, movement.messages.head.id)).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
             response => Ok(Json.toJson(response))
           )
       }.toResult
   }
 
-  def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): Action[AnyContent] = Action.async {
+  def getDepartureWithoutMessages(eoriNumber: EORINumber, movementId: MovementId): Action[AnyContent] = Action.async {
     repo
-      .getDepartureWithoutMessages(eoriNumber, departureId)
+      .getDepartureWithoutMessages(eoriNumber, movementId)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
@@ -93,9 +93,9 @@ class DeparturesController @Inject() (
       )
   }
 
-  def getDepartureMessages(eoriNumber: EORINumber, departureId: DepartureId, receivedSince: Option[OffsetDateTime] = None) = Action.async {
+  def getDepartureMessages(eoriNumber: EORINumber, movementId: MovementId, receivedSince: Option[OffsetDateTime] = None) = Action.async {
     repo
-      .getMessages(eoriNumber, departureId, MovementType.Departure, receivedSince)
+      .getMessages(eoriNumber, movementId, MovementType.Departure, receivedSince)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
@@ -106,9 +106,9 @@ class DeparturesController @Inject() (
       )
   }
 
-  def getMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): Action[AnyContent] = Action.async {
+  def getMessage(eoriNumber: EORINumber, movementId: MovementId, messageId: MessageId): Action[AnyContent] = Action.async {
     repo
-      .getSingleMessage(eoriNumber, departureId, messageId, MovementType.Departure)
+      .getSingleMessage(eoriNumber, movementId, messageId, MovementType.Departure)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

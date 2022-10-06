@@ -33,7 +33,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import scala.xml.NodeSeq
 
-class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Matchers with TestActorSystem with StreamTestHelpers {
+class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Matchers with TestActorSystem with StreamTestHelpers {
 
   private val testDate      = OffsetDateTime.now(ZoneOffset.UTC)
   private val UTCDateString = testDate.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
@@ -94,7 +94,7 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
     "<CC015C><messageSender>GB1234</messageReceiver></CC015C>"
 
   "When handed an XML stream" - {
-    val service = new DeparturesXmlParsingServiceImpl
+    val service = new MovementsXmlParsingServiceImpl
 
     "if it is valid, return an appropriate Declaration Data" in {
       val source = createStream(validXml)

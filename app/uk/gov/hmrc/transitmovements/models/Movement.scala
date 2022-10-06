@@ -20,8 +20,8 @@ import cats.data.NonEmptyList
 
 import java.time.OffsetDateTime
 
-case class Departure(
-  _id: DepartureId,
+case class Movement(
+  _id: MovementId,
   movementType: MovementType,
   enrollmentEORINumber: EORINumber,
   movementEORINumber: EORINumber,

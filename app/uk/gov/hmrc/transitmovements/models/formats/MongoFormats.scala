@@ -23,7 +23,7 @@ import play.api.libs.json.Writes
 import uk.gov.hmrc.mongo.play.json.formats.MongoBinaryFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
-import uk.gov.hmrc.transitmovements.models.Departure
+import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
@@ -50,7 +50,7 @@ trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
 
   // these use the dates above, so need to be here for compile-time macro expansion
   implicit val messageFormat: Format[Message]                                   = Json.format[Message]
-  implicit val departureFormat: Format[Departure]                               = Json.format[Departure]
+  implicit val movementFormat: Format[Movement]                                 = Json.format[Movement]
   implicit val departureWithoutMessagesFormat: Format[DepartureWithoutMessages] = Json.format[DepartureWithoutMessages]
   implicit val messageResponseFormat: Format[MessageResponse]                   = Json.format[MessageResponse]
 

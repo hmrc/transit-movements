@@ -26,12 +26,12 @@ import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import java.net.URI
 import java.time.OffsetDateTime
 
-class DepartureSpec extends AnyFlatSpec with Matchers with PresentationFormats {
+class MovementSpec extends AnyFlatSpec with Matchers with PresentationFormats {
 
   "json formatted departure" should "be created correctly" in {
 
-    val movement = Departure(
-      DepartureId("1"),
+    val movement = Movement(
+      MovementId("1"),
       MovementType.Departure,
       EORINumber("222"),
       EORINumber("223"),
@@ -51,7 +51,7 @@ class DepartureSpec extends AnyFlatSpec with Matchers with PresentationFormats {
       )
     )
 
-    val result = Json.toJson[Departure](movement)
+    val result = Json.toJson[Movement](movement)
 
     (result \ "_id").get should be(JsString("1"))
     (result \ "movementEORINumber").get should be(JsString("223"))

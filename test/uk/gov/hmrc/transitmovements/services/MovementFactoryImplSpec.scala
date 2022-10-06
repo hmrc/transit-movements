@@ -30,14 +30,14 @@ import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-class DepartureFactoryImplSpec extends SpecBase with ScalaFutures with Matchers with TestActorSystem with ModelGenerators {
+class MovementFactoryImplSpec extends SpecBase with ScalaFutures with Matchers with TestActorSystem with ModelGenerators {
 
   val instant: OffsetDateTime = OffsetDateTime.of(2022, 5, 27, 11, 0, 0, 0, ZoneOffset.UTC)
   val clock: Clock            = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
   val random                  = new SecureRandom
 
   "create" - {
-    val sut = new DepartureFactoryImpl(clock, random)
+    val sut = new MovementFactoryImpl(clock, random)
 
     "will create a departure with a message" in {
       val departure = sut.create(EORINumber("1"), MovementType.Departure, DeclarationData(EORINumber("1"), instant), arbitraryMessage.arbitrary.sample.get)

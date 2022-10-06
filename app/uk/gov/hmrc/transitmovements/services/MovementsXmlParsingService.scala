@@ -43,15 +43,15 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
-@ImplementedBy(classOf[DeparturesXmlParsingServiceImpl])
-trait DeparturesXmlParsingService {
+@ImplementedBy(classOf[MovementsXmlParsingServiceImpl])
+trait MovementsXmlParsingService {
 
   def extractDeclarationData(source: Source[ByteString, _]): EitherT[Future, ParseError, DeclarationData]
 
 }
 
 @Singleton
-class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Materializer) extends DeparturesXmlParsingService with XmlParsingServiceHelpers {
+class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materializer) extends MovementsXmlParsingService with XmlParsingServiceHelpers {
 
   // we don't want to starve the Play pool
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
