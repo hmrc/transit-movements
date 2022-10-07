@@ -30,6 +30,7 @@ import play.api.libs.json.Json
 import play.api.libs.Files.TemporaryFileCreator
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
@@ -73,7 +74,7 @@ class DeparturesController @Inject() (
             message <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, None, fileSource).asPresentation
             movement = movementFactory.create(eori, MovementType.Departure, declarationData, message)
             _ <- repo.insert(movement).asPresentation
-          } yield DeclarationResponse(movement._id, movement.messages.head.id)).fold[Result](
+          } yield DeclarationResponse(DepartureId(movement._id.value), movement.messages.head.id)).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
             response => Ok(Json.toJson(response))
           )

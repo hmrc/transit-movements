@@ -19,11 +19,12 @@ package uk.gov.hmrc.transitmovements.generators
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
-import uk.gov.hmrc.transitmovements.models.Movement
+import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
@@ -44,6 +45,11 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMovementType: Arbitrary[MovementType] =
     Arbitrary(Gen.oneOf(MovementType.movementTypes))
+
+  implicit lazy val arbitraryDepartureId: Arbitrary[DepartureId] =
+    Arbitrary {
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(DepartureId)
+    }
 
   implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =
     Arbitrary {
