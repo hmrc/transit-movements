@@ -25,6 +25,7 @@ import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -57,7 +58,7 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
 
     "when provided with a valid entry" in {
       val stream       = createParsingEventStream(withEntry)
-      val parsedResult = stream.via(XmlParsers.movementEORINumberExtractor).runWith(Sink.head)
+      val parsedResult = stream.via(XmlParsers.movementEORINumberExtractor("CC015C", "HolderOfTheTransitProcedure")).runWith(Sink.head)
 
       whenReady(parsedResult) {
         _ mustBe Right(EORINumber("GB1234"))
@@ -66,7 +67,7 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
 
     "when provided with no entry" in {
       val stream       = createParsingEventStream(withNoEntry)
-      val parsedResult = stream.via(XmlParsers.movementEORINumberExtractor).runWith(Sink.head)
+      val parsedResult = stream.via(XmlParsers.movementEORINumberExtractor("CC015C", "HolderOfTheTransitProcedure")).runWith(Sink.head)
 
       whenReady(parsedResult) {
         _ mustBe Left(ParseError.NoElementFound("identificationNumber"))
@@ -75,7 +76,7 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
 
     "when provided with two entries" in {
       val stream       = createParsingEventStream(withTwoEntries)
-      val parsedResult = stream.via(XmlParsers.movementEORINumberExtractor).runWith(Sink.head)
+      val parsedResult = stream.via(XmlParsers.movementEORINumberExtractor("CC015C", "HolderOfTheTransitProcedure")).runWith(Sink.head)
 
       whenReady(parsedResult) {
         _ mustBe Left(ParseError.TooManyElementsFound("identificationNumber"))
@@ -147,6 +148,56 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
           error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'notadatetime' could not be parsed at index 0"
       }
     }
+  }
+
+  "Movement Reference Number parser" - {
+
+    val withEntry: NodeSeq =
+      <CC007C>
+        <TransitOperation>
+          <MRN>movement reference number</MRN>
+        </TransitOperation>
+      </CC007C>
+
+    val withNoEntry: NodeSeq =
+      <CC007C>
+      </CC007C>
+
+    val withTwoEntries: NodeSeq =
+      <CC007C>
+        <TransitOperation>
+          <MRN>movement reference number1</MRN>
+          <MRN>movement reference number2</MRN>
+        </TransitOperation>
+      </CC007C>
+
+    "when provided with a valid entry" in {
+      val stream       = createParsingEventStream(withEntry)
+      val parsedResult = stream.via(XmlParsers.movementReferenceNumberExtractor("CC007C")).runWith(Sink.head)
+
+      whenReady(parsedResult) {
+        _ mustBe Right(MovementReferenceNumber("movement reference number"))
+      }
+    }
+
+    "when provided with no entry" in {
+      val stream       = createParsingEventStream(withNoEntry)
+      val parsedResult = stream.via(XmlParsers.movementReferenceNumberExtractor("CC007C")).runWith(Sink.head)
+
+      whenReady(parsedResult) {
+        _ mustBe Left(ParseError.NoElementFound("MRN"))
+      }
+    }
+
+    "when provided with two entries" in {
+      val stream       = createParsingEventStream(withTwoEntries)
+      val parsedResult = stream.via(XmlParsers.movementReferenceNumberExtractor("CC007C")).runWith(Sink.head)
+
+      whenReady(parsedResult) {
+        _ mustBe Left(ParseError.TooManyElementsFound("MRN"))
+      }
+    }
+
   }
 
 }

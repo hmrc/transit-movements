@@ -65,10 +65,10 @@ class ArrivalsController @Inject() (
       withTemporaryFile {
         (temporaryFile, source) =>
           (for {
-            declarationData <- xmlParsingService.extractDeclarationData(source).asPresentation
+            arrivalData <- xmlParsingService.extractArrivalData(source).asPresentation
             fileSource = FileIO.fromPath(temporaryFile)
-            message <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, None, fileSource).asPresentation
-            movement = movementFactory.create(eori, MovementType.Arrival, declarationData, message)
+            message <- messageFactory.create(MessageType.DeclarationData, arrivalData.generationDate, None, fileSource).asPresentation
+            movement = movementFactory.createArrival(eori, MovementType.Arrival, arrivalData, message)
             _ <- repo.insert(movement).asPresentation
           } yield ArrivalDeclarationResponse(ArrivalId(movement._id.value), movement.messages.head.id)).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

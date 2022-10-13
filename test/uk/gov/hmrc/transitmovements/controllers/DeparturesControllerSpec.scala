@@ -171,7 +171,9 @@ class DeparturesControllerSpec
       when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockMovementFactory.create(any[String].asInstanceOf[EORINumber], any[String].asInstanceOf[MovementType], any[DeclarationData], any[Message]))
+      when(
+        mockMovementFactory.createDeparture(any[String].asInstanceOf[EORINumber], any[String].asInstanceOf[MovementType], any[DeclarationData], any[Message])
+      )
         .thenReturn(movement)
 
       when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))

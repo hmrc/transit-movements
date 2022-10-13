@@ -72,7 +72,7 @@ class DeparturesController @Inject() (
             declarationData <- xmlParsingService.extractDeclarationData(source).asPresentation
             fileSource = FileIO.fromPath(temporaryFile)
             message <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, None, fileSource).asPresentation
-            movement = movementFactory.create(eori, MovementType.Departure, declarationData, message)
+            movement = movementFactory.createDeparture(eori, MovementType.Departure, declarationData, message)
             _ <- repo.insert(movement).asPresentation
           } yield DeclarationResponse(DepartureId(movement._id.value), movement.messages.head.id)).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

@@ -52,14 +52,15 @@ import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
+import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.ArrivalId
-import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
@@ -97,22 +98,24 @@ class ArrivalsControllerSpec
   lazy val now                     = OffsetDateTime.now
   lazy val instant: OffsetDateTime = OffsetDateTime.of(2022, 3, 14, 1, 0, 0, 0, ZoneOffset.UTC)
 
-  lazy val eoriNumber = arbitrary[EORINumber].sample.get
-  lazy val movementId = arbitrary[MovementId].sample.get
-  lazy val arrivalId  = arbitrary[ArrivalId].sample.get
-  lazy val messageId  = arbitrary[MessageId].sample.get
+  lazy val eoriNumber              = arbitrary[EORINumber].sample.get
+  lazy val movementId              = arbitrary[MovementId].sample.get
+  lazy val arrivalId               = arbitrary[ArrivalId].sample.get
+  lazy val messageId               = arbitrary[MessageId].sample.get
+  lazy val movementReferenceNumber = arbitrary[MovementReferenceNumber].sample.get
 
-  lazy val declarationData = DeclarationData(eoriNumber, OffsetDateTime.now(ZoneId.of("UTC")))
+  lazy val arrivalData = ArrivalData(eoriNumber, OffsetDateTime.now(ZoneId.of("UTC")), movementReferenceNumber)
 
-  lazy val arrivalDataEither: EitherT[Future, ParseError, DeclarationData] =
-    EitherT.rightT(declarationData)
+  lazy val arrivalDataEither: EitherT[Future, ParseError, ArrivalData] =
+    EitherT.rightT(arrivalData)
 
-  lazy val message = arbitrary[Message].sample.value.copy(id = messageId, generated = now, received = now, messageType = MessageType.DeclarationData)
+  lazy val message = arbitrary[Message].sample.value.copy(id = messageId, generated = now, received = now, messageType = MessageType.ArrivalNotification)
 
   lazy val movement = arbitrary[Movement].sample.value.copy(
     _id = movementId,
     enrollmentEORINumber = eoriNumber,
     movementEORINumber = eoriNumber,
+    movementReferenceNumber = Some(movementReferenceNumber),
     created = now,
     updated = now,
     messages = NonEmptyList.one(message)
@@ -149,10 +152,16 @@ class ArrivalsControllerSpec
   "createArrival" - {
 
     val validXml: NodeSeq =
-      <CC015C>
+      <CC007C>
         <messageSender>ABC123</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-      </CC015C>
+        <TraderAtDestination>
+          <identificationNumber>eori</identificationNumber>
+        </TraderAtDestination>
+        <TransitOperation>
+          <MRN>movement reerence number</MRN>
+        </TransitOperation>
+      </CC007C>
 
     lazy val messageFactoryEither: EitherT[Future, StreamError, Message] =
       EitherT.rightT(message)
@@ -162,10 +171,12 @@ class ArrivalsControllerSpec
       val tempFile = SingletonTemporaryFileCreator.create()
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
-      when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+      when(mockXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
         .thenReturn(arrivalDataEither)
 
-      when(mockMovementFactory.create(any[String].asInstanceOf[EORINumber], any[String].asInstanceOf[MovementType], any[DeclarationData], any[Message]))
+      when(
+        mockMovementFactory.createArrival(any[String].asInstanceOf[EORINumber], any[String].asInstanceOf[MovementType], any[ArrivalData], any[Message])
+      )
         .thenReturn(movement)
 
       when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
@@ -191,9 +202,9 @@ class ArrivalsControllerSpec
       "contains message to indicate element not found" in {
 
         val elementNotFoundXml: NodeSeq =
-          <CC015C></CC015C>
+          <CC007C></CC007C>
 
-        when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+        when(mockXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
           .thenReturn(EitherT.leftT(ParseError.NoElementFound("messageSender")))
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
@@ -213,12 +224,12 @@ class ArrivalsControllerSpec
       "contains message to indicate too many elements found" in {
 
         val tooManyFoundXml: NodeSeq =
-          <CC015C>
+          <CC007C>
             <messageSender>GB1234</messageSender>
             <messageSender>XI1234</messageSender>
-          </CC015C>
+          </CC007C>
 
-        when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+        when(mockXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
           .thenReturn(EitherT.leftT(ParseError.TooManyElementsFound("messageSender")))
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
@@ -238,14 +249,14 @@ class ArrivalsControllerSpec
       "contains message to indicate date time failure" in {
 
         val tooManyFoundXml: NodeSeq =
-          <CC015C>
+          <CC007C>
             <messageSender>GB1234</messageSender>
             <preparationDateAndTime>no</preparationDateAndTime>
-          </CC015C>
+          </CC007C>
 
         val cs: CharSequence = "no"
 
-        when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+        when(mockXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
           .thenReturn(
             EitherT.leftT(
               ParseError.BadDateTime("preparationDateAndTime", new DateTimeParseException("Text 'no' could not be parsed at index 0", cs, 0))
@@ -272,9 +283,9 @@ class ArrivalsControllerSpec
       "when an invalid xml causes an unknown ParseError to be thrown" in {
 
         val unknownErrorXml: String =
-          "<CC015C><messageSender>GB1234</messageSender>"
+          "<CC007C><messageSender>GB1234</messageSender>"
 
-        when(mockXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+        when(mockXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
           .thenReturn(EitherT.leftT(ParseError.UnexpectedError(Some(new IllegalArgumentException()))))
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())

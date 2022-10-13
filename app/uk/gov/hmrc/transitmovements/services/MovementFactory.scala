@@ -20,6 +20,7 @@ import akka.stream.Materializer
 import cats.data.NonEmptyList
 import com.google.inject.ImplementedBy
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
+import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
@@ -36,12 +37,20 @@ import javax.inject.Inject
 @ImplementedBy(classOf[MovementFactoryImpl])
 trait MovementFactory {
 
-  def create(
+  def createDeparture(
     eori: EORINumber,
     movementType: MovementType,
     declarationData: DeclarationData,
     message: Message
   ): Movement
+
+  def createArrival(
+    eori: EORINumber,
+    movementType: MovementType,
+    arrivalData: ArrivalData,
+    message: Message
+  ): Movement
+
 }
 
 class MovementFactoryImpl @Inject() (
@@ -51,7 +60,7 @@ class MovementFactoryImpl @Inject() (
   val materializer: Materializer
 ) extends MovementFactory {
 
-  def create(
+  def createDeparture(
     eori: EORINumber,
     movementType: MovementType,
     declarationData: DeclarationData,
@@ -63,6 +72,23 @@ class MovementFactoryImpl @Inject() (
       movementType = movementType,
       movementEORINumber = declarationData.movementEoriNumber,
       movementReferenceNumber = None,
+      created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+      updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+      messages = NonEmptyList.one(message)
+    )
+
+  def createArrival(
+    eori: EORINumber,
+    movementType: MovementType,
+    arrivalData: ArrivalData,
+    message: Message
+  ): Movement =
+    Movement(
+      _id = MovementId(ShortUUID.next(clock, random)),
+      enrollmentEORINumber = eori,
+      movementType = movementType,
+      movementEORINumber = arrivalData.movementEoriNumber,
+      movementReferenceNumber = Some(arrivalData.mrn),
       created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
       updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
       messages = NonEmptyList.one(message)
