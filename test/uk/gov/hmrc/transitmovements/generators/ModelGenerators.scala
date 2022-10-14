@@ -19,8 +19,6 @@ package uk.gov.hmrc.transitmovements.generators
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
-import uk.gov.hmrc.transitmovements.models.ArrivalId
-import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -46,16 +44,6 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMovementType: Arbitrary[MovementType] =
     Arbitrary(Gen.oneOf(MovementType.movementTypes))
-
-  implicit lazy val arbitraryDepartureId: Arbitrary[DepartureId] =
-    Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(DepartureId)
-    }
-
-  implicit lazy val arbitraryArrivalId: Arbitrary[ArrivalId] =
-    Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(ArrivalId)
-    }
 
   implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =
     Arbitrary {

@@ -53,7 +53,6 @@ import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.ArrivalData
-import uk.gov.hmrc.transitmovements.models.ArrivalId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -100,7 +99,6 @@ class ArrivalsControllerSpec
 
   lazy val eoriNumber              = arbitrary[EORINumber].sample.get
   lazy val movementId              = arbitrary[MovementId].sample.get
-  lazy val arrivalId               = arbitrary[ArrivalId].sample.get
   lazy val messageId               = arbitrary[MessageId].sample.get
   lazy val movementReferenceNumber = arbitrary[MovementReferenceNumber].sample.get
 

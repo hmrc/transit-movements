@@ -55,7 +55,6 @@ import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.DeclarationData
-import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
@@ -103,10 +102,9 @@ class DeparturesControllerSpec
   lazy val now                     = OffsetDateTime.now
   lazy val instant: OffsetDateTime = OffsetDateTime.of(2022, 3, 14, 1, 0, 0, 0, ZoneOffset.UTC)
 
-  lazy val eoriNumber  = arbitrary[EORINumber].sample.get
-  lazy val movementId  = arbitrary[MovementId].sample.get
-  lazy val departureId = arbitrary[DepartureId].sample.get
-  lazy val messageId   = arbitrary[MessageId].sample.get
+  lazy val eoriNumber = arbitrary[EORINumber].sample.get
+  lazy val movementId = arbitrary[MovementId].sample.get
+  lazy val messageId  = arbitrary[MessageId].sample.get
 
   lazy val declarationData = DeclarationData(eoriNumber, OffsetDateTime.now(ZoneId.of("UTC")))
 

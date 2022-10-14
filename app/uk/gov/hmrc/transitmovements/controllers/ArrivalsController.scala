@@ -29,12 +29,11 @@ import play.api.mvc.Result
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovements.models.ArrivalId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
-import uk.gov.hmrc.transitmovements.models.responses.ArrivalDeclarationResponse
+import uk.gov.hmrc.transitmovements.models.responses.ArrivalNotificationResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MovementFactory
@@ -67,10 +66,10 @@ class ArrivalsController @Inject() (
           (for {
             arrivalData <- xmlParsingService.extractArrivalData(source).asPresentation
             fileSource = FileIO.fromPath(temporaryFile)
-            message <- messageFactory.create(MessageType.DeclarationData, arrivalData.generationDate, None, fileSource).asPresentation
+            message <- messageFactory.create(MessageType.ArrivalNotification, arrivalData.generationDate, None, fileSource).asPresentation
             movement = movementFactory.createArrival(eori, MovementType.Arrival, arrivalData, message)
             _ <- repo.insert(movement).asPresentation
-          } yield ArrivalDeclarationResponse(ArrivalId(movement._id.value), movement.messages.head.id)).fold[Result](
+          } yield ArrivalNotificationResponse(movement._id, movement.messages.head.id)).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
             response => Ok(Json.toJson(response))
           )

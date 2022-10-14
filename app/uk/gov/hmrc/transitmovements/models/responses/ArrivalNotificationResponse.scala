@@ -18,12 +18,12 @@ package uk.gov.hmrc.transitmovements.models.responses
 
 import play.api.libs.json.Json
 import play.api.libs.json.OFormat
-import uk.gov.hmrc.transitmovements.models.ArrivalId
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 
-object ArrivalDeclarationResponse extends PresentationFormats {
-  implicit val arrivalDeclarationResponseFormat: OFormat[ArrivalDeclarationResponse] = Json.format[ArrivalDeclarationResponse]
+object ArrivalNotificationResponse extends PresentationFormats {
+  implicit val arrivalNotificationResponseFormat: OFormat[ArrivalNotificationResponse] = Json.format[ArrivalNotificationResponse]
 }
 
-case class ArrivalDeclarationResponse(arrivalId: ArrivalId, messageId: MessageId)
+case class ArrivalNotificationResponse(arrivalId: MovementId, messageId: MessageId)
