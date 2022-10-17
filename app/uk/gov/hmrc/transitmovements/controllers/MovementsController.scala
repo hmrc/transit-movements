@@ -70,7 +70,7 @@ class MovementsController @Inject() (
                   fileSource
                 )
                 .asPresentation
-              _ <- repo.updateMessages(MovementId(movementId.value), message, messageData.mrn).asPresentation
+              _ <- repo.updateMessages(movementId, message, messageData.mrn).asPresentation
             } yield message.id).fold[Result](
               baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
               id => Ok(Json.toJson(UpdateMovementResponse(id)))

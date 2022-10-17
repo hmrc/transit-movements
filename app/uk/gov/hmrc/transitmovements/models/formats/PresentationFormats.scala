@@ -28,7 +28,7 @@ trait PresentationFormats extends CommonFormats {
   // as these use the OffsetDateTime times, these need to be here to avoid the macro expansion of
   // OffsetDateTime when used with Mongo.
   implicit val messageFormat: Format[Message]                                   = Json.format[Message]
-  implicit val departureFormat: Format[Movement]                                = Json.format[Movement]
+  implicit val movementFormat: Format[Movement]                                 = Json.format[Movement]
   implicit val departureWithoutMessagesFormat: Format[DepartureWithoutMessages] = Json.format[DepartureWithoutMessages]
   implicit val messageResponseFormat: Format[MessageResponse]                   = Json.format[MessageResponse]
 
