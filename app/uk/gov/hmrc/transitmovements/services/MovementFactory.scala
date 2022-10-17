@@ -20,11 +20,13 @@ import akka.stream.Materializer
 import cats.data.NonEmptyList
 import com.google.inject.ImplementedBy
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
+import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.DeclarationData
-import uk.gov.hmrc.transitmovements.models.Departure
-import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.Movement
+import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.MovementType
 
 import java.security.SecureRandom
 import java.time.Clock
@@ -32,33 +34,61 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import javax.inject.Inject
 
-@ImplementedBy(classOf[DepartureFactoryImpl])
-trait DepartureFactory {
+@ImplementedBy(classOf[MovementFactoryImpl])
+trait MovementFactory {
 
-  def create(
+  def createDeparture(
     eori: EORINumber,
+    movementType: MovementType,
     declarationData: DeclarationData,
     message: Message
-  ): Departure
+  ): Movement
+
+  def createArrival(
+    eori: EORINumber,
+    movementType: MovementType,
+    arrivalData: ArrivalData,
+    message: Message
+  ): Movement
+
 }
 
-class DepartureFactoryImpl @Inject() (
+class MovementFactoryImpl @Inject() (
   clock: Clock,
   random: SecureRandom
 )(implicit
   val materializer: Materializer
-) extends DepartureFactory {
+) extends MovementFactory {
 
-  def create(
+  def createDeparture(
     eori: EORINumber,
+    movementType: MovementType,
     declarationData: DeclarationData,
     message: Message
-  ): Departure =
-    Departure(
-      _id = DepartureId(ShortUUID.next(clock, random)),
+  ): Movement =
+    Movement(
+      _id = MovementId(ShortUUID.next(clock, random)),
       enrollmentEORINumber = eori,
+      movementType = movementType,
       movementEORINumber = declarationData.movementEoriNumber,
       movementReferenceNumber = None,
+      created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+      updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+      messages = NonEmptyList.one(message)
+    )
+
+  def createArrival(
+    eori: EORINumber,
+    movementType: MovementType,
+    arrivalData: ArrivalData,
+    message: Message
+  ): Movement =
+    Movement(
+      _id = MovementId(ShortUUID.next(clock, random)),
+      enrollmentEORINumber = eori,
+      movementType = movementType,
+      movementEORINumber = arrivalData.movementEoriNumber,
+      movementReferenceNumber = Some(arrivalData.mrn),
       created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
       updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
       messages = NonEmptyList.one(message)

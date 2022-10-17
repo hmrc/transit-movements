@@ -50,14 +50,14 @@ import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
-import uk.gov.hmrc.transitmovements.repositories.DeparturesRepository
+import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
@@ -93,7 +93,7 @@ class MovementsControllerSpec
   val triggerId  = arbitraryMessageId.arbitrary.sample.get
 
   val mockXmlParsingService          = mock[MessagesXmlParsingService]
-  val mockRepository                 = mock[DeparturesRepository]
+  val mockRepository                 = mock[MovementsRepository]
   val mockMessageFactory             = mock[MessageFactory]
   val mockTemporaryFileCreator       = mock[TemporaryFileCreator]
   val mockMessageTypeHeaderExtractor = mock[MessageTypeHeaderExtractor]
@@ -154,7 +154,7 @@ class MovementsControllerSpec
       when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
         .thenReturn(messageFactoryEither)
 
-      when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message], any[Option[MovementReferenceNumber]]))
+      when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]]))
         .thenReturn(EitherT.rightT(()))
 
       val request = fakeRequest(POST, validXml)
@@ -193,7 +193,7 @@ class MovementsControllerSpec
         when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
           .thenReturn(messageFactoryEither)
 
-        when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message], any[Option[MovementReferenceNumber]]))
+        when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]]))
           .thenReturn(EitherT.rightT(()))
 
         val request = fakeRequest(POST, xml)
@@ -222,7 +222,7 @@ class MovementsControllerSpec
         when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
           .thenReturn(messageFactoryEither)
 
-        when(mockRepository.updateMessages(any[String].asInstanceOf[DepartureId], any[Message], any[Option[MovementReferenceNumber]]))
+        when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]]))
           .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(s"No departure found with the given id: ${movementId.value}")))
 
         val request = fakeRequest(POST, validXml)

@@ -33,17 +33,18 @@ import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models.Departure
-import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.Movement
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
-import uk.gov.hmrc.transitmovements.repositories.DeparturesRepositoryImpl.EPOCH_TIME
+import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 
@@ -59,69 +60,88 @@ import scala.util.Success
 import scala.util.Try
 import scala.util.control.NonFatal
 
-@ImplementedBy(classOf[DeparturesRepositoryImpl])
-trait DeparturesRepository {
-  def insert(departure: Departure): EitherT[Future, MongoError, Unit]
-  def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
-  def getSingleMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[MessageResponse]]
+@ImplementedBy(classOf[MovementsRepositoryImpl])
+trait MovementsRepository {
+  def insert(movement: Movement): EitherT[Future, MongoError, Unit]
+
+  def getDepartureWithoutMessages(
+    eoriNumber: EORINumber,
+    movementId: MovementId
+  ): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
+
+  def getSingleMessage(
+    eoriNumber: EORINumber,
+    movementId: MovementId,
+    messageId: MessageId,
+    movementType: MovementType
+  ): EitherT[Future, MongoError, Option[MessageResponse]]
 
   def getMessages(
     eoriNumber: EORINumber,
-    departureId: DepartureId,
+    movementId: MovementId,
+    movementType: MovementType,
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]]
+
   def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]]
-  def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit]
+  def updateMessages(movementId: MovementId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit]
 }
 
-object DeparturesRepositoryImpl {
+object MovementsRepositoryImpl {
   val EPOCH_TIME: LocalDateTime = LocalDateTime.ofEpochSecond(0, 0, ZoneOffset.UTC)
 }
 
-class DeparturesRepositoryImpl @Inject() (
+class MovementsRepositoryImpl @Inject() (
   appConfig: AppConfig,
   mongoComponent: MongoComponent,
   clock: Clock
 )(implicit ec: ExecutionContext)
-    extends PlayMongoRepository[Departure](
+    extends PlayMongoRepository[Movement](
       mongoComponent = mongoComponent,
-      collectionName = "departure_movements",
-      domainFormat = MongoFormats.departureFormat,
+      collectionName = "movements",
+      domainFormat = MongoFormats.movementFormat,
       indexes = Seq(
         IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS))
       ),
       extraCodecs = Seq(
-        Codecs.playFormatCodec(MongoFormats.departureFormat),
+        Codecs.playFormatCodec(MongoFormats.movementFormat),
         Codecs.playFormatCodec(MongoFormats.departureWithoutMessagesFormat),
         Codecs.playFormatCodec(MongoFormats.messageResponseFormat),
         Codecs.playFormatCodec(MongoFormats.messageFormat),
-        Codecs.playFormatCodec(MongoFormats.departureIdFormat),
+        Codecs.playFormatCodec(MongoFormats.movementIdFormat),
         Codecs.playFormatCodec(MongoFormats.mrnFormat),
         Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat)
       )
     )
-    with DeparturesRepository
+    with MovementsRepository
     with Logging
     with CommonFormats {
 
-  def insert(departure: Departure): EitherT[Future, MongoError, Unit] =
-    mongoRetry(Try(collection.insertOne(departure)) match {
+  def insert(movement: Movement): EitherT[Future, MongoError, Unit] =
+    mongoRetry(Try(collection.insertOne(movement)) match {
       case Success(obs) =>
         obs.toFuture().map {
           result =>
             if (result.wasAcknowledged()) {
               Right(())
             } else {
-              Left(InsertNotAcknowledged(s"Insert failed for departure $departure"))
+              Left(InsertNotAcknowledged(s"Insert failed for movement $movement"))
             }
         }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def getDepartureWithoutMessages(eoriNumber: EORINumber, departureId: DepartureId): EitherT[Future, MongoError, Option[DepartureWithoutMessages]] = {
+  def getDepartureWithoutMessages(
+    eoriNumber: EORINumber,
+    movementId: MovementId
+  ): EitherT[Future, MongoError, Option[DepartureWithoutMessages]] = {
 
-    val selector   = mAnd(mEq("_id", departureId.value), mEq("enrollmentEORINumber", eoriNumber.value))
+    val selector = mAnd(
+      mEq("_id", movementId.value),
+      mEq("enrollmentEORINumber", eoriNumber.value),
+      mEq("movementType", MovementType.Departure.value)
+    )
     val projection = DepartureWithoutMessages.projection
 
     val aggregates = Seq(
@@ -141,15 +161,17 @@ class DeparturesRepositoryImpl @Inject() (
 
   def getMessages(
     eoriNumber: EORINumber,
-    departureId: DepartureId,
+    movementId: MovementId,
+    movementType: MovementType,
     receivedSince: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]] = {
 
     val projection = MessageResponse.projection
 
     val selector = mAnd(
-      mEq("_id", departureId.value),
+      mEq("_id", movementId.value),
       mEq("enrollmentEORINumber", eoriNumber.value),
+      mEq("movementType", movementType.value),
       mGte("messages.received", receivedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME))
     )
 
@@ -175,8 +197,19 @@ class DeparturesRepositoryImpl @Inject() (
 
   }
 
-  def getSingleMessage(eoriNumber: EORINumber, departureId: DepartureId, messageId: MessageId): EitherT[Future, MongoError, Option[MessageResponse]] = {
-    val selector          = mAnd(mEq("_id", departureId.value), mEq("messages.id", messageId.value), mEq("enrollmentEORINumber", eoriNumber.value))
+  def getSingleMessage(
+    eoriNumber: EORINumber,
+    movementId: MovementId,
+    messageId: MessageId,
+    movementType: MovementType
+  ): EitherT[Future, MongoError, Option[MessageResponse]] = {
+
+    val selector = mAnd(
+      mEq("_id", movementId.value),
+      mEq("messages.id", messageId.value),
+      mEq("enrollmentEORINumber", eoriNumber.value),
+      mEq("movementType", movementType.value)
+    )
     val secondarySelector = mEq("messages.id", messageId.value)
     val aggregates =
       Seq(Aggregates.filter(selector), Aggregates.unwind("$messages"), Aggregates.filter(secondarySelector), Aggregates.replaceRoot("$messages"))
@@ -200,8 +233,11 @@ class DeparturesRepositoryImpl @Inject() (
     }
 
   def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]] = {
-    val selector: Bson = mEq("enrollmentEORINumber", eoriNumber.value)
-    val projection     = DepartureWithoutMessages.projection
+    val selector: Bson = mAnd(
+      mEq("enrollmentEORINumber", eoriNumber.value),
+      mEq("movementType", MovementType.Departure.value)
+    )
+    val projection = DepartureWithoutMessages.projection
 
     val aggregates = Seq(
       Aggregates.filter(selector),
@@ -223,9 +259,9 @@ class DeparturesRepositoryImpl @Inject() (
 
   }
 
-  def updateMessages(departureId: DepartureId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit] = {
+  def updateMessages(movementId: MovementId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit] = {
 
-    val filter: Bson = mEq(departureId)
+    val filter: Bson = mEq(movementId)
 
     val setUpdated   = mSet("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
     val pushMessages = mPush("messages", message)
@@ -241,10 +277,10 @@ class DeparturesRepositoryImpl @Inject() (
         obs.toFuture().map {
           result =>
             if (result.wasAcknowledged()) {
-              if (result.getModifiedCount == 0) Left(DocumentNotFound(s"No departure found with the given id: ${departureId.value}"))
+              if (result.getModifiedCount == 0) Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
               else Right(())
             } else {
-              Left(UpdateNotAcknowledged(s"Message update failed for departure: $departureId"))
+              Left(UpdateNotAcknowledged(s"Message update failed for movement: $movementId"))
             }
         }
       case Failure(NonFatal(ex)) =>

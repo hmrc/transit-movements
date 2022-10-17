@@ -32,14 +32,15 @@ import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.Departure
-import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.Movement
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
@@ -48,21 +49,21 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class DeparturesRepositorySpec
+class MovementsRepositorySpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
     with FutureAwaits
     with DefaultAwaitTimeout
     with Logging
-    with DefaultPlayMongoRepositorySupport[Departure]
+    with DefaultPlayMongoRepositorySupport[Movement]
     with ModelGenerators
     with OptionValues {
 
   val instant: OffsetDateTime = OffsetDateTime.of(2022, 5, 25, 16, 0, 0, 0, ZoneOffset.UTC)
 
   override lazy val mongoComponent: MongoComponent = {
-    val databaseName: String = "test-departures_movements"
+    val databaseName: String = "test-movements"
     val mongoUri: String     = s"mongodb://localhost:27017/$databaseName?retryWrites=false"
     MongoComponent(mongoUri)
   }
@@ -71,15 +72,15 @@ class DeparturesRepositorySpec
   private val appConfig              = app.injector.instanceOf[AppConfig]
   private val clockConfig            = app.injector.instanceOf[Clock]
 
-  override lazy val repository = new DeparturesRepositoryImpl(appConfig, mongoComponent, clockConfig)
+  override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, clockConfig)
 
   "DepartureMovementRepository" should "have the correct name" in {
-    repository.collectionName shouldBe "departure_movements"
+    repository.collectionName shouldBe "movements"
   }
 
   "insert" should "add the given departure to the database" in {
 
-    val departure = arbitrary[Departure].sample.value.copy(_id = DepartureId("2"))
+    val departure = arbitrary[Movement].sample.value.copy(_id = MovementId("2"))
     await(
       repository.insert(departure).value
     )
@@ -92,7 +93,7 @@ class DeparturesRepositorySpec
   }
 
   "getDepartureWithoutMessages" should "return DepartureWithoutMessages if it exists" in {
-    val departure = arbitrary[Departure].sample.value
+    val departure = arbitrary[Movement].sample.value.copy(movementType = MovementType.Departure)
 
     await(repository.insert(departure).value)
 
@@ -101,29 +102,29 @@ class DeparturesRepositorySpec
   }
 
   "getDepartureWithoutMessages" should "return none if the departure doesn't exist" in {
-    val departure = arbitrary[Departure].sample.value.copy(_id = DepartureId("1"))
+    val departure = arbitrary[Movement].sample.value.copy(_id = MovementId("1"))
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, DepartureId("2")).value)
+    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, MovementId("2")).value)
     result.right.get.isEmpty should be(true)
   }
 
   "getSingleMessage" should "return message response if it exists" in {
-    val departure = arbitrary[Departure].sample.value
+    val departure = arbitrary[Movement].sample.value
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id).value)
+    val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id, departure.movementType).value)
     result.right.get.get should be(MessageResponse.fromMessageWithBody(departure.messages.head))
   }
 
   "getSingleMessage" should "return none if the message doesn't exist" in {
-    val departure = arbitrary[Departure].sample.value
+    val departure = arbitrary[Movement].sample.value
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, MessageId("X")).value)
+    val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, MessageId("X"), departure.movementType).value)
     result.right.get.isEmpty should be(true)
   }
 
@@ -136,11 +137,11 @@ class DeparturesRepositorySpec
             .reverse
         )
         .value
-    val departure = arbitrary[Departure].sample.value.copy(messages = messages)
+    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, None).value)
+    val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None).value)
     result.right.get.get should be(
       departure.messages.map(
         message => MessageResponse.fromMessageWithoutBody(message)
@@ -162,11 +163,11 @@ class DeparturesRepositorySpec
         )
         .value
 
-    val departure = arbitrary[Departure].sample.value.copy(messages = messages)
+    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, Some(dateTime)).value)
+    val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, Some(dateTime)).value)
     result.right.get.get should be(
       departure.messages
         .map(
@@ -176,7 +177,7 @@ class DeparturesRepositorySpec
   }
 
   "getMessages" should "return none if the departure doesn't exist" in {
-    val result = await(repository.getMessages(EORINumber("NONEXISTENT_EORI"), DepartureId("NONEXISTENT_ID"), None).value)
+    val result = await(repository.getMessages(EORINumber("NONEXISTENT_EORI"), MovementId("NONEXISTENT_ID"), MovementType.Departure, None).value)
     result.right.get.isEmpty should be(true)
   }
 
@@ -213,18 +214,29 @@ class DeparturesRepositorySpec
     val message = arbitrary[Message].sample.value
 
     val departureGB1 =
-      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriGB, created = instant, updated = instant, messages = NonEmptyList(message, List.empty))
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementType = MovementType.Departure,
+        created = instant,
+        updated = instant,
+        messages = NonEmptyList(message, List.empty)
+      )
 
     val mrnGen = arbitrary[MovementReferenceNumber]
 
     val departureXi1 =
-      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriXI, updated = instant.plusMinutes(1), movementReferenceNumber = mrnGen.sample)
+      arbitrary[Movement].sample.value.copy(enrollmentEORINumber = eoriXI, updated = instant.plusMinutes(1), movementReferenceNumber = mrnGen.sample)
 
     val departureXi2 =
-      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriXI, updated = instant.minusMinutes(3), movementReferenceNumber = mrnGen.sample)
+      arbitrary[Movement].sample.value.copy(enrollmentEORINumber = eoriXI, updated = instant.minusMinutes(3), movementReferenceNumber = mrnGen.sample)
 
     val departureGB2 =
-      arbitrary[Departure].sample.value.copy(enrollmentEORINumber = eoriGB, updated = instant.plusMinutes(1), movementReferenceNumber = mrnGen.sample)
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementType = MovementType.Departure,
+        updated = instant.plusMinutes(1),
+        movementReferenceNumber = mrnGen.sample
+      )
 
     def setup() {
 
@@ -241,9 +253,9 @@ class DeparturesRepositorySpec
 
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
 
-    val departureID = arbitrary[DepartureId].sample.value
+    val departureID = arbitrary[MovementId].sample.value
     val departure =
-      arbitrary[Departure].sample.value
+      arbitrary[Movement].sample.value
         .copy(
           _id = departureID,
           created = instant,
@@ -279,9 +291,9 @@ class DeparturesRepositorySpec
 
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = None)
 
-    val departureId = arbitrary[DepartureId].sample.value
+    val departureId = arbitrary[MovementId].sample.value
     val departure =
-      arbitrary[Departure].sample.value
+      arbitrary[Movement].sample.value
         .copy(
           _id = departureId,
           created = instant,
@@ -318,16 +330,16 @@ class DeparturesRepositorySpec
 
   "updateMessages" should "return error if there is no matching movement with the given id" in {
 
-    val departureID = arbitrary[DepartureId].sample.value
+    val movementId = arbitrary[MovementId].sample.value
 
     val message =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(movementId.value)))
 
     val result = await(
-      repository.updateMessages(departureID, message, Some(arbitrary[MovementReferenceNumber].sample.get)).value
+      repository.updateMessages(movementId, message, Some(arbitrary[MovementReferenceNumber].sample.get)).value
     )
 
-    result should be(Left(MongoError.DocumentNotFound(s"No departure found with the given id: ${departureID.value}")))
+    result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
 
   }
 }

@@ -14,16 +14,8 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.responses
+package uk.gov.hmrc.transitmovements.models
 
-import play.api.libs.json.Json
-import play.api.libs.json.OFormat
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
+import java.time.OffsetDateTime
 
-object DeclarationResponse extends PresentationFormats {
-  implicit val declarationResponseFormat: OFormat[DeclarationResponse] = Json.format[DeclarationResponse]
-}
-
-case class DeclarationResponse(departureId: MovementId, messageId: MessageId)
+case class ArrivalData(movementEoriNumber: EORINumber, generationDate: OffsetDateTime, mrn: MovementReferenceNumber)

@@ -84,7 +84,7 @@ class MessagesXmlParsingServiceImpl @Inject() (implicit materializer: Materializ
         broadcastXml.out(0) ~> dateFlow ~> combiner.in0
 
         if (messageType == MrnAllocated) {
-          val mrnFlow = builder.add(XmlParsers.movementReferenceNumberExtractor)
+          val mrnFlow = builder.add(XmlParsers.movementReferenceNumberExtractor("CC028C"))
           val toOptionFlow = builder.add(Flow[ParseResult[MovementReferenceNumber]].map[ParseResult[Option[MovementReferenceNumber]]] {
             case Right(mrn) => Right(Some(mrn))
             case Left(x)    => Left(x)

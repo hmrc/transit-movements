@@ -19,14 +19,14 @@ package uk.gov.hmrc.transitmovements.generators
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
-import uk.gov.hmrc.transitmovements.models.Departure
-import uk.gov.hmrc.transitmovements.models.DepartureId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MovementType
 
 import java.net.URI
 import java.time.Instant
@@ -42,10 +42,8 @@ trait ModelGenerators extends BaseGenerators {
       } yield EORINumber(id.toString)
     }
 
-  implicit lazy val arbitraryDepartureId: Arbitrary[DepartureId] =
-    Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(DepartureId)
-    }
+  implicit lazy val arbitraryMovementType: Arbitrary[MovementType] =
+    Arbitrary(Gen.oneOf(MovementType.movementTypes))
 
   implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =
     Arbitrary {
@@ -97,15 +95,16 @@ trait ModelGenerators extends BaseGenerators {
       } yield Message(id, received, generated, messageType, triggerId, url, body)
     }
 
-  implicit lazy val arbitraryDeparture: Arbitrary[Departure] =
+  implicit lazy val arbitraryMovement: Arbitrary[Movement] =
     Arbitrary {
       for {
-        id                      <- arbitrary[DepartureId]
+        id                      <- arbitrary[MovementId]
+        movementType            <- arbitrary[MovementType]
         eori                    <- arbitrary[EORINumber]
         movementReferenceNumber <- arbitrary[Option[MovementReferenceNumber]]
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
         messages                <- nonEmptyListOfMaxLength[Message](2)
-      } yield Departure(id, eori, eori, movementReferenceNumber, created, updated, messages)
+      } yield Movement(id, movementType, eori, eori, movementReferenceNumber, created, updated, messages)
     }
 }
