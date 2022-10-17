@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.models.responses
 
-import cats.data.NonEmptyList
+import play.api.libs.json.Json
+import play.api.libs.json.OFormat
+import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 
-import java.time.OffsetDateTime
+object ArrivalNotificationResponse extends PresentationFormats {
+  implicit val arrivalNotificationResponseFormat: OFormat[ArrivalNotificationResponse] = Json.format[ArrivalNotificationResponse]
+}
 
-case class Departure(
-  _id: DepartureId,
-  enrollmentEORINumber: EORINumber,
-  movementEORINumber: EORINumber,
-  movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
-  created: OffsetDateTime,
-  updated: OffsetDateTime,
-  messages: NonEmptyList[Message]
-)
+case class ArrivalNotificationResponse(arrivalId: MovementId, messageId: MessageId)

@@ -23,9 +23,11 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
+import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -33,12 +35,12 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import scala.xml.NodeSeq
 
-class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Matchers with TestActorSystem with StreamTestHelpers {
+class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Matchers with TestActorSystem with StreamTestHelpers {
 
   private val testDate      = OffsetDateTime.now(ZoneOffset.UTC)
   private val UTCDateString = testDate.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
 
-  val validXml: NodeSeq =
+  val validDeclarationDataXml: NodeSeq =
     <CC015C>
       <HolderOfTheTransitProcedure>
         <identificationNumber>GB1234</identificationNumber>
@@ -46,10 +48,29 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
     </CC015C>
 
-  val noSender: NodeSeq =
+  val validArrivalDataXml: NodeSeq =
+    <CC007C>
+      <TraderAtDestination>
+        <identificationNumber>GB1234</identificationNumber>
+      </TraderAtDestination>
+      <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
+      <TransitOperation>
+        <MRN>token</MRN>
+      </TransitOperation>
+    </CC007C>
+
+  val noSenderForDeclarationData: NodeSeq =
     <CC015C>
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
     </CC015C>
+
+  val noSenderForArrivalData: NodeSeq =
+    <CC007C>
+      <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
+      <TransitOperation>
+        <MRN>token</MRN>
+      </TransitOperation>
+    </CC007C>
 
   val twoSenders: NodeSeq =
     <CC015C>
@@ -60,12 +81,32 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
     </CC015C>
 
-  val noDate: NodeSeq =
+  val noDateForDeclarationData: NodeSeq =
     <CC015C>
       <HolderOfTheTransitProcedure>
         <identificationNumber>GB1234</identificationNumber>
       </HolderOfTheTransitProcedure>
     </CC015C>
+
+  val noDateForArrivalData: NodeSeq =
+    <CC007C>
+      <TraderAtDestination>
+        <identificationNumber>GB1234</identificationNumber>
+      </TraderAtDestination>
+      <TransitOperation>
+        <MRN>token</MRN>
+      </TransitOperation>
+    </CC007C>
+
+  val noMrnForArrivalData: NodeSeq =
+    <CC007C>
+      <TraderAtDestination>
+        <identificationNumber>GB1234</identificationNumber>
+      </TraderAtDestination>
+      <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
+      <TransitOperation>
+      </TransitOperation>
+    </CC007C>
 
   val twoDates: NodeSeq =
     <CC015C>
@@ -76,7 +117,7 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
       <preparationDateAndTime>{UTCDateString}</preparationDateAndTime>
     </CC015C>
 
-  val badDate: NodeSeq =
+  val badDateDeclarationData: NodeSeq =
     <CC015C>
       <HolderOfTheTransitProcedure>
         <identificationNumber>GB1234</identificationNumber>
@@ -84,8 +125,22 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
       <preparationDateAndTime>notadate</preparationDateAndTime>
     </CC015C>
 
-  val incompleteXml: String =
+  val badDateArrivalData: NodeSeq =
+    <CC007C>
+      <TraderAtDestination>
+        <identificationNumber>GB1234</identificationNumber>
+      </TraderAtDestination>
+      <preparationDateAndTime>notadate</preparationDateAndTime>
+      <TransitOperation>
+        <MRN>token</MRN>
+      </TransitOperation>
+    </CC007C>
+
+  val incompleteDeclarationDataXml: String =
     "<CC015C><messageSender>GB1234</messageSender>"
+
+  val incompleteArrivalDataXml: String =
+    "<CC007C><messageSender>GB1234</messageSender>"
 
   val missingInnerTag: String =
     "<CC015C><messageSender>GB1234</CC015C>"
@@ -93,11 +148,11 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
   val mismatchedTags: String =
     "<CC015C><messageSender>GB1234</messageReceiver></CC015C>"
 
-  "When handed an XML stream" - {
-    val service = new DeparturesXmlParsingServiceImpl
+  "When handed an Declaration Data XML stream" - {
+    val service = new MovementsXmlParsingServiceImpl
 
     "if it is valid, return an appropriate Declaration Data" in {
-      val source = createStream(validXml)
+      val source = createStream(validDeclarationDataXml)
 
       val result = service.extractDeclarationData(source)
 
@@ -107,9 +162,9 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
     }
 
     "if it doesn't have a identificationNumber, return ParseError.NoElementFound for the message sender" in {
-      val source = createStream(noSender)
+      val source = createStream(noSenderForArrivalData)
 
-      val result = service.extractDeclarationData(source)
+      val result = service.extractArrivalData(source)
 
       whenReady(result.value) {
         _ mustBe Left(ParseError.NoElementFound("identificationNumber"))
@@ -117,7 +172,7 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
     }
 
     "if it doesn't have a preparation date, return ParseError.NoElementFound" in {
-      val source = createStream(noDate)
+      val source = createStream(noDateForDeclarationData)
 
       val result = service.extractDeclarationData(source)
 
@@ -147,7 +202,7 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
     }
 
     "it it has a preparation date that is unparsable, return ParseError.BadDateTime" in {
-      val stream       = createParsingEventStream(badDate)
+      val stream       = createParsingEventStream(badDateDeclarationData)
       val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor(MessageType.DeclarationData)).runWith(Sink.head)
 
       whenReady(parsedResult) {
@@ -160,7 +215,7 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
     }
 
     "if it is missing the end tag, return ParseError.Unknown" in {
-      val source = createStream(incompleteXml)
+      val source = createStream(incompleteDeclarationDataXml)
 
       val result = service.extractDeclarationData(source)
 
@@ -197,6 +252,77 @@ class DeparturesXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with
           either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
       }
     }
+  }
+
+  "When handed an Arrival Data XML stream" - {
+    val service = new MovementsXmlParsingServiceImpl
+
+    "if it is valid, return an appropriate Arrival Data" in {
+      val source = createStream(validArrivalDataXml)
+
+      val result = service.extractArrivalData(source)
+
+      whenReady(result.value) {
+        _ mustBe Right(ArrivalData(EORINumber("GB1234"), testDate, MovementReferenceNumber("token")))
+      }
+    }
+
+    "if it doesn't have a identificationNumber, return ParseError.NoElementFound for the message sender" in {
+      val source = createStream(noSenderForArrivalData)
+
+      val result = service.extractArrivalData(source)
+
+      whenReady(result.value) {
+        _ mustBe Left(ParseError.NoElementFound("identificationNumber"))
+      }
+    }
+
+    "if it doesn't have a preparation date, return ParseError.NoElementFound" in {
+      val source = createStream(noDateForArrivalData)
+
+      val result = service.extractArrivalData(source)
+
+      whenReady(result.value) {
+        _ mustBe Left(ParseError.NoElementFound("preparationDateAndTime"))
+      }
+    }
+
+    "it it has a preparation date that is unparsable, return ParseError.BadDateTime" in {
+      val stream       = createParsingEventStream(badDateArrivalData)
+      val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor(MessageType.ArrivalNotification)).runWith(Sink.head)
+
+      whenReady(parsedResult) {
+        result =>
+          val error = result.left.get
+          error mustBe a[ParseError.BadDateTime]
+          error.asInstanceOf[ParseError.BadDateTime].element mustBe "preparationDateAndTime"
+          error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'notadate' could not be parsed at index 0"
+      }
+    }
+
+    "if it is missing the end tag, return ParseError.Unknown" in {
+      val source = createStream(incompleteArrivalDataXml)
+
+      val result = service.extractArrivalData(source)
+
+      whenReady(result.value) {
+        either =>
+          either mustBe a[Left[ParseError, _]]
+          either.left.get mustBe a[ParseError.UnexpectedError]
+          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[IllegalStateException]
+      }
+    }
+
+    "if it doesn't have a mrn, return ParseError.NoElementFound" in {
+      val source = createStream(noMrnForArrivalData)
+
+      val result = service.extractArrivalData(source)
+
+      whenReady(result.value) {
+        _ mustBe Left(ParseError.NoElementFound("MRN"))
+      }
+    }
+
   }
 
 }

@@ -32,9 +32,11 @@ import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import com.google.inject.Singleton
+import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -43,15 +45,17 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
-@ImplementedBy(classOf[DeparturesXmlParsingServiceImpl])
-trait DeparturesXmlParsingService {
+@ImplementedBy(classOf[MovementsXmlParsingServiceImpl])
+trait MovementsXmlParsingService {
 
   def extractDeclarationData(source: Source[ByteString, _]): EitherT[Future, ParseError, DeclarationData]
+
+  def extractArrivalData(source: Source[ByteString, _]): EitherT[Future, ParseError, ArrivalData]
 
 }
 
 @Singleton
-class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Materializer) extends DeparturesXmlParsingService with XmlParsingServiceHelpers {
+class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materializer) extends MovementsXmlParsingService with XmlParsingServiceHelpers {
 
   // we don't want to starve the Play pool
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
@@ -72,7 +76,7 @@ class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Material
           val combiner  = builder.add(ZipWith[ParseResult[EORINumber], ParseResult[OffsetDateTime], ParseResult[DeclarationData]](buildDeclarationData))
 
           val xmlParsing = builder.add(XmlParsing.parser)
-          val eoriFlow   = builder.add(XmlParsers.movementEORINumberExtractor)
+          val eoriFlow   = builder.add(XmlParsers.movementEORINumberExtractor("CC015C", "HolderOfTheTransitProcedure"))
           val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor(MessageType.DeclarationData))
 
           xmlParsing.out ~> broadcast.in
@@ -83,6 +87,42 @@ class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Material
       }
     )
 
+  private val arrivalFlow: Flow[ByteString, ParseResult[ArrivalData], NotUsed] =
+    Flow.fromGraph(
+      GraphDSL.create() {
+        implicit builder =>
+          import GraphDSL.Implicits._
+
+          val broadcast = builder.add(Broadcast[ParseEvent](3))
+          val combiner = builder.add(
+            ZipWith[ParseResult[EORINumber], ParseResult[OffsetDateTime], ParseResult[MovementReferenceNumber], ParseResult[ArrivalData]](buildArrivalData)
+          )
+
+          val xmlParsing = builder.add(XmlParsing.parser)
+          val eoriFlow   = builder.add(XmlParsers.movementEORINumberExtractor("CC007C", "TraderAtDestination"))
+          val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor(MessageType.ArrivalNotification))
+          val mrnFlow    = builder.add(XmlParsers.movementReferenceNumberExtractor("CC007C"))
+
+          xmlParsing.out ~> broadcast.in
+          broadcast.out(0) ~> eoriFlow ~> combiner.in0
+          broadcast.out(1) ~> dateFlow ~> combiner.in1
+          broadcast.out(2) ~> mrnFlow ~> combiner.in2
+
+          FlowShape(xmlParsing.in, combiner.out)
+      }
+    )
+
+  private def buildArrivalData(
+    eoriMaybe: ParseResult[EORINumber],
+    dateMaybe: ParseResult[OffsetDateTime],
+    mrnMaybe: ParseResult[MovementReferenceNumber]
+  ): ParseResult[ArrivalData] =
+    for {
+      eoriNumber     <- eoriMaybe
+      generationDate <- dateMaybe
+      mrn            <- mrnMaybe
+    } yield ArrivalData(eoriNumber, generationDate, mrn)
+
   override def extractDeclarationData(source: Source[ByteString, _]): EitherT[Future, ParseError, DeclarationData] =
     EitherT(
       source
@@ -91,6 +131,16 @@ class DeparturesXmlParsingServiceImpl @Inject() (implicit materializer: Material
           case NonFatal(e) => Left(ParseError.UnexpectedError(Some(e)))
         }
         .runWith(Sink.head[Either[ParseError, DeclarationData]])
+    )
+
+  override def extractArrivalData(source: Source[ByteString, _]): EitherT[Future, ParseError, ArrivalData] =
+    EitherT(
+      source
+        .via(arrivalFlow)
+        .recover {
+          case NonFatal(e) => Left(ParseError.UnexpectedError(Some(e)))
+        }
+        .runWith(Sink.head[Either[ParseError, ArrivalData]])
     )
 
 }

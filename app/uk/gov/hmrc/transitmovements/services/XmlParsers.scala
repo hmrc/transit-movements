@@ -32,12 +32,13 @@ import java.time.format.DateTimeParseException
 
 object XmlParsers extends XmlParsingServiceHelpers {
 
-  lazy val movementEORINumberExtractor: Flow[ParseEvent, ParseResult[EORINumber], NotUsed] = XmlParsing
-    .subtree("CC015C" :: "HolderOfTheTransitProcedure" :: "identificationNumber" :: Nil)
-    .collect {
-      case element if element.getTextContent.nonEmpty => EORINumber(element.getTextContent)
-    }
-    .single("identificationNumber")
+  def movementEORINumberExtractor(rootNode: String, eori: String): Flow[ParseEvent, ParseResult[EORINumber], NotUsed] =
+    XmlParsing
+      .subtree(rootNode :: eori :: "identificationNumber" :: Nil)
+      .collect {
+        case element if element.getTextContent.nonEmpty => EORINumber(element.getTextContent)
+      }
+      .single("identificationNumber")
 
   def preparationDateTimeExtractor(messageType: MessageType): Flow[ParseEvent, ParseResult[OffsetDateTime], NotUsed] = XmlParsing
     .subtree(messageType.rootNode :: "preparationDateAndTime" :: Nil)
@@ -50,8 +51,8 @@ object XmlParsers extends XmlParsingServiceHelpers {
       case exception: DateTimeParseException => Left(ParseError.BadDateTime("preparationDateAndTime", exception))
     }
 
-  lazy val movementReferenceNumberExtractor: Flow[ParseEvent, ParseResult[MovementReferenceNumber], NotUsed] = XmlParsing
-    .subtree("CC028C" :: "TransitOperation" :: "MRN" :: Nil)
+  def movementReferenceNumberExtractor(rootNode: String): Flow[ParseEvent, ParseResult[MovementReferenceNumber], NotUsed] = XmlParsing
+    .subtree(rootNode :: "TransitOperation" :: "MRN" :: Nil)
     .collect {
       case element if element.getTextContent.nonEmpty => MovementReferenceNumber(element.getTextContent)
     }
