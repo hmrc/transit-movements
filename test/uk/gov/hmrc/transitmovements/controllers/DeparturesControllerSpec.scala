@@ -63,6 +63,7 @@ import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
@@ -427,9 +428,9 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getDeparturesForEori(eoriNumber).url)
 
     "must return OK if departures were found" in {
-      val response = DepartureWithoutMessages.fromDeparture(movement)
+      val response = MovementWithoutMessages.fromMovement(movement)
 
-      when(mockRepository.getDepartures(EORINumber(any())))
+      when(mockRepository.getMovements(EORINumber(any()), any()))
         .thenReturn(EitherT.rightT(Some(NonEmptyList(response, List.empty))))
 
       val result = controller.getDeparturesForEori(eoriNumber)(request)
@@ -438,7 +439,7 @@ class DeparturesControllerSpec
     }
 
     "must return NOT_FOUND if no ids were found" in {
-      when(mockRepository.getDepartures(EORINumber(any())))
+      when(mockRepository.getMovements(EORINumber(any()), any()))
         .thenReturn(EitherT.rightT(None))
 
       val result = controller.getDeparturesForEori(eoriNumber)(request)
@@ -447,7 +448,7 @@ class DeparturesControllerSpec
     }
 
     "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
-      when(mockRepository.getDepartures(EORINumber(any())))
+      when(mockRepository.getMovements(EORINumber(any()), any()))
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
       val result = controller.getDeparturesForEori(eoriNumber)(request)
