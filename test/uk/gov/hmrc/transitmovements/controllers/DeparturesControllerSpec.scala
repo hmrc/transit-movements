@@ -23,7 +23,7 @@ import akka.util.Timeout
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.{eq => eqTo}
+import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
 import org.scalacheck.Arbitrary.arbitrary
@@ -359,7 +359,7 @@ class DeparturesControllerSpec
     "must return OK if message found in the correct format" in {
       val messageResponse = MessageResponse.fromMessageWithBody(movement.messages.head)
 
-      when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), any()))
+      when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(MovementType.Departure)))
         .thenReturn(EitherT.rightT(Some(messageResponse)))
 
       val result = controller.getMessage(eoriNumber, movementId, messageId)(request)
@@ -369,7 +369,7 @@ class DeparturesControllerSpec
     }
 
     "must return NOT_FOUND if no message found" in {
-      when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), any()))
+      when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(MovementType.Departure)))
         .thenReturn(EitherT.rightT(None))
 
       val result = controller.getMessage(eoriNumber, movementId, messageId)(request)
@@ -378,7 +378,7 @@ class DeparturesControllerSpec
     }
 
     "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
-      when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), any()))
+      when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(MovementType.Departure)))
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
       val result = controller.getMessage(eoriNumber, movementId, messageId)(request)
@@ -396,7 +396,7 @@ class DeparturesControllerSpec
 
       lazy val messageResponseList = NonEmptyList.one(messageResponses)
 
-      when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), any(), eqTo(None)))
+      when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure), eqTo(None)))
         .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageResponses))))
 
       val result = controller.getDepartureMessages(eoriNumber, movementId, None)(request)
@@ -406,7 +406,7 @@ class DeparturesControllerSpec
     }
 
     "must return NOT_FOUND if no departure found" in {
-      when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), any(), eqTo(None)))
+      when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure), eqTo(None)))
         .thenReturn(EitherT.rightT(None))
 
       val result = controller.getDepartureMessages(eoriNumber, movementId, None)(request)
@@ -415,7 +415,7 @@ class DeparturesControllerSpec
     }
 
     "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
-      when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), any(), eqTo(None)))
+      when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure), eqTo(None)))
         .thenReturn(EitherT.leftT(UnexpectedError(None)))
 
       val result = controller.getDepartureMessages(eoriNumber, movementId, None)(request)
@@ -430,7 +430,7 @@ class DeparturesControllerSpec
     "must return OK if departures were found" in {
       val response = MovementWithoutMessages.fromMovement(movement)
 
-      when(mockRepository.getMovements(EORINumber(any()), any()))
+      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Departure)))
         .thenReturn(EitherT.rightT(Some(NonEmptyList(response, List.empty))))
 
       val result = controller.getDeparturesForEori(eoriNumber)(request)
@@ -439,7 +439,7 @@ class DeparturesControllerSpec
     }
 
     "must return NOT_FOUND if no ids were found" in {
-      when(mockRepository.getMovements(EORINumber(any()), any()))
+      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Departure)))
         .thenReturn(EitherT.rightT(None))
 
       val result = controller.getDeparturesForEori(eoriNumber)(request)
