@@ -55,6 +55,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import javax.inject.Singleton
 import scala.concurrent._
 import scala.util.Failure
 import scala.util.Success
@@ -92,6 +93,7 @@ object MovementsRepositoryImpl {
   val EPOCH_TIME: LocalDateTime = LocalDateTime.ofEpochSecond(0, 0, ZoneOffset.UTC)
 }
 
+@Singleton
 class MovementsRepositoryImpl @Inject() (
   appConfig: AppConfig,
   mongoComponent: MongoComponent,
