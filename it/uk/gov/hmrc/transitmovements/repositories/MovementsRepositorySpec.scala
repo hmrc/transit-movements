@@ -41,6 +41,7 @@ import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
@@ -183,31 +184,57 @@ class MovementsRepositorySpec
 
   "getDepartures" should
     "return a list of departure responses for the supplied EORI sorted by last updated, latest first" in {
-      GetDeparturesSetup.setup()
-      val result = await(repository.getDepartures(GetDeparturesSetup.eoriGB).value)
+      GetMovementsSetup.setup()
+      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure).value)
 
       result.right.get.value should be(
         NonEmptyList(
-          DepartureWithoutMessages.fromDeparture(GetDeparturesSetup.departureGB2),
-          List(DepartureWithoutMessages.fromDeparture(GetDeparturesSetup.departureGB1))
+          MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
+          List(MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1))
         )
       )
     }
 
   it should "return no departure ids for an EORI that doesn't exist" in {
-    GetDeparturesSetup.setup()
-    val result = await(repository.getDepartures(EORINumber("FR999")).value)
+    GetMovementsSetup.setup()
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure).value)
 
     result.right.get should be(None)
   }
 
   it should "return no departure ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getDepartures(EORINumber("FR999")).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure).value)
     result.right.get should be(None)
   }
 
-  object GetDeparturesSetup {
+  "getArrivals" should
+    "return a list of arrival responses for the supplied EORI sorted by last updated, latest first" in {
+      GetMovementsSetup.setup()
+      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival).value)
+
+      result.right.get.value should be(
+        NonEmptyList(
+          MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
+          List(MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1))
+        )
+      )
+    }
+
+  it should "return no arrival ids for an EORI that doesn't exist" in {
+    GetMovementsSetup.setup()
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival).value)
+
+    result.right.get should be(None)
+  }
+
+  it should "return no arrival ids when the db is empty" in {
+    // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival).value)
+    result.right.get should be(None)
+  }
+
+  object GetMovementsSetup {
 
     val eoriGB  = arbitrary[EORINumber].sample.value
     val eoriXI  = arbitrary[EORINumber].sample.value
@@ -217,6 +244,15 @@ class MovementsRepositorySpec
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementType = MovementType.Departure,
+        created = instant,
+        updated = instant,
+        messages = NonEmptyList(message, List.empty)
+      )
+
+    val arrivalGB1 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementType = MovementType.Arrival,
         created = instant,
         updated = instant,
         messages = NonEmptyList(message, List.empty)
@@ -238,6 +274,14 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
+    val arrivalGB2 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementType = MovementType.Arrival,
+        updated = instant.plusMinutes(1),
+        movementReferenceNumber = mrnGen.sample
+      )
+
     def setup() {
 
       //populate db in non-time order
@@ -245,6 +289,9 @@ class MovementsRepositorySpec
       await(repository.insert(departureGB2).value)
       await(repository.insert(departureXi1).value)
       await(repository.insert(departureGB1).value)
+
+      await(repository.insert(arrivalGB2).value)
+      await(repository.insert(arrivalGB1).value)
     }
 
   }

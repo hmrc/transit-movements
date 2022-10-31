@@ -24,6 +24,7 @@ import play.api.Logging
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.Action
+import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
 import play.api.mvc.Result
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -74,6 +75,19 @@ class ArrivalsController @Inject() (
             response => Ok(Json.toJson(response))
           )
       }.toResult
+  }
+
+  def getArrivalsForEori(eoriNumber: EORINumber): Action[AnyContent] = Action.async {
+    repo
+      .getMovements(eoriNumber, MovementType.Arrival)
+      .asPresentation
+      .fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        {
+          case Some(message) => Ok(Json.toJson(message))
+          case None          => NotFound
+        }
+      )
   }
 
 }

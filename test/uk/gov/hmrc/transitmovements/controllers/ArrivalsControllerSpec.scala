@@ -23,6 +23,7 @@ import akka.util.Timeout
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
 import org.scalacheck.Arbitrary.arbitrary
@@ -49,6 +50,7 @@ import play.api.test.Helpers.contentAsJson
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HttpVerbs.POST
+import play.api.http.Status.NOT_FOUND
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
@@ -61,11 +63,13 @@ import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MovementFactory
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -320,6 +324,39 @@ class ArrivalsControllerSpec
           "message" -> "Internal server error"
         )
       }
+    }
+  }
+
+  "getArrivalsForEori" - {
+    val request = FakeRequest("GET", routes.ArrivalsController.getArrivalsForEori(eoriNumber).url)
+
+    "must return OK if arrivals were found" in {
+      val response = MovementWithoutMessages.fromMovement(movement)
+
+      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival)))
+        .thenReturn(EitherT.rightT(Some(NonEmptyList(response, List.empty))))
+
+      val result = controller.getArrivalsForEori(eoriNumber)(request)
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.toJson(NonEmptyList(response, List.empty))
+    }
+
+    "must return NOT_FOUND if no ids were found" in {
+      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival)))
+        .thenReturn(EitherT.rightT(None))
+
+      val result = controller.getArrivalsForEori(eoriNumber)(request)
+
+      status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
+      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival)))
+        .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
+
+      val result = controller.getArrivalsForEori(eoriNumber)(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
     }
   }
 

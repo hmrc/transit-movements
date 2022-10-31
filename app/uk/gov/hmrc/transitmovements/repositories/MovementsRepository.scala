@@ -41,6 +41,7 @@ import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
@@ -54,6 +55,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import javax.inject.Singleton
 import scala.concurrent._
 import scala.util.Failure
 import scala.util.Success
@@ -83,7 +85,7 @@ trait MovementsRepository {
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]]
 
-  def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]]
+  def getMovements(eoriNumber: EORINumber, movementType: MovementType): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]]
   def updateMessages(movementId: MovementId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit]
 }
 
@@ -91,6 +93,7 @@ object MovementsRepositoryImpl {
   val EPOCH_TIME: LocalDateTime = LocalDateTime.ofEpochSecond(0, 0, ZoneOffset.UTC)
 }
 
+@Singleton
 class MovementsRepositoryImpl @Inject() (
   appConfig: AppConfig,
   mongoComponent: MongoComponent,
@@ -106,6 +109,7 @@ class MovementsRepositoryImpl @Inject() (
       extraCodecs = Seq(
         Codecs.playFormatCodec(MongoFormats.movementFormat),
         Codecs.playFormatCodec(MongoFormats.departureWithoutMessagesFormat),
+        Codecs.playFormatCodec(MongoFormats.movementWithoutMessagesFormat),
         Codecs.playFormatCodec(MongoFormats.messageResponseFormat),
         Codecs.playFormatCodec(MongoFormats.messageFormat),
         Codecs.playFormatCodec(MongoFormats.movementIdFormat),
@@ -232,12 +236,12 @@ class MovementsRepositoryImpl @Inject() (
       )
     }
 
-  def getDepartures(eoriNumber: EORINumber): EitherT[Future, MongoError, Option[NonEmptyList[DepartureWithoutMessages]]] = {
+  def getMovements(eoriNumber: EORINumber, movementType: MovementType): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]] = {
     val selector: Bson = mAnd(
       mEq("enrollmentEORINumber", eoriNumber.value),
-      mEq("movementType", MovementType.Departure.value)
+      mEq("movementType", movementType.value)
     )
-    val projection = DepartureWithoutMessages.projection
+    val projection = MovementWithoutMessages.projection
 
     val aggregates = Seq(
       Aggregates.filter(selector),
@@ -245,7 +249,7 @@ class MovementsRepositoryImpl @Inject() (
       Aggregates.project(projection)
     )
 
-    mongoRetry(Try(collection.aggregate[DepartureWithoutMessages](aggregates)) match {
+    mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
       case Success(obs) =>
         obs
           .toFuture()
