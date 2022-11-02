@@ -65,11 +65,13 @@ import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
+import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MovementFactory
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -355,6 +357,43 @@ class ArrivalsControllerSpec
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
       val result = controller.getArrivalsForEori(eoriNumber)(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+  }
+
+  "getArrivalMessages" - {
+
+    val request = FakeRequest("GET", routes.ArrivalsController.getArrivalMessages(eoriNumber, movementId).url)
+
+    "must return OK and a list of message ids" in {
+      val messageResponses = MessageResponse.fromMessageWithoutBody(movement.messages.head)
+
+      lazy val messageResponseList = NonEmptyList.one(messageResponses)
+
+      when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival), eqTo(None)))
+        .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageResponses))))
+
+      val result = controller.getArrivalMessages(eoriNumber, movementId, None)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.toJson(messageResponseList)
+    }
+
+    "must return NOT_FOUND if no arrival found" in {
+      when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival), eqTo(None)))
+        .thenReturn(EitherT.rightT(None))
+
+      val result = controller.getArrivalMessages(eoriNumber, movementId, None)(request)
+
+      status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
+      when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival), eqTo(None)))
+        .thenReturn(EitherT.leftT(UnexpectedError(None)))
+
+      val result = controller.getArrivalMessages(eoriNumber, movementId, None)(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
     }
