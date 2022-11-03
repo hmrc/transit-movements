@@ -393,4 +393,38 @@ class ArrivalsControllerSpec
     }
   }
 
+  "getMessage" - {
+    val request = FakeRequest("GET", routes.ArrivalsController.getMessage(eoriNumber, movementId, messageId).url)
+
+    "must return OK if message found in the correct format" in {
+      val messageResponse = MessageResponse.fromMessageWithBody(movement.messages.head)
+
+      when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(MovementType.Arrival)))
+        .thenReturn(EitherT.rightT(Some(messageResponse)))
+
+      val result = controller.getMessage(eoriNumber, movementId, messageId)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.toJson(messageResponse)
+    }
+
+    "must return NOT_FOUND if no message found" in {
+      when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(MovementType.Arrival)))
+        .thenReturn(EitherT.rightT(None))
+
+      val result = controller.getMessage(eoriNumber, movementId, messageId)(request)
+
+      status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
+      when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(MovementType.Arrival)))
+        .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Exception("error")))))
+
+      val result = controller.getMessage(eoriNumber, movementId, messageId)(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+  }
+
 }

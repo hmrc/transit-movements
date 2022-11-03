@@ -31,6 +31,7 @@ import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
@@ -101,6 +102,19 @@ class ArrivalsController @Inject() (
         {
           case Some(arrivalMessages) => Ok(Json.toJson(arrivalMessages))
           case None                  => NotFound
+        }
+      )
+  }
+
+  def getMessage(eoriNumber: EORINumber, movementId: MovementId, messageId: MessageId): Action[AnyContent] = Action.async {
+    repo
+      .getSingleMessage(eoriNumber, movementId, messageId, MovementType.Arrival)
+      .asPresentation
+      .fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        {
+          case Some(message) => Ok(Json.toJson(message))
+          case None          => NotFound
         }
       )
   }

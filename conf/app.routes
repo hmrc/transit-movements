@@ -17,3 +17,5 @@ POST       /traders/:EORI/movements/arrivals                                    
 GET       /traders/:EORI/movements/arrivals                                        uk.gov.hmrc.transitmovements.controllers.ArrivalsController.getArrivalsForEori(EORI: EORINumber)
 
 GET        /traders/:EORI/movements/arrivals/:movementId/messages                uk.gov.hmrc.transitmovements.controllers.ArrivalsController.getArrivalMessages(EORI: EORINumber, movementId: MovementId, receivedSince: Option[OffsetDateTime] ?= None)
+
+GET        /traders/:EORI/movements/arrivals/:movementId/messages/:messageId     uk.gov.hmrc.transitmovements.controllers.ArrivalsController.getMessage(EORI: EORINumber, movementId: MovementId, messageId: MessageId)
