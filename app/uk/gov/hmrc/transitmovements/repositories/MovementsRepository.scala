@@ -33,7 +33,6 @@ import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -66,10 +65,11 @@ import scala.util.control.NonFatal
 trait MovementsRepository {
   def insert(movement: Movement): EitherT[Future, MongoError, Unit]
 
-  def getDepartureWithoutMessages(
+  def getMovementWithoutMessages(
     eoriNumber: EORINumber,
-    movementId: MovementId
-  ): EitherT[Future, MongoError, Option[DepartureWithoutMessages]]
+    movementId: MovementId,
+    movementType: MovementType
+  ): EitherT[Future, MongoError, Option[MovementWithoutMessages]]
 
   def getSingleMessage(
     eoriNumber: EORINumber,
@@ -108,7 +108,6 @@ class MovementsRepositoryImpl @Inject() (
       ),
       extraCodecs = Seq(
         Codecs.playFormatCodec(MongoFormats.movementFormat),
-        Codecs.playFormatCodec(MongoFormats.departureWithoutMessagesFormat),
         Codecs.playFormatCodec(MongoFormats.movementWithoutMessagesFormat),
         Codecs.playFormatCodec(MongoFormats.messageResponseFormat),
         Codecs.playFormatCodec(MongoFormats.messageFormat),
@@ -136,24 +135,25 @@ class MovementsRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def getDepartureWithoutMessages(
+  def getMovementWithoutMessages(
     eoriNumber: EORINumber,
-    movementId: MovementId
-  ): EitherT[Future, MongoError, Option[DepartureWithoutMessages]] = {
+    movementId: MovementId,
+    movementType: MovementType
+  ): EitherT[Future, MongoError, Option[MovementWithoutMessages]] = {
 
     val selector = mAnd(
       mEq("_id", movementId.value),
       mEq("enrollmentEORINumber", eoriNumber.value),
-      mEq("movementType", MovementType.Departure.value)
+      mEq("movementType", movementType.value)
     )
-    val projection = DepartureWithoutMessages.projection
+    val projection = MovementWithoutMessages.projection
 
     val aggregates = Seq(
       Aggregates.filter(selector),
       Aggregates.project(projection)
     )
 
-    mongoRetry(Try(collection.aggregate[DepartureWithoutMessages](aggregates)) match {
+    mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
       case Success(obs) =>
         obs.headOption().map {
           opt => Right(opt)

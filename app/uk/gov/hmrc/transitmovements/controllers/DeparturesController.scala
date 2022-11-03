@@ -82,7 +82,7 @@ class DeparturesController @Inject() (
 
   def getDepartureWithoutMessages(eoriNumber: EORINumber, movementId: MovementId): Action[AnyContent] = Action.async {
     repo
-      .getDepartureWithoutMessages(eoriNumber, movementId)
+      .getMovementWithoutMessages(eoriNumber, movementId, MovementType.Departure)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

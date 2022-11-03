@@ -20,7 +20,6 @@ import org.scalacheck.Gen
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
 import play.api.mvc.Headers
-import play.api.test.FakeHeaders
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
