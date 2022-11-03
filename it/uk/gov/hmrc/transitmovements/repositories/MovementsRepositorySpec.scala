@@ -98,7 +98,7 @@ class MovementsRepositorySpec
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, departure._id).value)
+    val result = await(repository.getMovementWithoutMessages(departure.enrollmentEORINumber, departure._id).value)
     result.right.get.get should be(DepartureWithoutMessages.fromDeparture(departure))
   }
 
@@ -107,7 +107,7 @@ class MovementsRepositorySpec
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, MovementId("2")).value)
+    val result = await(repository.getMovementWithoutMessages(departure.enrollmentEORINumber, MovementId("2")).value)
     result.right.get.isEmpty should be(true)
   }
 

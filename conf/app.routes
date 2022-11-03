@@ -15,3 +15,5 @@ POST       /traders/movements/:movementId/messages                              
 POST       /traders/:EORI/movements/arrivals                                        uk.gov.hmrc.transitmovements.controllers.ArrivalsController.createArrival(EORI: EORINumber)
 
 GET       /traders/:EORI/movements/arrivals                                        uk.gov.hmrc.transitmovements.controllers.ArrivalsController.getArrivalsForEori(EORI: EORINumber)
+
+GET        /traders/:EORI/movements/arrivals/:movementId                         uk.gov.hmrc.transitmovements.controllers.ArrivalsController.getArrivalWithoutMessages(EORI: EORINumber, movementId: MovementId)

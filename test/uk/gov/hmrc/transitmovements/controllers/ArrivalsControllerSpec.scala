@@ -360,4 +360,36 @@ class ArrivalsControllerSpec
     }
   }
 
+  "getArrivalWithoutMessages" - {
+    val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, movementId).url)
+
+    "must return OK if arrival found" in {
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure)))
+        .thenReturn(EitherT.rightT(Some(MovementWithoutMessages.fromMovement(movement))))
+
+      val result = controller.getArrivalWithoutMessages(eoriNumber, movementId)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.toJson(MovementWithoutMessages.fromMovement(movement))(PresentationFormats.movementWithoutMessagesFormat)
+    }
+
+    "must return NOT_FOUND if arrival movement does not exist in DB" in {
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure)))
+        .thenReturn(EitherT.rightT(None))
+
+      val result = controller.getArrivalWithoutMessages(eoriNumber, movementId)(request)
+
+      status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVER_ERROR if repository returns an error" in {
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure)))
+        .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
+
+      val result = controller.getArrivalWithoutMessages(eoriNumber, movementId)(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+  }
+
 }

@@ -32,6 +32,7 @@ import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.ArrivalNotificationResponse
@@ -86,6 +87,19 @@ class ArrivalsController @Inject() (
         {
           case Some(message) => Ok(Json.toJson(message))
           case None          => NotFound
+        }
+      )
+  }
+
+  def getArrivalWithoutMessages(eoriNumber: EORINumber, movementId: MovementId): Action[AnyContent] = Action.async {
+    repo
+      .getMovementWithoutMessages(eoriNumber, movementId, MovementType.Arrival)
+      .asPresentation
+      .fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        {
+          case Some(arrivalWithoutMessages) => Ok(Json.toJson(arrivalWithoutMessages))
+          case None                         => NotFound
         }
       )
   }
