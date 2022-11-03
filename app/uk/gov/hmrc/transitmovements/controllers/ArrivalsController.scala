@@ -32,6 +32,7 @@ import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.ArrivalNotificationResponse
@@ -40,6 +41,7 @@ import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MovementFactory
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 
+import java.time.OffsetDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -86,6 +88,19 @@ class ArrivalsController @Inject() (
         {
           case Some(message) => Ok(Json.toJson(message))
           case None          => NotFound
+        }
+      )
+  }
+
+  def getArrivalMessages(eoriNumber: EORINumber, movementId: MovementId, receivedSince: Option[OffsetDateTime] = None) = Action.async {
+    repo
+      .getMessages(eoriNumber, movementId, MovementType.Arrival, receivedSince)
+      .asPresentation
+      .fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        {
+          case Some(arrivalMessages) => Ok(Json.toJson(arrivalMessages))
+          case None                  => NotFound
         }
       )
   }
