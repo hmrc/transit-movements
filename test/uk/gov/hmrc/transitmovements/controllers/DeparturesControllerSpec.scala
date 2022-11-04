@@ -55,7 +55,6 @@ import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.DeclarationData
-import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -325,17 +324,17 @@ class DeparturesControllerSpec
     val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, movementId).url)
 
     "must return OK if departure found" in {
-      when(mockRepository.getDepartureWithoutMessages(EORINumber(any()), MovementId(any())))
-        .thenReturn(EitherT.rightT(Some(DepartureWithoutMessages.fromDeparture(movement))))
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure)))
+        .thenReturn(EitherT.rightT(Some(MovementWithoutMessages.fromMovement(movement))))
 
       val result = controller.getDepartureWithoutMessages(eoriNumber, movementId)(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.toJson(DepartureWithoutMessages.fromDeparture(movement))(PresentationFormats.departureWithoutMessagesFormat)
+      contentAsJson(result) mustBe Json.toJson(MovementWithoutMessages.fromMovement(movement))(PresentationFormats.movementWithoutMessagesFormat)
     }
 
     "must return NOT_FOUND if no departure found" in {
-      when(mockRepository.getDepartureWithoutMessages(EORINumber(any()), MovementId(any())))
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure)))
         .thenReturn(EitherT.rightT(None))
 
       val result = controller.getDepartureWithoutMessages(eoriNumber, movementId)(request)
@@ -344,7 +343,7 @@ class DeparturesControllerSpec
     }
 
     "must return INTERNAL_SERVER_ERROR if repository has an error" in {
-      when(mockRepository.getDepartureWithoutMessages(EORINumber(any()), MovementId(any())))
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure)))
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
       val result = controller.getDepartureWithoutMessages(eoriNumber, movementId)(request)

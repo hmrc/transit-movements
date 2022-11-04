@@ -18,7 +18,6 @@ package uk.gov.hmrc.transitmovements.models.formats
 
 import play.api.libs.json.Format
 import play.api.libs.json.Json
-import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
@@ -28,11 +27,10 @@ trait PresentationFormats extends CommonFormats {
 
   // as these use the OffsetDateTime times, these need to be here to avoid the macro expansion of
   // OffsetDateTime when used with Mongo.
-  implicit val messageFormat: Format[Message]                                   = Json.format[Message]
-  implicit val movementFormat: Format[Movement]                                 = Json.format[Movement]
-  implicit val departureWithoutMessagesFormat: Format[DepartureWithoutMessages] = Json.format[DepartureWithoutMessages]
-  implicit val movementWithoutMessagesFormat: Format[MovementWithoutMessages]   = Json.format[MovementWithoutMessages]
-  implicit val messageResponseFormat: Format[MessageResponse]                   = Json.format[MessageResponse]
+  implicit val messageFormat: Format[Message]                                 = Json.format[Message]
+  implicit val movementFormat: Format[Movement]                               = Json.format[Movement]
+  implicit val movementWithoutMessagesFormat: Format[MovementWithoutMessages] = Json.format[MovementWithoutMessages]
+  implicit val messageResponseFormat: Format[MessageResponse]                 = Json.format[MessageResponse]
 
 }
 
