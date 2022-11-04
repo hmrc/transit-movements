@@ -355,7 +355,7 @@ class ArrivalsControllerSpec
   }
 
   "getArrivalWithoutMessages" - {
-    val request = FakeRequest("GET", routes.ArrivalsController.getArrivalMessages(eoriNumber, movementId).url)
+    val request = FakeRequest("GET", routes.ArrivalsController.getArrivalWithoutMessages(eoriNumber, movementId).url)
 
     "must return OK if arrival found" in {
       when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival)))
