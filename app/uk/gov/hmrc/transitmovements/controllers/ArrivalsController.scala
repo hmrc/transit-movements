@@ -119,6 +119,7 @@ class ArrivalsController @Inject() (
       )
   }
 
+<<<<<<< HEAD
   def getMessage(eoriNumber: EORINumber, movementId: MovementId, messageId: MessageId): Action[AnyContent] = Action.async {
     repo
       .getSingleMessage(eoriNumber, movementId, messageId, MovementType.Arrival)
@@ -132,4 +133,6 @@ class ArrivalsController @Inject() (
       )
   }
 
+=======
+>>>>>>> 3a46637b04eea7b5ff46a13d125d7257144d1875
 }

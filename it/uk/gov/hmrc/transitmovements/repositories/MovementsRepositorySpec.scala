@@ -98,8 +98,13 @@ class MovementsRepositorySpec
 
     await(repository.insert(movement).value)
 
+<<<<<<< HEAD
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
     result.right.get.get should be(MovementWithoutMessages.fromMovement(movement))
+=======
+    val result = await(repository.getMovementWithoutMessages(departure.enrollmentEORINumber, departure._id).value)
+    result.right.get.get should be(DepartureWithoutMessages.fromDeparture(departure))
+>>>>>>> 3a46637b04eea7b5ff46a13d125d7257144d1875
   }
 
   "getDepartureWithoutMessages" should "return none if the movement doesn't exist" in {
@@ -107,7 +112,11 @@ class MovementsRepositorySpec
 
     await(repository.insert(movement).value)
 
+<<<<<<< HEAD
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, MovementId("2"), movement.movementType).value)
+=======
+    val result = await(repository.getMovementWithoutMessages(departure.enrollmentEORINumber, MovementId("2")).value)
+>>>>>>> 3a46637b04eea7b5ff46a13d125d7257144d1875
     result.right.get.isEmpty should be(true)
   }
 
