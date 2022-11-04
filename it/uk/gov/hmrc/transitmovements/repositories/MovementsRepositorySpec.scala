@@ -102,7 +102,7 @@ class MovementsRepositorySpec
     result.right.get.get should be(MovementWithoutMessages.fromMovement(movement))
   }
 
-  "getDepartureWithoutMessages" should "return none if the movement doesn't exist" in {
+  "getMovementWithoutMessages" should "return none if the movement doesn't exist" in {
     val movement = arbitrary[Movement].sample.value.copy(_id = MovementId("1"))
 
     await(repository.insert(movement).value)
