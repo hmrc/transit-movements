@@ -27,6 +27,7 @@ import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
 import java.net.URI
 import java.time.Instant
@@ -106,5 +107,14 @@ trait ModelGenerators extends BaseGenerators {
         updated                 <- arbitrary[OffsetDateTime]
         messages                <- nonEmptyListOfMaxLength[Message](2)
       } yield Movement(id, movementType, eori, eori, movementReferenceNumber, created, updated, messages)
+    }
+
+  implicit lazy val arbitraryMessageResponse: Arbitrary[MessageResponse] =
+    Arbitrary {
+      for {
+        id             <- arbitrary[MessageId]
+        offsetDateTime <- arbitrary[OffsetDateTime]
+        messageType    <- arbitrary[MessageType]
+      } yield MessageResponse(id, offsetDateTime, messageType, None)
     }
 }

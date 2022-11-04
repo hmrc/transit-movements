@@ -27,48 +27,39 @@ import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
-
-import scala.concurrent.ExecutionContext.Implicits.global
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
+import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.Request
-
-import scala.concurrent.duration.DurationInt
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HttpVerbs.POST
-import play.api.http.Status.NOT_FOUND
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.ArrivalData
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.Movement
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.MovementType
-import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
+import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
+import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MovementFactory
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
+import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
@@ -77,7 +68,9 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 import scala.xml.NodeSeq
 
 class ArrivalsControllerSpec
@@ -88,7 +81,8 @@ class ArrivalsControllerSpec
     with ScalaFutures
     with BeforeAndAfterEach
     with PresentationFormats
-    with ModelGenerators {
+    with ModelGenerators
+    with ScalaCheckDrivenPropertyChecks {
 
   implicit val timeout: Timeout = 5.seconds
 
@@ -361,10 +355,10 @@ class ArrivalsControllerSpec
   }
 
   "getArrivalWithoutMessages" - {
-    val request = FakeRequest("GET", routes.DeparturesController.getDepartureWithoutMessages(eoriNumber, movementId).url)
+    val request = FakeRequest("GET", routes.ArrivalsController.getArrivalMessages(eoriNumber, movementId).url)
 
     "must return OK if arrival found" in {
-      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure)))
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival)))
         .thenReturn(EitherT.rightT(Some(MovementWithoutMessages.fromMovement(movement))))
 
       val result = controller.getArrivalWithoutMessages(eoriNumber, movementId)(request)
@@ -374,7 +368,7 @@ class ArrivalsControllerSpec
     }
 
     "must return NOT_FOUND if arrival movement does not exist in DB" in {
-      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure)))
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival)))
         .thenReturn(EitherT.rightT(None))
 
       val result = controller.getArrivalWithoutMessages(eoriNumber, movementId)(request)
@@ -383,12 +377,54 @@ class ArrivalsControllerSpec
     }
 
     "must return INTERNAL_SERVER_ERROR if repository returns an error" in {
-      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Departure)))
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival)))
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
       val result = controller.getArrivalWithoutMessages(eoriNumber, movementId)(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+  }
+
+  "getArrivalMessages" - {
+
+    val request = FakeRequest("GET", routes.ArrivalsController.getArrivalMessages(eoriNumber, movementId).url)
+
+    "must return OK and a list of message ids if an arrival is found and messages match the receivedSince filter" in forAll(
+      arbitrary[MessageResponse],
+      Gen.option(arbitrary[OffsetDateTime])
+    ) {
+      (messageResponses, receivedSince) =>
+        lazy val messageResponseList = NonEmptyList.one(messageResponses)
+
+        when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival), eqTo(receivedSince)))
+          .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageResponses))))
+
+        val result = controller.getArrivalMessages(eoriNumber, movementId, receivedSince)(request)
+
+        status(result) mustBe OK
+        contentAsJson(result) mustBe Json.toJson(messageResponseList)
+    }
+
+    "must return NOT_FOUND if no arrival found" in forAll(Gen.option(arbitrary[OffsetDateTime])) {
+      receivedSince =>
+        when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival), eqTo(receivedSince)))
+          .thenReturn(EitherT.rightT(None))
+
+        val result = controller.getArrivalMessages(eoriNumber, movementId, receivedSince)(request)
+
+        status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVER_ERROR when a database error is thrown" in forAll(Gen.option(arbitrary[OffsetDateTime])) {
+      receivedSince =>
+        when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival), eqTo(receivedSince)))
+          .thenReturn(EitherT.leftT(UnexpectedError(None)))
+
+        val result = controller.getArrivalMessages(eoriNumber, movementId, receivedSince)(request)
+
+        status(result) mustBe INTERNAL_SERVER_ERROR
+
     }
   }
 
