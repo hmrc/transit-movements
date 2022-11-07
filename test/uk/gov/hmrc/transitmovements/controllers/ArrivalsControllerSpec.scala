@@ -354,23 +354,57 @@ class ArrivalsControllerSpec
     }
   }
 
+  "getArrivalWithoutMessages" - {
+    val request = FakeRequest("GET", routes.ArrivalsController.getArrivalWithoutMessages(eoriNumber, movementId).url)
+
+    "must return OK if arrival found" in {
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival)))
+        .thenReturn(EitherT.rightT(Some(MovementWithoutMessages.fromMovement(movement))))
+
+      val result = controller.getArrivalWithoutMessages(eoriNumber, movementId)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.toJson(MovementWithoutMessages.fromMovement(movement))(PresentationFormats.movementWithoutMessagesFormat)
+    }
+
+    "must return NOT_FOUND if arrival movement does not exist in DB" in {
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival)))
+        .thenReturn(EitherT.rightT(None))
+
+      val result = controller.getArrivalWithoutMessages(eoriNumber, movementId)(request)
+
+      status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVER_ERROR if repository returns an error" in {
+      when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival)))
+        .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
+
+      val result = controller.getArrivalWithoutMessages(eoriNumber, movementId)(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+  }
+
   "getArrivalMessages" - {
 
     val request = FakeRequest("GET", routes.ArrivalsController.getArrivalMessages(eoriNumber, movementId).url)
 
-    "must return OK and a list of message ids if an arrival is found and messages match the receivedSince filter" in
-      forAll(arbitrary[MessageResponse], Gen.option(arbitrary[OffsetDateTime])) {
-        (messageResponses, receivedSince) =>
-          lazy val messageResponseList = NonEmptyList.one(messageResponses)
+    "must return OK and a list of message ids if an arrival is found and messages match the receivedSince filter" in forAll(
+      arbitrary[MessageResponse],
+      Gen.option(arbitrary[OffsetDateTime])
+    ) {
+      (messageResponses, receivedSince) =>
+        lazy val messageResponseList = NonEmptyList.one(messageResponses)
 
-          when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival), eqTo(receivedSince)))
-            .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageResponses))))
+        when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(MovementType.Arrival), eqTo(receivedSince)))
+          .thenReturn(EitherT.rightT(Some(NonEmptyList.one(messageResponses))))
 
-          val result = controller.getArrivalMessages(eoriNumber, movementId, receivedSince)(request)
+        val result = controller.getArrivalMessages(eoriNumber, movementId, receivedSince)(request)
 
-          status(result) mustBe OK
-          contentAsJson(result) mustBe Json.toJson(messageResponseList)
-      }
+        status(result) mustBe OK
+        contentAsJson(result) mustBe Json.toJson(messageResponseList)
+    }
 
     "must return NOT_FOUND if no arrival found" in forAll(Gen.option(arbitrary[OffsetDateTime])) {
       receivedSince =>
@@ -390,6 +424,7 @@ class ArrivalsControllerSpec
         val result = controller.getArrivalMessages(eoriNumber, movementId, receivedSince)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
+
     }
   }
 
@@ -426,5 +461,4 @@ class ArrivalsControllerSpec
       status(result) mustBe INTERNAL_SERVER_ERROR
     }
   }
-
 }

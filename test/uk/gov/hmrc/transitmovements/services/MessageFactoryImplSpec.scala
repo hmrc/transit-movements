@@ -23,7 +23,6 @@ import play.api.libs.Files.SingletonTemporaryFileCreator
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 
 import java.io.File
 import uk.gov.hmrc.transitmovements.models.Message

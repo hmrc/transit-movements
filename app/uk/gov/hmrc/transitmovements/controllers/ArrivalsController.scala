@@ -106,6 +106,19 @@ class ArrivalsController @Inject() (
       )
   }
 
+  def getArrivalWithoutMessages(eoriNumber: EORINumber, movementId: MovementId): Action[AnyContent] = Action.async {
+    repo
+      .getMovementWithoutMessages(eoriNumber, movementId, MovementType.Arrival)
+      .asPresentation
+      .fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        {
+          case Some(arrivalWithoutMessages) => Ok(Json.toJson(arrivalWithoutMessages))
+          case None                         => NotFound
+        }
+      )
+  }
+
   def getMessage(eoriNumber: EORINumber, movementId: MovementId, messageId: MessageId): Action[AnyContent] = Action.async {
     repo
       .getSingleMessage(eoriNumber, movementId, messageId, MovementType.Arrival)
@@ -118,5 +131,4 @@ class ArrivalsController @Inject() (
         }
       )
   }
-
 }

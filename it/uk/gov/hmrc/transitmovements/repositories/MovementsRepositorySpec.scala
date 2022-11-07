@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovements.repositories
 import cats.data.NonEmptyList
 import org.mongodb.scala.model.Filters
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -32,7 +33,6 @@ import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.DepartureWithoutMessages
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -79,7 +79,7 @@ class MovementsRepositorySpec
     repository.collectionName shouldBe "movements"
   }
 
-  "insert" should "add the given departure to the database" in {
+  "insert" should "add the given movement to the database" in {
 
     val departure = arbitrary[Movement].sample.value.copy(_id = MovementId("2"))
     await(
@@ -93,21 +93,22 @@ class MovementsRepositorySpec
     firstItem._id.value should be(departure._id.value)
   }
 
-  "getDepartureWithoutMessages" should "return DepartureWithoutMessages if it exists" in {
-    val departure = arbitrary[Movement].sample.value.copy(movementType = MovementType.Departure)
+  "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists" in {
+    val movement = arbitrary[Movement].sample.value
 
-    await(repository.insert(departure).value)
+    await(repository.insert(movement).value)
 
-    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, departure._id).value)
-    result.right.get.get should be(DepartureWithoutMessages.fromDeparture(departure))
+    val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
+    result.right.get.get should be(MovementWithoutMessages.fromMovement(movement))
   }
 
-  "getDepartureWithoutMessages" should "return none if the departure doesn't exist" in {
-    val departure = arbitrary[Movement].sample.value.copy(_id = MovementId("1"))
+  "getMovementWithoutMessages" should "return none if the movement doesn't exist" in {
+    val movement = arbitrary[Movement].sample.value.copy(_id = MovementId("1"))
 
-    await(repository.insert(departure).value)
+    await(repository.insert(movement).value)
 
-    val result = await(repository.getDepartureWithoutMessages(departure.enrollmentEORINumber, MovementId("2")).value)
+    val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, MovementId("2"), movement.movementType).value)
+
     result.right.get.isEmpty should be(true)
   }
 
@@ -177,13 +178,13 @@ class MovementsRepositorySpec
     )
   }
 
-  "getMessages" should "return none if the departure doesn't exist" in {
+  "getMessages" should "return none if the movement doesn't exist" in {
     val result = await(repository.getMessages(EORINumber("NONEXISTENT_EORI"), MovementId("NONEXISTENT_ID"), MovementType.Departure, None).value)
     result.right.get.isEmpty should be(true)
   }
 
   "getDepartures" should
-    "return a list of departure responses for the supplied EORI sorted by last updated, latest first" in {
+    "return a list of movement responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()
       val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure).value)
 
@@ -195,14 +196,14 @@ class MovementsRepositorySpec
       )
     }
 
-  it should "return no departure ids for an EORI that doesn't exist" in {
+  it should "return no movement ids for an EORI that doesn't exist" in {
     GetMovementsSetup.setup()
     val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure).value)
 
     result.right.get should be(None)
   }
 
-  it should "return no departure ids when the db is empty" in {
+  it should "return no movement ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
     val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure).value)
     result.right.get should be(None)
