@@ -19,7 +19,6 @@ package uk.gov.hmrc.transitmovements.repositories
 import cats.data.NonEmptyList
 import org.mongodb.scala.model.Filters
 import org.scalacheck.Arbitrary.arbitrary
-import org.scalacheck.Gen
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
