@@ -51,6 +51,7 @@ import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
+import uk.gov.hmrc.transitmovements.fakes.utils.FakePreMaterialisedFutureProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
@@ -86,11 +87,11 @@ class ArrivalsControllerSpec
 
   implicit val timeout: Timeout = 5.seconds
 
-  val mockXmlParsingService    = mock[MovementsXmlParsingService]
-  val mockRepository           = mock[MovementsRepository]
-  val mockMovementFactory      = mock[MovementFactory]
-  val mockMessageFactory       = mock[MessageFactory]
-  val mockTemporaryFileCreator = mock[TemporaryFileCreator]
+  val mockXmlParsingService             = mock[MovementsXmlParsingService]
+  val mockRepository                    = mock[MovementsRepository]
+  val mockMovementFactory               = mock[MovementFactory]
+  val mockMessageFactory                = mock[MessageFactory]
+  implicit val mockTemporaryFileCreator = mock[TemporaryFileCreator]
 
   lazy val now                     = OffsetDateTime.now
   lazy val instant: OffsetDateTime = OffsetDateTime.of(2022, 3, 14, 1, 0, 0, 0, ZoneOffset.UTC)
@@ -135,7 +136,7 @@ class ArrivalsControllerSpec
       mockMessageFactory,
       mockRepository,
       mockXmlParsingService,
-      mockTemporaryFileCreator
+      FakePreMaterialisedFutureProvider
     )
 
   override def afterEach() {

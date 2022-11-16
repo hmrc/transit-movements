@@ -49,6 +49,7 @@ import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
+import uk.gov.hmrc.transitmovements.fakes.utils.FakePreMaterialisedFutureProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageData
@@ -92,11 +93,11 @@ class MovementsControllerSpec
   val messageId  = arbitraryMessageId.arbitrary.sample.get
   val triggerId  = arbitraryMessageId.arbitrary.sample.get
 
-  val mockXmlParsingService          = mock[MessagesXmlParsingService]
-  val mockRepository                 = mock[MovementsRepository]
-  val mockMessageFactory             = mock[MessageFactory]
-  val mockTemporaryFileCreator       = mock[TemporaryFileCreator]
-  val mockMessageTypeHeaderExtractor = mock[MessageTypeHeaderExtractor]
+  val mockXmlParsingService             = mock[MessagesXmlParsingService]
+  val mockRepository                    = mock[MovementsRepository]
+  val mockMessageFactory                = mock[MessageFactory]
+  val mockMessageTypeHeaderExtractor    = mock[MessageTypeHeaderExtractor]
+  implicit val mockTemporaryFileCreator = mock[TemporaryFileCreator]
 
   lazy val messageData: MessageData = MessageData(OffsetDateTime.now(ZoneId.of("UTC")), None)
 
@@ -127,7 +128,7 @@ class MovementsControllerSpec
   }
 
   val controller =
-    new MovementsController(stubControllerComponents(), mockMessageFactory, mockRepository, mockXmlParsingService, mockTemporaryFileCreator)
+    new MovementsController(stubControllerComponents(), mockMessageFactory, mockRepository, mockXmlParsingService, FakePreMaterialisedFutureProvider)
 
   "updateMovement" - {
 

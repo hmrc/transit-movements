@@ -16,18 +16,17 @@
 
 package uk.gov.hmrc.transitmovements.controllers
 
-import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import akka.stream.Materializer
-import akka.stream.scaladsl.FileIO
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import play.api.Logging
+import play.api.libs.Files.TemporaryFileCreator
+import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
 import play.api.mvc.Result
-import play.api.libs.json.Json
-import play.api.libs.Files.TemporaryFileCreator
+import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.EORINumber
@@ -35,12 +34,13 @@ import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
-import uk.gov.hmrc.transitmovements.services.MovementFactory
-import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
-import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
+import uk.gov.hmrc.transitmovements.services.MessageFactory
+import uk.gov.hmrc.transitmovements.services.MovementFactory
+import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
+import uk.gov.hmrc.transitmovements.utils.PreMaterialisedFutureProvider
 
 import java.time.OffsetDateTime
 import javax.inject.Inject
@@ -53,31 +53,28 @@ class DeparturesController @Inject() (
   messageFactory: MessageFactory,
   repo: MovementsRepository,
   xmlParsingService: MovementsXmlParsingService,
-  val temporaryFileCreator: TemporaryFileCreator
+  val preMaterialisedFutureProvider: PreMaterialisedFutureProvider
 )(implicit
-  val materializer: Materializer
+  val materializer: Materializer,
+  val temporaryFileCreator: TemporaryFileCreator
 ) extends BackendController(cc)
     with Logging
     with StreamingParsers
     with ConvertError
-    with TemporaryFiles
     with PresentationFormats {
 
-  def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
-    implicit request =>
-      withTemporaryFile {
-        (temporaryFile, source) =>
-          (for {
-            declarationData <- xmlParsingService.extractDeclarationData(source).asPresentation
-            fileSource = FileIO.fromPath(temporaryFile)
-            message <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, None, fileSource).asPresentation
-            movement = movementFactory.createDeparture(eori, MovementType.Departure, declarationData, message)
-            _ <- repo.insert(movement).asPresentation
-          } yield DeclarationResponse(movement._id, movement.messages.head.id)).fold[Result](
-            baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-            response => Ok(Json.toJson(response))
-          )
-      }.toResult
+  def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithAwait {
+    awaitFileWrite => implicit request =>
+      (for {
+        declarationData <- xmlParsingService.extractDeclarationData(request.body).asPresentation
+        _               <- awaitFileWrite
+        message         <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, None, request.body).asPresentation
+        movement = movementFactory.createDeparture(eori, MovementType.Departure, declarationData, message)
+        _ <- repo.insert(movement).asPresentation
+      } yield DeclarationResponse(movement._id, movement.messages.head.id)).fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        response => Ok(Json.toJson(response))
+      )
   }
 
   def getDepartureWithoutMessages(eoriNumber: EORINumber, movementId: MovementId): Action[AnyContent] = Action.async {
