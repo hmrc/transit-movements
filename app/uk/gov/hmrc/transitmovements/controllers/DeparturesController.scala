@@ -116,9 +116,9 @@ class DeparturesController @Inject() (
       )
   }
 
-  def getDeparturesForEori(eoriNumber: EORINumber): Action[AnyContent] = Action.async {
+  def getDeparturesForEori(eoriNumber: EORINumber, updatedSince: Option[OffsetDateTime] = None): Action[AnyContent] = Action.async {
     repo
-      .getMovements(eoriNumber, MovementType.Departure)
+      .getMovements(eoriNumber, MovementType.Departure, updatedSince)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

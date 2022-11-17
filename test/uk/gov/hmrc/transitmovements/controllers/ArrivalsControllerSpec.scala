@@ -328,7 +328,7 @@ class ArrivalsControllerSpec
     "must return OK if arrivals were found" in {
       val response = MovementWithoutMessages.fromMovement(movement)
 
-      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival)))
+      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival), eqTo(None)))
         .thenReturn(EitherT.rightT(Some(NonEmptyList(response, List.empty))))
 
       val result = controller.getArrivalsForEori(eoriNumber)(request)
@@ -337,7 +337,7 @@ class ArrivalsControllerSpec
     }
 
     "must return NOT_FOUND if no ids were found" in {
-      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival)))
+      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival), eqTo(None)))
         .thenReturn(EitherT.rightT(None))
 
       val result = controller.getArrivalsForEori(eoriNumber)(request)
@@ -346,7 +346,7 @@ class ArrivalsControllerSpec
     }
 
     "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
-      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival)))
+      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival), eqTo(None)))
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
       val result = controller.getArrivalsForEori(eoriNumber)(request)

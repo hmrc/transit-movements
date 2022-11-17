@@ -430,7 +430,7 @@ class DeparturesControllerSpec
     "must return OK if departures were found" in {
       val response = MovementWithoutMessages.fromMovement(movement)
 
-      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Departure)))
+      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Departure), eqTo(None)))
         .thenReturn(EitherT.rightT(Some(NonEmptyList(response, List.empty))))
 
       val result = controller.getDeparturesForEori(eoriNumber)(request)
@@ -439,7 +439,7 @@ class DeparturesControllerSpec
     }
 
     "must return NOT_FOUND if no ids were found" in {
-      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Departure)))
+      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Departure), eqTo(None)))
         .thenReturn(EitherT.rightT(None))
 
       val result = controller.getDeparturesForEori(eoriNumber)(request)
@@ -448,7 +448,7 @@ class DeparturesControllerSpec
     }
 
     "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
-      when(mockRepository.getMovements(EORINumber(any()), any()))
+      when(mockRepository.getMovements(EORINumber(any()), any(), eqTo(None)))
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
       val result = controller.getDeparturesForEori(eoriNumber)(request)
