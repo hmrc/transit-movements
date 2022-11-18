@@ -85,7 +85,11 @@ trait MovementsRepository {
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]]
 
-  def getMovements(eoriNumber: EORINumber, movementType: MovementType): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]]
+  def getMovements(
+    eoriNumber: EORINumber,
+    movementType: MovementType,
+    updatedSince: Option[OffsetDateTime]
+  ): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]]
   def updateMessages(movementId: MovementId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit]
 }
 
@@ -236,10 +240,15 @@ class MovementsRepositoryImpl @Inject() (
       )
     }
 
-  def getMovements(eoriNumber: EORINumber, movementType: MovementType): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]] = {
+  def getMovements(
+    eoriNumber: EORINumber,
+    movementType: MovementType,
+    updatedSince: Option[OffsetDateTime]
+  ): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]] = {
     val selector: Bson = mAnd(
       mEq("enrollmentEORINumber", eoriNumber.value),
-      mEq("movementType", movementType.value)
+      mEq("movementType", movementType.value),
+      mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME))
     )
     val projection = MovementWithoutMessages.projection
 
