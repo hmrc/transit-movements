@@ -34,7 +34,6 @@ import uk.gov.hmrc.transitmovements.services.errors.StreamError
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import javax.inject.Inject
 import scala.concurrent.Future
 import scala.util.control.NonFatal
@@ -45,6 +44,7 @@ trait MessageFactory {
   def create(
     messageType: MessageType,
     generationDate: OffsetDateTime,
+    received: OffsetDateTime,
     triggerId: Option[MessageId],
     tempFile: Source[ByteString, Future[IOResult]]
   ): EitherT[Future, StreamError, Message]
@@ -60,6 +60,7 @@ class MessageFactoryImpl @Inject() (
   def create(
     messageType: MessageType,
     generationDate: OffsetDateTime,
+    received: OffsetDateTime,
     triggerId: Option[MessageId],
     tempFile: Source[ByteString, Future[IOResult]]
   ): EitherT[Future, StreamError, Message] =
@@ -67,7 +68,7 @@ class MessageFactoryImpl @Inject() (
       message =>
         Message(
           id = MessageId(ShortUUID.next(clock, random)),
-          received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+          received = received,
           generated = generationDate,
           messageType = messageType,
           triggerId = triggerId,

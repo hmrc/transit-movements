@@ -42,7 +42,9 @@ import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MovementFactory
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 
+import java.time.Clock
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -55,7 +57,8 @@ class ArrivalsController @Inject() (
   xmlParsingService: MovementsXmlParsingService,
   val temporaryFileCreator: TemporaryFileCreator
 )(implicit
-  val materializer: Materializer
+  val materializer: Materializer,
+  clock: Clock
 ) extends BackendController(cc)
     with Logging
     with StreamingParsers
@@ -70,8 +73,9 @@ class ArrivalsController @Inject() (
           (for {
             arrivalData <- xmlParsingService.extractArrivalData(source).asPresentation
             fileSource = FileIO.fromPath(temporaryFile)
-            message <- messageFactory.create(MessageType.ArrivalNotification, arrivalData.generationDate, None, fileSource).asPresentation
-            movement = movementFactory.createArrival(eori, MovementType.Arrival, arrivalData, message)
+            received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+            message <- messageFactory.create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, fileSource).asPresentation
+            movement = movementFactory.createArrival(eori, MovementType.Arrival, arrivalData, message, received, received)
             _ <- repo.insert(movement).asPresentation
           } yield ArrivalNotificationResponse(movement._id, movement.messages.head.id)).fold[Result](
             baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

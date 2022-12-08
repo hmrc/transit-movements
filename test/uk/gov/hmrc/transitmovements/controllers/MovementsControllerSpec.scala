@@ -65,8 +65,10 @@ import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -126,6 +128,9 @@ class MovementsControllerSpec
     super.afterEach()
   }
 
+  val instant: OffsetDateTime = OffsetDateTime.of(2022, 8, 26, 9, 0, 0, 0, ZoneOffset.UTC)
+  implicit val clock          = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
+
   val controller =
     new MovementsController(stubControllerComponents(), mockMessageFactory, mockRepository, mockXmlParsingService, mockTemporaryFileCreator)
 
@@ -151,10 +156,12 @@ class MovementsControllerSpec
       when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
         .thenReturn(messageDataEither)
 
-      when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
+      when(
+        mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]])
+      )
         .thenReturn(messageFactoryEither)
 
-      when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]]))
+      when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.rightT(()))
 
       val request = fakeRequest(POST, validXml)
@@ -190,10 +197,18 @@ class MovementsControllerSpec
             )
           )
 
-        when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
+        when(
+          mockMessageFactory.create(
+            any[MessageType],
+            any[OffsetDateTime],
+            any[OffsetDateTime],
+            any[Option[MessageId]],
+            any[Source[ByteString, Future[IOResult]]]
+          )
+        )
           .thenReturn(messageFactoryEither)
 
-        when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]]))
+        when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
           .thenReturn(EitherT.rightT(()))
 
         val request = fakeRequest(POST, xml)
@@ -219,10 +234,18 @@ class MovementsControllerSpec
         when(mockXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
           .thenReturn(messageDataEither)
 
-        when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
+        when(
+          mockMessageFactory.create(
+            any[MessageType],
+            any[OffsetDateTime],
+            any[OffsetDateTime],
+            any[Option[MessageId]],
+            any[Source[ByteString, Future[IOResult]]]
+          )
+        )
           .thenReturn(messageFactoryEither)
 
-        when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]]))
+        when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
           .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(s"No departure found with the given id: ${movementId.value}")))
 
         val request = fakeRequest(POST, validXml)

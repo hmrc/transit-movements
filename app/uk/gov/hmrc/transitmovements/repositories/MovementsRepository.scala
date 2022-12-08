@@ -86,7 +86,13 @@ trait MovementsRepository {
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]]
 
   def getMovements(eoriNumber: EORINumber, movementType: MovementType): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]]
-  def updateMessages(movementId: MovementId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit]
+
+  def updateMessages(
+    movementId: MovementId,
+    message: Message,
+    mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit]
 }
 
 object MovementsRepositoryImpl {
@@ -263,11 +269,16 @@ class MovementsRepositoryImpl @Inject() (
 
   }
 
-  def updateMessages(movementId: MovementId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit] = {
+  def updateMessages(
+    movementId: MovementId,
+    message: Message,
+    mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit] = {
 
     val filter: Bson = mEq(movementId)
 
-    val setUpdated   = mSet("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
+    val setUpdated   = mSet("updated", received)
     val pushMessages = mPush("messages", message)
 
     val combined = Seq(setUpdated, pushMessages) ++ mrn

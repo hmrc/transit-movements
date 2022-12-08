@@ -64,6 +64,7 @@ import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
+import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -128,6 +129,8 @@ class ArrivalsControllerSpec
       body = body
     )
 
+  implicit val clock = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
+
   val controller =
     new ArrivalsController(
       stubControllerComponents(),
@@ -171,11 +174,20 @@ class ArrivalsControllerSpec
         .thenReturn(arrivalDataEither)
 
       when(
-        mockMovementFactory.createArrival(any[String].asInstanceOf[EORINumber], any[String].asInstanceOf[MovementType], any[ArrivalData], any[Message])
+        mockMovementFactory.createArrival(
+          any[String].asInstanceOf[EORINumber],
+          any[String].asInstanceOf[MovementType],
+          any[ArrivalData],
+          any[Message],
+          any[OffsetDateTime],
+          any[OffsetDateTime]
+        )
       )
         .thenReturn(movement)
 
-      when(mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]]))
+      when(
+        mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]])
+      )
         .thenReturn(messageFactoryEither)
 
       when(mockRepository.insert(any()))

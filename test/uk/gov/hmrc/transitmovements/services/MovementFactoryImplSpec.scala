@@ -41,7 +41,14 @@ class MovementFactoryImplSpec extends SpecBase with ScalaFutures with Matchers w
 
     "will create a departure with a message" in {
       val departure =
-        sut.createDeparture(EORINumber("1"), MovementType.Departure, DeclarationData(EORINumber("1"), instant), arbitraryMessage.arbitrary.sample.get)
+        sut.createDeparture(
+          EORINumber("1"),
+          MovementType.Departure,
+          DeclarationData(EORINumber("1"), instant),
+          arbitraryMessage.arbitrary.sample.get,
+          instant,
+          instant
+        )
 
       departure.messages.length mustBe 1
     }
