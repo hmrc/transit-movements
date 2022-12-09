@@ -48,7 +48,6 @@ import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl.EPOCH_T
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 
-import java.time.Clock
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -90,7 +89,14 @@ trait MovementsRepository {
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]]
-  def updateMessages(movementId: MovementId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit]
+
+  def updateMessages(
+    movementId: MovementId,
+    message: Message,
+    mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit]
+
 }
 
 object MovementsRepositoryImpl {
@@ -100,8 +106,7 @@ object MovementsRepositoryImpl {
 @Singleton
 class MovementsRepositoryImpl @Inject() (
   appConfig: AppConfig,
-  mongoComponent: MongoComponent,
-  clock: Clock
+  mongoComponent: MongoComponent
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[Movement](
       mongoComponent = mongoComponent,
@@ -272,11 +277,16 @@ class MovementsRepositoryImpl @Inject() (
 
   }
 
-  def updateMessages(movementId: MovementId, message: Message, mrn: Option[MovementReferenceNumber]): EitherT[Future, MongoError, Unit] = {
+  def updateMessages(
+    movementId: MovementId,
+    message: Message,
+    mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit] = {
 
     val filter: Bson = mEq(movementId)
 
-    val setUpdated   = mSet("updated", OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
+    val setUpdated   = mSet("updated", received)
     val pushMessages = mPush("messages", message)
 
     val combined = Seq(setUpdated, pushMessages) ++ mrn

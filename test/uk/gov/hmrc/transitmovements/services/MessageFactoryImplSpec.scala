@@ -49,7 +49,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
       val stream    = FileIO.fromPath(tempFile.path)
       val triggerId = Some(MessageId("123"))
 
-      val result = sut.create(MessageType.DestinationOfficeRejection, instant, triggerId, stream)
+      val result = sut.create(MessageType.DestinationOfficeRejection, instant, instant, triggerId, stream)
 
       whenReady(result.value) {
         r =>
@@ -63,7 +63,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
       val stream    = FileIO.fromPath(new File("").toPath, 5)
       val triggerId = Some(MessageId("456"))
 
-      val result = sut.create(MessageType.RequestOfRelease, instant, triggerId, stream)
+      val result = sut.create(MessageType.RequestOfRelease, instant, instant, triggerId, stream)
 
       whenReady(result.value) {
         r =>

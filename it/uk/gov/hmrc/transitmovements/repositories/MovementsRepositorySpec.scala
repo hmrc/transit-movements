@@ -60,7 +60,8 @@ class MovementsRepositorySpec
     with ModelGenerators
     with OptionValues {
 
-  val instant: OffsetDateTime = OffsetDateTime.of(2022, 5, 25, 16, 0, 0, 0, ZoneOffset.UTC)
+  val instant: OffsetDateTime         = OffsetDateTime.of(2022, 5, 25, 16, 0, 0, 0, ZoneOffset.UTC)
+  val receivedInstant: OffsetDateTime = OffsetDateTime.of(2022, 6, 12, 0, 0, 0, 0, ZoneOffset.UTC)
 
   override lazy val mongoComponent: MongoComponent = {
     val databaseName: String = "test-movements"
@@ -70,9 +71,8 @@ class MovementsRepositorySpec
 
   implicit lazy val app: Application = GuiceApplicationBuilder().configure().build()
   private val appConfig              = app.injector.instanceOf[AppConfig]
-  private val clockConfig            = app.injector.instanceOf[Clock]
 
-  override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, clockConfig)
+  override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent)
 
   "DepartureMovementRepository" should "have the correct name" in {
     repository.collectionName shouldBe "movements"
@@ -340,8 +340,7 @@ class MovementsRepositorySpec
 
   }
 
-  "updateMessages" should "if not MrnAllocated, add a message to the matching movement and set updated parameter" in {
-
+  "updateMessages" should "if not MrnAllocated, add a message to the matching movement and set updated parameter to when the latest message was received" in {
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
 
     val departureID = arbitrary[MovementId].sample.value
@@ -359,10 +358,15 @@ class MovementsRepositorySpec
     )
 
     val message2 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(departureID.value)))
+      arbitrary[Message].sample.value.copy(
+        body = None,
+        messageType = MessageType.DepartureOfficeRejection,
+        triggerId = Some(MessageId(departureID.value)),
+        received = receivedInstant
+      )
 
     val result = await(
-      repository.updateMessages(departureID, message2, None).value
+      repository.updateMessages(departureID, message2, None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -371,14 +375,14 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureID.value)).first().toFuture()
     }
 
-    movement.updated shouldNot be(instant)
+    movement.updated shouldEqual receivedInstant
     movement.messages.length should be(2)
     movement.messages.toList should contain(message1)
     movement.messages.toList should contain(message2)
 
   }
 
-  "updateMessages" should "if MrnAllocated, update MRN field when message type is MRNAllocated, as well as messages and updated field" in {
+  "updateMessages" should "if MrnAllocated, update MRN field when message type is MRNAllocated, as well as messages and set updated parameter to when the latest message was received" in {
 
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = None)
 
@@ -398,11 +402,16 @@ class MovementsRepositorySpec
     )
 
     val message2 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = Some(MessageId(departureId.value)))
+      arbitrary[Message].sample.value.copy(
+        body = None,
+        messageType = MessageType.MrnAllocated,
+        triggerId = Some(MessageId(departureId.value)),
+        received = receivedInstant
+      )
 
     val mrn = arbitrary[MovementReferenceNumber].sample.value
     val result = await(
-      repository.updateMessages(departureId, message2, Some(mrn)).value
+      repository.updateMessages(departureId, message2, Some(mrn), receivedInstant).value
     )
 
     result should be(Right(()))
@@ -411,7 +420,7 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureId.value)).first().toFuture()
     }
 
-    movement.updated shouldNot be(instant)
+    movement.updated shouldEqual receivedInstant
     movement.messages.length should be(2)
     movement.messages.toList should contain(message1)
     movement.messages.toList should contain(message2)
@@ -427,7 +436,7 @@ class MovementsRepositorySpec
       arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(movementId.value)))
 
     val result = await(
-      repository.updateMessages(movementId, message, Some(arbitrary[MovementReferenceNumber].sample.get)).value
+      repository.updateMessages(movementId, message, Some(arbitrary[MovementReferenceNumber].sample.get), instant).value
     )
 
     result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))

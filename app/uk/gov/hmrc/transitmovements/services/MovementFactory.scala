@@ -31,7 +31,6 @@ import uk.gov.hmrc.transitmovements.models.MovementType
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import javax.inject.Inject
 
 @ImplementedBy(classOf[MovementFactoryImpl])
@@ -41,14 +40,18 @@ trait MovementFactory {
     eori: EORINumber,
     movementType: MovementType,
     declarationData: DeclarationData,
-    message: Message
+    message: Message,
+    created: OffsetDateTime,
+    updated: OffsetDateTime
   ): Movement
 
   def createArrival(
     eori: EORINumber,
     movementType: MovementType,
     arrivalData: ArrivalData,
-    message: Message
+    message: Message,
+    created: OffsetDateTime,
+    updated: OffsetDateTime
   ): Movement
 
 }
@@ -64,7 +67,9 @@ class MovementFactoryImpl @Inject() (
     eori: EORINumber,
     movementType: MovementType,
     declarationData: DeclarationData,
-    message: Message
+    message: Message,
+    created: OffsetDateTime,
+    updated: OffsetDateTime
   ): Movement =
     Movement(
       _id = MovementId(ShortUUID.next(clock, random)),
@@ -72,8 +77,8 @@ class MovementFactoryImpl @Inject() (
       movementType = movementType,
       movementEORINumber = declarationData.movementEoriNumber,
       movementReferenceNumber = None,
-      created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
-      updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+      created = created,
+      updated = updated,
       messages = NonEmptyList.one(message)
     )
 
@@ -81,7 +86,9 @@ class MovementFactoryImpl @Inject() (
     eori: EORINumber,
     movementType: MovementType,
     arrivalData: ArrivalData,
-    message: Message
+    message: Message,
+    created: OffsetDateTime,
+    updated: OffsetDateTime
   ): Movement =
     Movement(
       _id = MovementId(ShortUUID.next(clock, random)),
@@ -89,8 +96,8 @@ class MovementFactoryImpl @Inject() (
       movementType = movementType,
       movementEORINumber = arrivalData.movementEoriNumber,
       movementReferenceNumber = Some(arrivalData.mrn),
-      created = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
-      updated = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC),
+      created = created,
+      updated = updated,
       messages = NonEmptyList.one(message)
     )
 

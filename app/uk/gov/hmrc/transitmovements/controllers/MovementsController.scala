@@ -35,6 +35,9 @@ import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
 import uk.gov.hmrc.transitmovements.utils.PreMaterialisedFutureProvider
 
+import java.time.Clock
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -47,6 +50,7 @@ class MovementsController @Inject() (
   val preMaterialisedFutureProvider: PreMaterialisedFutureProvider
 )(implicit
   val materializer: Materializer,
+  clock: Clock,
   val temporaryFileCreator: TemporaryFileCreator
 ) extends BackendController(cc)
     with StreamingParsers
@@ -60,15 +64,17 @@ class MovementsController @Inject() (
           messageType <- extract(request.headers).asPresentation
           messageData <- xmlParsingService.extractMessageData(request.body, messageType).asPresentation
           _           <- awaitFileWrite
+          received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
           message <- factory
             .create(
               messageType,
               messageData.generationDate,
+              received,
               triggerId,
               request.body
             )
             .asPresentation
-          _ <- repo.updateMessages(movementId, message, messageData.mrn).asPresentation
+          _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
         } yield message.id).fold[Result](
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
           id => Ok(Json.toJson(UpdateMovementResponse(id)))
