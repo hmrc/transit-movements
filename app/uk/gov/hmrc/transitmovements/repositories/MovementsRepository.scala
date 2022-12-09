@@ -48,7 +48,6 @@ import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl.EPOCH_T
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 
-import java.time.Clock
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -85,7 +84,11 @@ trait MovementsRepository {
     received: Option[OffsetDateTime]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]]
 
-  def getMovements(eoriNumber: EORINumber, movementType: MovementType): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]]
+  def getMovements(
+    eoriNumber: EORINumber,
+    movementType: MovementType,
+    updatedSince: Option[OffsetDateTime]
+  ): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]]
 
   def updateMessages(
     movementId: MovementId,
@@ -93,6 +96,7 @@ trait MovementsRepository {
     mrn: Option[MovementReferenceNumber],
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
+
 }
 
 object MovementsRepositoryImpl {
@@ -102,8 +106,7 @@ object MovementsRepositoryImpl {
 @Singleton
 class MovementsRepositoryImpl @Inject() (
   appConfig: AppConfig,
-  mongoComponent: MongoComponent,
-  clock: Clock
+  mongoComponent: MongoComponent
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[Movement](
       mongoComponent = mongoComponent,
@@ -242,10 +245,15 @@ class MovementsRepositoryImpl @Inject() (
       )
     }
 
-  def getMovements(eoriNumber: EORINumber, movementType: MovementType): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]] = {
+  def getMovements(
+    eoriNumber: EORINumber,
+    movementType: MovementType,
+    updatedSince: Option[OffsetDateTime]
+  ): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]] = {
     val selector: Bson = mAnd(
       mEq("enrollmentEORINumber", eoriNumber.value),
-      mEq("movementType", movementType.value)
+      mEq("movementType", movementType.value),
+      mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME))
     )
     val projection = MovementWithoutMessages.projection
 

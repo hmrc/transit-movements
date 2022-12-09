@@ -134,6 +134,9 @@ object MessageType {
   /** E_INC_NOT (IE182) */
   case object IncidentNotification extends DepartureResponseMessageType("IE182", "CC182C", "/xsd/CC182C.xsd")
 
+  /** E_REC_NOT (IE035) */
+  case object RecoveryNotification extends DepartureResponseMessageType("IE035", "CC035C", "/xsd/CC035C.xsd")
+
   val departureResponseValues = Set(
     AmendmentAcceptance,
     DepartureOfficeRejection,
@@ -147,7 +150,8 @@ object MessageType {
     NoReleaseForTransit,
     ControlDecisionNotification,
     NotificationToAmend,
-    IncidentNotification
+    IncidentNotification,
+    RecoveryNotification
   )
 
   val departureValues = departureRequestValues ++ departureResponseValues
@@ -162,9 +166,12 @@ object MessageType {
   /** E_PRE_NOT (IE170) */
   case object UnloadingRemarks extends ArrivalRequestMessageType("IE044", "CC044C", "/xsd/CC044C.xsd")
 
+  case object InformationAboutNonArrivedMovement extends ArrivalRequestMessageType("IE141", "CC141C", "/xsd/CC141C.xsd")
+
   val arrivalRequestValues = Set(
     ArrivalNotification,
-    UnloadingRemarks
+    UnloadingRemarks,
+    InformationAboutNonArrivedMovement
   )
 
   // ****************
@@ -180,10 +187,13 @@ object MessageType {
   /** E_ULD_PER (IE025) */
   case object UnloadingPermission extends ArrivalResponseMessageType("IE043", "CC043C", "/xsd/CC043C.xsd")
 
+  case object RequestOnNonArrivedMovement extends ArrivalResponseMessageType("IE140", "CC140C", "/xsd/CC140C.xsd")
+
   val arrivalResponseValues = Set(
     DestinationOfficeRejection,
     GoodsReleaseNotification,
-    UnloadingPermission
+    UnloadingPermission,
+    RequestOnNonArrivedMovement
   )
 
   val arrivalValues = arrivalRequestValues ++ arrivalResponseValues

@@ -60,7 +60,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
     }
 
     "will return a Left when a NonFatal exception is thrown as a StreamError" in {
-      val stream    = FileIO.fromFile(new File(""), 5)
+      val stream    = FileIO.fromPath(new File("").toPath, 5)
       val triggerId = Some(MessageId("456"))
 
       val result = sut.create(MessageType.RequestOfRelease, instant, instant, triggerId, stream)

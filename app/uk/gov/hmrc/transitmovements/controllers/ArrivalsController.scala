@@ -17,7 +17,6 @@
 package uk.gov.hmrc.transitmovements.controllers
 
 import akka.stream.Materializer
-import akka.stream.scaladsl.FileIO
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import play.api.Logging
@@ -41,6 +40,7 @@ import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MovementFactory
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
+import uk.gov.hmrc.transitmovements.utils.PreMaterialisedFutureProvider
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -55,38 +55,35 @@ class ArrivalsController @Inject() (
   messageFactory: MessageFactory,
   repo: MovementsRepository,
   xmlParsingService: MovementsXmlParsingService,
-  val temporaryFileCreator: TemporaryFileCreator
+  val preMaterialisedFutureProvider: PreMaterialisedFutureProvider
 )(implicit
   val materializer: Materializer,
-  clock: Clock
+  clock: Clock,
+  val temporaryFileCreator: TemporaryFileCreator
 ) extends BackendController(cc)
     with Logging
     with StreamingParsers
     with ConvertError
-    with TemporaryFiles
     with PresentationFormats {
 
-  def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
-    implicit request =>
-      withTemporaryFile {
-        (temporaryFile, source) =>
-          (for {
-            arrivalData <- xmlParsingService.extractArrivalData(source).asPresentation
-            fileSource = FileIO.fromPath(temporaryFile)
-            received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-            message <- messageFactory.create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, fileSource).asPresentation
-            movement = movementFactory.createArrival(eori, MovementType.Arrival, arrivalData, message, received, received)
-            _ <- repo.insert(movement).asPresentation
-          } yield ArrivalNotificationResponse(movement._id, movement.messages.head.id)).fold[Result](
-            baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-            response => Ok(Json.toJson(response))
-          )
-      }.toResult
+  def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithAwait {
+    awaitFileWrite => implicit request =>
+      (for {
+        arrivalData <- xmlParsingService.extractArrivalData(request.body).asPresentation
+        _           <- awaitFileWrite
+        received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+        message <- messageFactory.create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body).asPresentation
+        movement = movementFactory.createArrival(eori, MovementType.Arrival, arrivalData, message, received, received)
+        _ <- repo.insert(movement).asPresentation
+      } yield ArrivalNotificationResponse(movement._id, movement.messages.head.id)).fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        response => Ok(Json.toJson(response))
+      )
   }
 
-  def getArrivalsForEori(eoriNumber: EORINumber): Action[AnyContent] = Action.async {
+  def getArrivalsForEori(eoriNumber: EORINumber, updatedSince: Option[OffsetDateTime] = None): Action[AnyContent] = Action.async {
     repo
-      .getMovements(eoriNumber, MovementType.Arrival)
+      .getMovements(eoriNumber, MovementType.Arrival, updatedSince)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

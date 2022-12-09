@@ -71,9 +71,8 @@ class MovementsRepositorySpec
 
   implicit lazy val app: Application = GuiceApplicationBuilder().configure().build()
   private val appConfig              = app.injector.instanceOf[AppConfig]
-  private val clockConfig            = app.injector.instanceOf[Clock]
 
-  override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, clockConfig)
+  override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent)
 
   "DepartureMovementRepository" should "have the correct name" in {
     repository.collectionName shouldBe "movements"
@@ -186,7 +185,7 @@ class MovementsRepositorySpec
   "getDepartures" should
     "return a list of movement responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()
-      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure).value)
+      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None).value)
 
       result.right.get.value should be(
         NonEmptyList(
@@ -196,23 +195,37 @@ class MovementsRepositorySpec
       )
     }
 
+  it should "return a list of movement responses for the supplied EORI if there are movements that were updated since the given time" in {
+    val dateTime = instant
+    GetMovementsSetup.setup()
+    await(repository.insert(GetMovementsSetup.departureGB3).value)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime)).value)
+
+    result.right.get.value should be(
+      NonEmptyList(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
+        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1))
+      )
+    )
+  }
+
   it should "return no movement ids for an EORI that doesn't exist" in {
     GetMovementsSetup.setup()
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None).value)
 
     result.right.get should be(None)
   }
 
   it should "return no movement ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None).value)
     result.right.get should be(None)
   }
 
   "getArrivals" should
     "return a list of arrival responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()
-      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival).value)
+      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None).value)
 
       result.right.get.value should be(
         NonEmptyList(
@@ -222,16 +235,30 @@ class MovementsRepositorySpec
       )
     }
 
+  it should "return a list of movement responses for the supplied EORI if there are movements that were updated since the given time" in {
+    val dateTime = instant
+    GetMovementsSetup.setup()
+    await(repository.insert(GetMovementsSetup.arrivalGB3).value)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime)).value)
+
+    result.right.get.value should be(
+      NonEmptyList(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
+        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1))
+      )
+    )
+  }
+
   it should "return no arrival ids for an EORI that doesn't exist" in {
     GetMovementsSetup.setup()
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None).value)
 
     result.right.get should be(None)
   }
 
   it should "return no arrival ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None).value)
     result.right.get should be(None)
   }
 
@@ -275,11 +302,27 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
+    val departureGB3 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementType = MovementType.Departure,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = mrnGen.sample
+      )
+
     val arrivalGB2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementType = MovementType.Arrival,
         updated = instant.plusMinutes(1),
+        movementReferenceNumber = mrnGen.sample
+      )
+
+    val arrivalGB3 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementType = MovementType.Arrival,
+        updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
       )
 

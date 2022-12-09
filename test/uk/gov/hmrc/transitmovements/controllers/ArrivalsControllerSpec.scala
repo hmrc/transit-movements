@@ -51,6 +51,7 @@ import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
+import uk.gov.hmrc.transitmovements.fakes.utils.FakePreMaterialisedFutureProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
@@ -87,11 +88,11 @@ class ArrivalsControllerSpec
 
   implicit val timeout: Timeout = 5.seconds
 
-  val mockXmlParsingService    = mock[MovementsXmlParsingService]
-  val mockRepository           = mock[MovementsRepository]
-  val mockMovementFactory      = mock[MovementFactory]
-  val mockMessageFactory       = mock[MessageFactory]
-  val mockTemporaryFileCreator = mock[TemporaryFileCreator]
+  val mockXmlParsingService             = mock[MovementsXmlParsingService]
+  val mockRepository                    = mock[MovementsRepository]
+  val mockMovementFactory               = mock[MovementFactory]
+  val mockMessageFactory                = mock[MessageFactory]
+  implicit val mockTemporaryFileCreator = mock[TemporaryFileCreator]
 
   lazy val now                     = OffsetDateTime.now
   lazy val instant: OffsetDateTime = OffsetDateTime.of(2022, 3, 14, 1, 0, 0, 0, ZoneOffset.UTC)
@@ -138,7 +139,7 @@ class ArrivalsControllerSpec
       mockMessageFactory,
       mockRepository,
       mockXmlParsingService,
-      mockTemporaryFileCreator
+      FakePreMaterialisedFutureProvider
     )
 
   override def afterEach() {
@@ -339,7 +340,7 @@ class ArrivalsControllerSpec
     "must return OK if arrivals were found" in {
       val response = MovementWithoutMessages.fromMovement(movement)
 
-      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival)))
+      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival), eqTo(None)))
         .thenReturn(EitherT.rightT(Some(NonEmptyList(response, List.empty))))
 
       val result = controller.getArrivalsForEori(eoriNumber)(request)
@@ -347,22 +348,37 @@ class ArrivalsControllerSpec
       contentAsJson(result) mustBe Json.toJson(NonEmptyList(response, List.empty))
     }
 
-    "must return NOT_FOUND if no ids were found" in {
-      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival)))
-        .thenReturn(EitherT.rightT(None))
+    "must return OK if arrivals were found and it match the updatedSince filter" in forAll(Gen.option(arbitrary[OffsetDateTime])) {
+      updatedSince =>
+        val response = MovementWithoutMessages.fromMovement(movement)
 
-      val result = controller.getArrivalsForEori(eoriNumber)(request)
+        when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival), eqTo(updatedSince)))
+          .thenReturn(EitherT.rightT(Some(NonEmptyList(response, List.empty))))
 
-      status(result) mustBe NOT_FOUND
+        val result = controller.getArrivalsForEori(eoriNumber, updatedSince)(request)
+
+        status(result) mustBe OK
+        contentAsJson(result) mustBe Json.toJson(NonEmptyList(response, List.empty))
     }
 
-    "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
-      when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival)))
-        .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
+    "must return NOT_FOUND if no ids were found" in forAll(Gen.option(arbitrary[OffsetDateTime])) {
+      updatedSince =>
+        when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival), eqTo(updatedSince)))
+          .thenReturn(EitherT.rightT(None))
 
-      val result = controller.getArrivalsForEori(eoriNumber)(request)
+        val result = controller.getArrivalsForEori(eoriNumber, updatedSince)(request)
 
-      status(result) mustBe INTERNAL_SERVER_ERROR
+        status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in forAll(Gen.option(arbitrary[OffsetDateTime])) {
+      updatedSince =>
+        when(mockRepository.getMovements(EORINumber(any()), eqTo(MovementType.Arrival), eqTo(updatedSince)))
+          .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
+
+        val result = controller.getArrivalsForEori(eoriNumber, updatedSince)(request)
+
+        status(result) mustBe INTERNAL_SERVER_ERROR
     }
   }
 

@@ -17,23 +17,23 @@
 package uk.gov.hmrc.transitmovements.controllers
 
 import akka.stream.Materializer
-import akka.stream.scaladsl.FileIO
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import play.api.libs.Files.TemporaryFileCreator
+import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
 import play.api.mvc.Result
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MovementId
-import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
+import uk.gov.hmrc.transitmovements.utils.PreMaterialisedFutureProvider
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -47,41 +47,38 @@ class MovementsController @Inject() (
   factory: MessageFactory,
   repo: MovementsRepository,
   xmlParsingService: MessagesXmlParsingService,
-  val temporaryFileCreator: TemporaryFileCreator
+  val preMaterialisedFutureProvider: PreMaterialisedFutureProvider
 )(implicit
   val materializer: Materializer,
-  clock: Clock
+  clock: Clock,
+  val temporaryFileCreator: TemporaryFileCreator
 ) extends BackendController(cc)
     with StreamingParsers
-    with TemporaryFiles
     with ConvertError
     with MessageTypeHeaderExtractor {
 
   def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
-    Action.async(streamFromMemory) {
-      implicit request =>
-        withTemporaryFile {
-          (temporaryFile, source) =>
-            (for {
-              messageType <- extract(request.headers).asPresentation
-              messageData <- xmlParsingService.extractMessageData(source, messageType).asPresentation
-              fileSource = FileIO.fromPath(temporaryFile)
-              received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-              message <- factory
-                .create(
-                  messageType,
-                  messageData.generationDate,
-                  received,
-                  triggerId,
-                  fileSource
-                )
-                .asPresentation
-              _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
-            } yield message.id).fold[Result](
-              baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-              id => Ok(Json.toJson(UpdateMovementResponse(id)))
+    Action.streamWithAwait {
+      awaitFileWrite => implicit request =>
+        (for {
+          messageType <- extract(request.headers).asPresentation
+          messageData <- xmlParsingService.extractMessageData(request.body, messageType).asPresentation
+          _           <- awaitFileWrite
+          received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+          message <- factory
+            .create(
+              messageType,
+              messageData.generationDate,
+              received,
+              triggerId,
+              request.body
             )
-        }.toResult
+            .asPresentation
+          _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
+        } yield message.id).fold[Result](
+          baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+          id => Ok(Json.toJson(UpdateMovementResponse(id)))
+        )
     }
 
 }

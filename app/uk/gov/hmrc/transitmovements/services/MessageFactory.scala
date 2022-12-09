@@ -16,15 +16,12 @@
 
 package uk.gov.hmrc.transitmovements.services
 
-import akka.stream.IOResult
 import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
-
-import scala.concurrent.ExecutionContext.Implicits.global
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
@@ -35,6 +32,7 @@ import java.security.SecureRandom
 import java.time.Clock
 import java.time.OffsetDateTime
 import javax.inject.Inject
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
@@ -46,7 +44,7 @@ trait MessageFactory {
     generationDate: OffsetDateTime,
     received: OffsetDateTime,
     triggerId: Option[MessageId],
-    tempFile: Source[ByteString, Future[IOResult]]
+    tempFile: Source[ByteString, _]
   ): EitherT[Future, StreamError, Message]
 }
 
@@ -62,9 +60,9 @@ class MessageFactoryImpl @Inject() (
     generationDate: OffsetDateTime,
     received: OffsetDateTime,
     triggerId: Option[MessageId],
-    tempFile: Source[ByteString, Future[IOResult]]
+    source: Source[ByteString, _]
   ): EitherT[Future, StreamError, Message] =
-    getMessageBody(tempFile).map {
+    getMessageBody(source).map {
       message =>
         Message(
           id = MessageId(ShortUUID.next(clock, random)),
@@ -77,7 +75,7 @@ class MessageFactoryImpl @Inject() (
         )
     }
 
-  private def getMessageBody(tempFile: Source[ByteString, Future[IOResult]]): EitherT[Future, StreamError, String] =
+  private def getMessageBody(tempFile: Source[ByteString, _]): EitherT[Future, StreamError, String] =
     EitherT {
       tempFile
         .fold("")(
