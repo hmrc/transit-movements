@@ -16,12 +16,11 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-sealed abstract class MovementType(val value: String) extends Product with Serializable
+sealed abstract class MovementType(val value: String, val urlFragment: String)
 
 object MovementType {
-  case object Arrival   extends MovementType("arrival")
-  case object Departure extends MovementType("departure")
+  case object Departure extends MovementType("departure", "departures")
+  case object Arrival   extends MovementType("arrival", "arrivals")
 
   lazy val movementTypes: Set[MovementType] = Set(Arrival, Departure)
-
 }
