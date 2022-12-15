@@ -23,6 +23,7 @@ import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
 import com.mongodb.client.model.Filters.{gte => mGte}
+import com.mongodb.client.model.Filters.empty
 import com.mongodb.client.model.Updates.{push => mPush}
 import com.mongodb.client.model.Updates.{set => mSet}
 import com.mongodb.client.model.Updates.{combine => mCombine}
@@ -87,7 +88,8 @@ trait MovementsRepository {
   def getMovements(
     eoriNumber: EORINumber,
     movementType: MovementType,
-    updatedSince: Option[OffsetDateTime]
+    updatedSince: Option[OffsetDateTime],
+    movementEORI: Option[EORINumber]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]]
 
   def updateMessages(
@@ -122,7 +124,8 @@ class MovementsRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.messageFormat),
         Codecs.playFormatCodec(MongoFormats.movementIdFormat),
         Codecs.playFormatCodec(MongoFormats.mrnFormat),
-        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat)
+        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
+        Codecs.playFormatCodec(MongoFormats.eoriNumberFormat)
       )
     )
     with MovementsRepository
@@ -248,13 +251,16 @@ class MovementsRepositoryImpl @Inject() (
   def getMovements(
     eoriNumber: EORINumber,
     movementType: MovementType,
-    updatedSince: Option[OffsetDateTime]
+    updatedSince: Option[OffsetDateTime],
+    movementEORI: Option[EORINumber]
   ): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]] = {
     val selector: Bson = mAnd(
       mEq("enrollmentEORINumber", eoriNumber.value),
       mEq("movementType", movementType.value),
-      mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME))
+      mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
+      movementEORIFilter(movementEORI)
     )
+
     val projection = MovementWithoutMessages.projection
 
     val aggregates = Seq(
@@ -276,6 +282,12 @@ class MovementsRepositoryImpl @Inject() (
     })
 
   }
+
+  private def movementEORIFilter(movementEORI: Option[EORINumber]): Bson =
+    movementEORI match {
+      case Some(movementEORI) => mAnd(mEq("movementEORINumber", movementEORI.value))
+      case _                  => empty()
+    }
 
   def updateMessages(
     movementId: MovementId,

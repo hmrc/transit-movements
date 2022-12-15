@@ -29,11 +29,7 @@ import play.api.mvc.Result
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.ArrivalNotificationResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
@@ -41,7 +37,6 @@ import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MovementFactory
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 import uk.gov.hmrc.transitmovements.utils.PreMaterialisedFutureProvider
-
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -81,18 +76,19 @@ class ArrivalsController @Inject() (
       )
   }
 
-  def getArrivalsForEori(eoriNumber: EORINumber, updatedSince: Option[OffsetDateTime] = None): Action[AnyContent] = Action.async {
-    repo
-      .getMovements(eoriNumber, MovementType.Arrival, updatedSince)
-      .asPresentation
-      .fold[Result](
-        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        {
-          case Some(message) => Ok(Json.toJson(message))
-          case None          => NotFound
-        }
-      )
-  }
+  def getArrivalsForEori(eoriNumber: EORINumber, updatedSince: Option[OffsetDateTime] = None, movementEORI: Option[EORINumber] = None): Action[AnyContent] =
+    Action.async {
+      repo
+        .getMovements(eoriNumber, MovementType.Arrival, updatedSince, movementEORI)
+        .asPresentation
+        .fold[Result](
+          baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+          {
+            case Some(message) => Ok(Json.toJson(message))
+            case None          => NotFound
+          }
+        )
+    }
 
   def getArrivalMessages(eoriNumber: EORINumber, movementId: MovementId, receivedSince: Option[OffsetDateTime] = None) = Action.async {
     repo
@@ -132,4 +128,5 @@ class ArrivalsController @Inject() (
         }
       )
   }
+
 }

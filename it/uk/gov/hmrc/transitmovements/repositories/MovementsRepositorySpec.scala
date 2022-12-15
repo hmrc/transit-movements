@@ -183,9 +183,9 @@ class MovementsRepositorySpec
   }
 
   "getDepartures" should
-    "return a list of movement responses for the supplied EORI sorted by last updated, latest first" in {
+    "return a list of departure movement responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()
-      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None).value)
+      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None).value)
 
       result.right.get.value should be(
         NonEmptyList(
@@ -195,11 +195,37 @@ class MovementsRepositorySpec
       )
     }
 
-  it should "return a list of movement responses for the supplied EORI if there are movements that were updated since the given time" in {
+  it should "return a list of departure movement responses for the supplied EORI if there are movements that were updated since the given time" in {
     val dateTime = instant
     GetMovementsSetup.setup()
     await(repository.insert(GetMovementsSetup.departureGB3).value)
-    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime)).value)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime), None).value)
+
+    result.right.get.value should be(
+      NonEmptyList(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
+        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1))
+      )
+    )
+  }
+
+  it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed movementEORI" in {
+    GetMovementsSetup.setup()
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, Some(GetMovementsSetup.movementEORI)).value)
+
+    result.right.get.value should be(
+      NonEmptyList(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
+        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1))
+      )
+    )
+  }
+
+  it should "return a list of departure movement responses for the supplied EORI if there are movements that were updated since the given time and passed movementEORI" in {
+    val dateTime = instant
+    GetMovementsSetup.setup()
+    await(repository.insert(GetMovementsSetup.departureGB3).value)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime), Some(GetMovementsSetup.movementEORI)).value)
 
     result.right.get.value should be(
       NonEmptyList(
@@ -211,21 +237,21 @@ class MovementsRepositorySpec
 
   it should "return no movement ids for an EORI that doesn't exist" in {
     GetMovementsSetup.setup()
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None).value)
 
     result.right.get should be(None)
   }
 
   it should "return no movement ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None).value)
     result.right.get should be(None)
   }
 
   "getArrivals" should
-    "return a list of arrival responses for the supplied EORI sorted by last updated, latest first" in {
+    "return a list of an arrival responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()
-      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None).value)
+      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None).value)
 
       result.right.get.value should be(
         NonEmptyList(
@@ -235,11 +261,37 @@ class MovementsRepositorySpec
       )
     }
 
-  it should "return a list of movement responses for the supplied EORI if there are movements that were updated since the given time" in {
+  it should "return a list of an arrival movement responses for the supplied EORI if there are movements that were updated since the given time" in {
     val dateTime = instant
     GetMovementsSetup.setup()
     await(repository.insert(GetMovementsSetup.arrivalGB3).value)
-    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime)).value)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), None).value)
+
+    result.right.get.value should be(
+      NonEmptyList(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
+        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1))
+      )
+    )
+  }
+
+  it should "return a list of an arrival movement responses for the supplied EORI if there are movements that matched with passed movementEORI" in {
+    GetMovementsSetup.setup()
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, Some(GetMovementsSetup.movementEORI)).value)
+
+    result.right.get.value should be(
+      NonEmptyList(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
+        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1))
+      )
+    )
+  }
+
+  it should "return a list of an arrival movement responses for the supplied EORI if there are movements that were updated since the given time and passed movementEORI" in {
+    val dateTime = instant
+    GetMovementsSetup.setup()
+    await(repository.insert(GetMovementsSetup.arrivalGB3).value)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), Some(GetMovementsSetup.movementEORI)).value)
 
     result.right.get.value should be(
       NonEmptyList(
@@ -251,26 +303,28 @@ class MovementsRepositorySpec
 
   it should "return no arrival ids for an EORI that doesn't exist" in {
     GetMovementsSetup.setup()
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None).value)
 
     result.right.get should be(None)
   }
 
   it should "return no arrival ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None).value)
     result.right.get should be(None)
   }
 
   object GetMovementsSetup {
 
-    val eoriGB  = arbitrary[EORINumber].sample.value
-    val eoriXI  = arbitrary[EORINumber].sample.value
-    val message = arbitrary[Message].sample.value
+    val eoriGB       = arbitrary[EORINumber].sample.value
+    val eoriXI       = arbitrary[EORINumber].sample.value
+    val movementEORI = arbitrary[EORINumber].sample.value
+    val message      = arbitrary[Message].sample.value
 
     val departureGB1 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
+        movementEORINumber = movementEORI,
         movementType = MovementType.Departure,
         created = instant,
         updated = instant,
@@ -280,6 +334,7 @@ class MovementsRepositorySpec
     val arrivalGB1 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
+        movementEORINumber = movementEORI,
         movementType = MovementType.Arrival,
         created = instant,
         updated = instant,
@@ -289,14 +344,25 @@ class MovementsRepositorySpec
     val mrnGen = arbitrary[MovementReferenceNumber]
 
     val departureXi1 =
-      arbitrary[Movement].sample.value.copy(enrollmentEORINumber = eoriXI, updated = instant.plusMinutes(1), movementReferenceNumber = mrnGen.sample)
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriXI,
+        movementEORINumber = movementEORI,
+        updated = instant.plusMinutes(1),
+        movementReferenceNumber = mrnGen.sample
+      )
 
     val departureXi2 =
-      arbitrary[Movement].sample.value.copy(enrollmentEORINumber = eoriXI, updated = instant.minusMinutes(3), movementReferenceNumber = mrnGen.sample)
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriXI,
+        movementEORINumber = movementEORI,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = mrnGen.sample
+      )
 
     val departureGB2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
+        movementEORINumber = movementEORI,
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample
@@ -305,6 +371,7 @@ class MovementsRepositorySpec
     val departureGB3 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
+        movementEORINumber = movementEORI,
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
@@ -313,6 +380,7 @@ class MovementsRepositorySpec
     val arrivalGB2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
+        movementEORINumber = movementEORI,
         movementType = MovementType.Arrival,
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample
@@ -321,6 +389,7 @@ class MovementsRepositorySpec
     val arrivalGB3 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
+        movementEORINumber = movementEORI,
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
