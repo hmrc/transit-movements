@@ -35,8 +35,7 @@ import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
-import uk.gov.hmrc.transitmovements.models.responses.ArrivalNotificationResponse
-import uk.gov.hmrc.transitmovements.models.responses.DeclarationResponse
+import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
@@ -85,7 +84,7 @@ class MovementsController @Inject() (
         message <- messageFactory.create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body).asPresentation
         movement = movementFactory.createArrival(eori, MovementType.Arrival, arrivalData, message, received, received)
         _ <- repo.insert(movement).asPresentation
-      } yield ArrivalNotificationResponse(movement._id, movement.messages.head.id)).fold[Result](
+      } yield MovementResponse(movement._id, movement.messages.head.id)).fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         response => Ok(Json.toJson(response))
       )
@@ -100,7 +99,7 @@ class MovementsController @Inject() (
         message <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body).asPresentation
         movement = movementFactory.createDeparture(eori, MovementType.Departure, declarationData, message, received, received)
         _ <- repo.insert(movement).asPresentation
-      } yield DeclarationResponse(movement._id, movement.messages.head.id)).fold[Result](
+      } yield MovementResponse(movement._id, movement.messages.head.id)).fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         response => Ok(Json.toJson(response))
       )
