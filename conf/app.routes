@@ -2,7 +2,7 @@
 
 POST       /traders/:EORI/movements/departures                                      uk.gov.hmrc.transitmovements.controllers.DeparturesController.createDeparture(EORI: EORINumber)
 
-GET        /traders/:EORI/movements                                                 uk.gov.hmrc.transitmovements.controllers.DeparturesController.getDeparturesForEori(EORI: EORINumber, updatedSince: Option[OffsetDateTime] ?= None)
+GET        /traders/:EORI/movements                                                 uk.gov.hmrc.transitmovements.controllers.DeparturesController.getDeparturesForEori(EORI: EORINumber, updatedSince: Option[OffsetDateTime] ?= None, movementEORI: Option[EORINumber] ?= None)
 
 GET        /traders/:EORI/movements/departures/:movementId                         uk.gov.hmrc.transitmovements.controllers.DeparturesController.getDepartureWithoutMessages(EORI: EORINumber, movementId: MovementId)
 
@@ -14,7 +14,7 @@ POST       /traders/movements/:movementId/messages                              
 
 POST       /traders/:EORI/movements/arrivals                                        uk.gov.hmrc.transitmovements.controllers.ArrivalsController.createArrival(EORI: EORINumber)
 
-GET       /traders/:EORI/movements/arrivals                                        uk.gov.hmrc.transitmovements.controllers.ArrivalsController.getArrivalsForEori(EORI: EORINumber, updatedSince: Option[OffsetDateTime] ?= None)
+GET       /traders/:EORI/movements/arrivals                                        uk.gov.hmrc.transitmovements.controllers.ArrivalsController.getArrivalsForEori(EORI: EORINumber, updatedSince: Option[OffsetDateTime] ?= None, movementEORI: Option[EORINumber] ?= None)
 
 GET        /traders/:EORI/movements/arrivals/:movementId/messages                uk.gov.hmrc.transitmovements.controllers.ArrivalsController.getArrivalMessages(EORI: EORINumber, movementId: MovementId, receivedSince: Option[OffsetDateTime] ?= None)
 
