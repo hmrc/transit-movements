@@ -23,30 +23,18 @@ import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import play.api.Application
-import play.api.Logging
+import play.api.{Application, Logging}
 import play.api.inject.guice.GuiceApplicationBuilder
-import play.api.test.DefaultAwaitTimeout
-import play.api.test.FutureAwaits
+import play.api.test.{DefaultAwaitTimeout, FutureAwaits}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.Movement
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.MovementType
-import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
+import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
-import java.time.Clock
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
+import java.time.{OffsetDateTime, ZoneOffset}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class MovementsRepositorySpec
@@ -211,6 +199,7 @@ class MovementsRepositorySpec
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed movementEORI" in {
     GetMovementsSetup.setup()
+    await(repository.insert(GetMovementsSetup.departureGB4).value)
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, Some(GetMovementsSetup.movementEORI)).value)
 
     result.right.get.value should be(
@@ -277,6 +266,7 @@ class MovementsRepositorySpec
 
   it should "return a list of an arrival movement responses for the supplied EORI if there are movements that matched with passed movementEORI" in {
     GetMovementsSetup.setup()
+    await(repository.insert(GetMovementsSetup.arrivalGB4).value)
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, Some(GetMovementsSetup.movementEORI)).value)
 
     result.right.get.value should be(
@@ -377,6 +367,15 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
+    val departureGB4 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = EORINumber("1234AB"),
+        movementType = MovementType.Departure,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = mrnGen.sample
+      )
+
     val arrivalGB2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
@@ -390,6 +389,15 @@ class MovementsRepositorySpec
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = movementEORI,
+        movementType = MovementType.Arrival,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = mrnGen.sample
+      )
+
+    val arrivalGB4 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = EORINumber("1234AB"),
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
