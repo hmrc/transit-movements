@@ -129,9 +129,14 @@ class MovementsController @Inject() (
         )
     }
 
-  def getMovementsForEori(eoriNumber: EORINumber, movementType: MovementType, updatedSince: Option[OffsetDateTime] = None): Action[AnyContent] = Action.async {
+  def getMovementsForEori(
+    eoriNumber: EORINumber,
+    movementType: MovementType,
+    updatedSince: Option[OffsetDateTime] = None,
+    movementEORI: Option[EORINumber] = None
+  ): Action[AnyContent] = Action.async {
     repo
-      .getMovements(eoriNumber, movementType, updatedSince)
+      .getMovements(eoriNumber, movementType, updatedSince, movementEORI)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
@@ -168,7 +173,12 @@ class MovementsController @Inject() (
       )
   }
 
-  def getMessages(eoriNumber: EORINumber, movementType: MovementType, movementId: MovementId, receivedSince: Option[OffsetDateTime] = None) =
+  def getMessages(
+    eoriNumber: EORINumber,
+    movementType: MovementType,
+    movementId: MovementId,
+    receivedSince: Option[OffsetDateTime] = None
+  ) =
     Action.async {
       repo
         .getMessages(eoriNumber, movementId, movementType, receivedSince)

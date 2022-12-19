@@ -2,7 +2,7 @@
 
 POST       /traders/:EORI/movements/:movementType                                      uk.gov.hmrc.transitmovements.controllers.MovementsController.createMovement(EORI: EORINumber, movementType: MovementType)
 
-GET        /traders/:EORI/movements/:movementType                                 uk.gov.hmrc.transitmovements.controllers.MovementsController.getMovementsForEori(EORI: EORINumber, movementType: MovementType, updatedSince: Option[OffsetDateTime] ?= None)
+GET        /traders/:EORI/movements/:movementType                                 uk.gov.hmrc.transitmovements.controllers.MovementsController.getMovementsForEori(EORI: EORINumber, movementType: MovementType, updatedSince: Option[OffsetDateTime] ?= None, movementEORI: Option[EORINumber] ?= None)
 
 GET        /traders/:EORI/movements/:movementType/:movementId                         uk.gov.hmrc.transitmovements.controllers.MovementsController.getMovementWithoutMessages(EORI: EORINumber, movementType: MovementType, movementId: MovementId)
 
@@ -11,5 +11,3 @@ GET        /traders/:EORI/movements/:movementType/:movementId/messages          
 GET        /traders/:EORI/movements/:movementType/:movementId/messages/:messageId     uk.gov.hmrc.transitmovements.controllers.MovementsController.getMessage(EORI: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId)
 
 POST       /traders/movements/:movementId/messages                                 uk.gov.hmrc.transitmovements.controllers.MovementsController.updateMovement(movementId: MovementId, triggerId: Option[MessageId] ?= None)
-
-
