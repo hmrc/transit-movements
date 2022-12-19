@@ -83,12 +83,15 @@ object MessageType {
   /** E_PRE_NOT (IE170) */
   case object PresentationNotification extends DepartureRequestMessageType("IE170", "CC170C", "/xsd/CC170C.xsd")
 
+  case object InformationAboutNonArrivedMovement extends DepartureRequestMessageType("IE141", "CC141C", "/xsd/CC141C.xsd")
+
   val departureRequestValues = Set(
     DeclarationAmendment,
     DeclarationInvalidation,
     DeclarationData,
     RequestOfRelease,
-    PresentationNotification
+    PresentationNotification,
+    InformationAboutNonArrivedMovement
   )
 
   // ********************
@@ -137,6 +140,8 @@ object MessageType {
   /** E_REC_NOT (IE035) */
   case object RecoveryNotification extends DepartureResponseMessageType("IE035", "CC035C", "/xsd/CC035C.xsd")
 
+  case object RequestOnNonArrivedMovement extends DepartureResponseMessageType("IE140", "CC140C", "/xsd/CC140C.xsd")
+
   val departureResponseValues = Set(
     AmendmentAcceptance,
     DepartureOfficeRejection,
@@ -151,7 +156,8 @@ object MessageType {
     ControlDecisionNotification,
     NotificationToAmend,
     IncidentNotification,
-    RecoveryNotification
+    RecoveryNotification,
+    RequestOnNonArrivedMovement
   )
 
   val departureValues = departureRequestValues ++ departureResponseValues
@@ -165,8 +171,6 @@ object MessageType {
 
   /** E_PRE_NOT (IE170) */
   case object UnloadingRemarks extends ArrivalRequestMessageType("IE044", "CC044C", "/xsd/CC044C.xsd")
-
-  case object InformationAboutNonArrivedMovement extends ArrivalRequestMessageType("IE141", "CC141C", "/xsd/CC141C.xsd")
 
   val arrivalRequestValues = Set(
     ArrivalNotification,
@@ -187,13 +191,10 @@ object MessageType {
   /** E_ULD_PER (IE025) */
   case object UnloadingPermission extends ArrivalResponseMessageType("IE043", "CC043C", "/xsd/CC043C.xsd")
 
-  case object RequestOnNonArrivedMovement extends ArrivalResponseMessageType("IE140", "CC140C", "/xsd/CC140C.xsd")
-
   val arrivalResponseValues = Set(
     DestinationOfficeRejection,
     GoodsReleaseNotification,
-    UnloadingPermission,
-    RequestOnNonArrivedMovement
+    UnloadingPermission
   )
 
   val arrivalValues = arrivalRequestValues ++ arrivalResponseValues
