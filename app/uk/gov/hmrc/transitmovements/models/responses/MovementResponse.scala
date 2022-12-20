@@ -22,8 +22,8 @@ import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 
-object ArrivalNotificationResponse extends PresentationFormats {
-  implicit val arrivalNotificationResponseFormat: OFormat[ArrivalNotificationResponse] = Json.format[ArrivalNotificationResponse]
+object MovementResponse extends PresentationFormats {
+  implicit val movementResponseFormat: OFormat[MovementResponse] = Json.format[MovementResponse]
 }
 
-case class ArrivalNotificationResponse(arrivalId: MovementId, messageId: MessageId)
+case class MovementResponse(movementId: MovementId, messageId: MessageId)

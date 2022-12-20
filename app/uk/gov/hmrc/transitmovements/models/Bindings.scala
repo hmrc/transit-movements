@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import play.api.mvc.PathBindable
 import play.api.mvc.QueryStringBindable
 
 import java.time.OffsetDateTime
@@ -32,4 +33,15 @@ object Bindings {
     )
   }
 
+  implicit def pathBinder(implicit binder: PathBindable[String]): PathBindable[MovementType] = new PathBindable[MovementType] {
+
+    override def bind(key: String, value: String): Either[String, MovementType] =
+      for {
+        urlFragment  <- binder.bind(key, value).right
+        movementType <- MovementType.movementTypes.find(_.urlFragment == urlFragment).toRight("Invalid movement type").right
+      } yield movementType
+
+    override def unbind(key: String, movementType: MovementType): String =
+      movementType.urlFragment
+  }
 }
