@@ -41,7 +41,7 @@ lazy val scalacSettings = Def.settings(
       opts.filterNot(Set("-Ywarn-dead-code"))
   },
   // Disable warnings arising from generated routing code
-  scalacOptions += "-Wconf:src=routes/.*:silent"
+  scalacOptions += "-Wconf:src=routes/.*:s"
 )
 
 // Scoverage exclusions and minimums
