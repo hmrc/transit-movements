@@ -10,7 +10,7 @@ lazy val microservice = Project(appName, file("."))
   .disablePlugins(JUnitXmlReportPlugin) //Required to prevent https://github.com/scalatest/scalatest/issues/1427
   .settings(
     majorVersion := 0,
-    scalaVersion := "2.12.15",
+    scalaVersion := "2.13.8",
     libraryDependencies ++= AppDependencies.compile ++ AppDependencies.test,
     PlayKeys.playDefaultPort := 9520,
     // Import models by default in route files
@@ -41,7 +41,7 @@ lazy val scalacSettings = Def.settings(
       opts.filterNot(Set("-Ywarn-dead-code"))
   },
   // Disable warnings arising from generated routing code
-  scalacOptions += "-Wconf:src=routes/.*:silent"
+  scalacOptions += "-Wconf:src=routes/.*:s"
 )
 
 // Scoverage exclusions and minimums
