@@ -70,10 +70,12 @@ class MovementsController @Inject() (
     with MessageTypeHeaderExtractor
     with PresentationFormats {
 
-  def createMovement(eori: EORINumber, movementType: MovementType): Action[Source[ByteString, _]] = movementType match {
-    case MovementType.Arrival   => createArrival(eori)
-    case MovementType.Departure => createDeparture(eori)
-  }
+  def createMovement(eori: EORINumber, movementType: MovementType): Action[Source[ByteString, _]] =
+    // Determine whether this is for a large or small message then route
+    movementType match {
+      case MovementType.Arrival   => createArrival(eori)
+      case MovementType.Departure => createDeparture(eori)
+    }
 
   private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithAwait {
     awaitFileWrite => implicit request =>
@@ -84,7 +86,7 @@ class MovementsController @Inject() (
         message <- messageFactory.create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body).asPresentation
         movement = movementFactory.createArrival(eori, MovementType.Arrival, arrivalData, message, received, received)
         _ <- repo.insert(movement).asPresentation
-      } yield MovementResponse(movement._id, movement.messages.head.id)).fold[Result](
+      } yield MovementResponse(movement._id, Some(movement.messages.get.head.id))).fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         response => Ok(Json.toJson(response))
       )
@@ -99,10 +101,22 @@ class MovementsController @Inject() (
         message <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body).asPresentation
         movement = movementFactory.createDeparture(eori, MovementType.Departure, declarationData, message, received, received)
         _ <- repo.insert(movement).asPresentation
-      } yield MovementResponse(movement._id, movement.messages.head.id)).fold[Result](
+      } yield MovementResponse(movement._id, Some(movement.messages.get.head.id))).fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         response => Ok(Json.toJson(response))
       )
+  }
+
+  private def createEmptyMovement(eori: EORINumber, movementType: MovementType) = {
+    val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+    val movement = movementFactory.createEmptyMovement(eori, movementType, received, received)
+
+    (for {
+      _ <- repo.insert(movement).asPresentation
+    } yield MovementResponse(movement._id, None)).fold[Result](
+      baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+      response => Ok(Json.toJson(response))
+    )
   }
 
   def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =

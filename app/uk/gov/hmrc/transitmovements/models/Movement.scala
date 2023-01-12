@@ -24,9 +24,9 @@ case class Movement(
   _id: MovementId,
   movementType: MovementType,
   enrollmentEORINumber: EORINumber,
-  movementEORINumber: EORINumber,
+  movementEORINumber: Option[EORINumber],
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
   created: OffsetDateTime,
   updated: OffsetDateTime,
-  messages: NonEmptyList[Message]
+  messages: Option[NonEmptyList[Message]]
 )

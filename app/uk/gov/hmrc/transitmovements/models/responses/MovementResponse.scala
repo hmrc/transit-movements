@@ -26,4 +26,4 @@ object MovementResponse extends PresentationFormats {
   implicit val movementResponseFormat: OFormat[MovementResponse] = Json.format[MovementResponse]
 }
 
-case class MovementResponse(movementId: MovementId, messageId: MessageId)
+case class MovementResponse(movementId: MovementId, messageId: Option[MessageId])

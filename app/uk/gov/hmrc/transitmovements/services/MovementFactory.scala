@@ -54,6 +54,8 @@ trait MovementFactory {
     updated: OffsetDateTime
   ): Movement
 
+  def createEmptyMovement(eori: EORINumber, movementType: MovementType, created: OffsetDateTime, updated: OffsetDateTime): Movement
+
 }
 
 class MovementFactoryImpl @Inject() (
@@ -75,7 +77,7 @@ class MovementFactoryImpl @Inject() (
       _id = MovementId(ShortUUID.next(clock, random)),
       enrollmentEORINumber = eori,
       movementType = movementType,
-      movementEORINumber = declarationData.movementEoriNumber,
+      movementEORINumber = Some(declarationData.movementEoriNumber),
       movementReferenceNumber = None,
       created = created,
       updated = updated,
@@ -94,11 +96,22 @@ class MovementFactoryImpl @Inject() (
       _id = MovementId(ShortUUID.next(clock, random)),
       enrollmentEORINumber = eori,
       movementType = movementType,
-      movementEORINumber = arrivalData.movementEoriNumber,
+      movementEORINumber = Some(arrivalData.movementEoriNumber),
       movementReferenceNumber = Some(arrivalData.mrn),
       created = created,
       updated = updated,
       messages = NonEmptyList.one(message)
     )
 
+  def createEmptyMovement(eori: EORINumber, movementType: MovementType, created: OffsetDateTime, updated: OffsetDateTime): Movement =
+    Movement(
+      _id = MovementId(ShortUUID.next(clock, random)),
+      enrollmentEORINumber = eori,
+      movementType = movementType,
+      movementEORINumber = None,
+      movementReferenceNumber = None,
+      created = created,
+      updated = updated,
+      messages = None
+    )
 }
