@@ -108,7 +108,7 @@ trait ModelGenerators extends BaseGenerators {
         movementReferenceNumber <- arbitrary[Option[MovementReferenceNumber]]
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
-        messages                <- nonEmptyListOfMaxLength[Message](2)
-      } yield Movement(id, movementType, eori, eori, movementReferenceNumber, created, updated, messages)
+        messages                <- arbitrary[Vector[Message]]
+      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, created, updated, messages)
     }
 }

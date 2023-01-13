@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import cats.data.NonEmptyList
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsString
@@ -34,11 +33,11 @@ class MovementSpec extends AnyFlatSpec with Matchers with PresentationFormats {
       MovementId("1"),
       MovementType.Departure,
       EORINumber("222"),
-      EORINumber("223"),
+      Some(EORINumber("223")),
       Some(MovementReferenceNumber("333")),
       OffsetDateTime.now(),
       OffsetDateTime.now(),
-      NonEmptyList.one(
+      Vector(
         Message(
           id = MessageId("999"),
           received = OffsetDateTime.now(),
@@ -55,6 +54,7 @@ class MovementSpec extends AnyFlatSpec with Matchers with PresentationFormats {
 
     (result \ "_id").get should be(JsString("1"))
     (result \ "movementEORINumber").get should be(JsString("223"))
-    (result \ "movementReferenceNumber").get should be(JsString("333"))
+    (result \ "movementEORINumber").get should be(JsString("223"))
+    (result \ "messages" \\ "id").head should be(JsString("999"))
   }
 }

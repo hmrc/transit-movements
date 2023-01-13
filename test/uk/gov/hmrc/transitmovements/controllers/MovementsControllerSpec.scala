@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -112,10 +112,10 @@ class MovementsControllerSpec
   lazy val movement = arbitrary[Movement].sample.value.copy(
     _id = movementId,
     enrollmentEORINumber = eoriNumber,
-    movementEORINumber = eoriNumber,
+    movementEORINumber = Some(eoriNumber),
     created = now,
     updated = now,
-    messages = NonEmptyList.one(message)
+    messages = Vector(message)
   )
 
   val now = OffsetDateTime.now

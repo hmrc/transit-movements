@@ -122,13 +122,10 @@ class MovementsRepositorySpec
 
   "getMessages" should "return message responses if there are messages" in {
     val messages =
-      NonEmptyList
-        .fromList(
-          List(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value)
-            .sortBy(_.received)
-            .reverse
-        )
-        .value
+      Vector(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value)
+        .sortBy(_.received)
+        .reverse
+
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
@@ -145,15 +142,11 @@ class MovementsRepositorySpec
     val dateTime = arbitrary[OffsetDateTime].sample.value
 
     val messages =
-      NonEmptyList
-        .fromList(
-          List(
-            arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1)),
-            arbitraryMessage.arbitrary.sample.value.copy(received = dateTime),
-            arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1))
-          )
-        )
-        .value
+      Vector(
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1)),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1))
+      )
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
@@ -317,21 +310,21 @@ class MovementsRepositorySpec
     val departureGB1 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
         created = instant,
         updated = instant,
-        messages = NonEmptyList(message, List.empty)
+        messages = Vector(message)
       )
 
     val arrivalGB1 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
         created = instant,
         updated = instant,
-        messages = NonEmptyList(message, List.empty)
+        messages = Vector(message)
       )
 
     val mrnGen = arbitrary[MovementReferenceNumber]
@@ -339,7 +332,7 @@ class MovementsRepositorySpec
     val departureXi1 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriXI,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample
       )
@@ -347,7 +340,7 @@ class MovementsRepositorySpec
     val departureXi2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriXI,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
       )
@@ -355,7 +348,7 @@ class MovementsRepositorySpec
     val departureGB2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample
@@ -364,7 +357,7 @@ class MovementsRepositorySpec
     val departureGB3 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
@@ -373,7 +366,7 @@ class MovementsRepositorySpec
     val departureGB4 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = EORINumber("1234AB"),
+        movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
@@ -382,7 +375,7 @@ class MovementsRepositorySpec
     val arrivalGB2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample
@@ -391,7 +384,7 @@ class MovementsRepositorySpec
     val arrivalGB3 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
@@ -400,7 +393,7 @@ class MovementsRepositorySpec
     val arrivalGB4 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = EORINumber("1234AB"),
+        movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
@@ -430,7 +423,7 @@ class MovementsRepositorySpec
           _id = departureID,
           created = instant,
           updated = instant,
-          messages = NonEmptyList(message1, List.empty)
+          messages = Vector(message1)
         )
 
     await(
@@ -474,7 +467,7 @@ class MovementsRepositorySpec
           created = instant,
           updated = instant,
           movementReferenceNumber = None,
-          messages = NonEmptyList(message1, List.empty)
+          messages = Vector(message1)
         )
 
     await(

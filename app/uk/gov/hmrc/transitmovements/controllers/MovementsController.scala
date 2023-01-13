@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +49,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
+import scala.concurrent.Future
 
 @Singleton
 class MovementsController @Inject() (
@@ -68,13 +69,17 @@ class MovementsController @Inject() (
     with StreamingParsers
     with ConvertError
     with MessageTypeHeaderExtractor
-    with PresentationFormats {
+    with PresentationFormats
+    with ContentTypeRouting {
 
-  def createMovement(eori: EORINumber, movementType: MovementType): Action[Source[ByteString, _]] =
-    // Determine whether this is for a large or small message then route
-    movementType match {
-      case MovementType.Arrival   => createArrival(eori)
-      case MovementType.Departure => createDeparture(eori)
+  def createMovement(eori: EORINumber, movementType: MovementType) =
+    contentTypeRoute {
+      case Some(_) =>
+        movementType match {
+          case MovementType.Arrival   => createArrival(eori)
+          case MovementType.Departure => createDeparture(eori)
+        }
+      case None => createEmptyMovement(eori, movementType)
     }
 
   private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithAwait {
@@ -86,7 +91,7 @@ class MovementsController @Inject() (
         message <- messageFactory.create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body).asPresentation
         movement = movementFactory.createArrival(eori, MovementType.Arrival, arrivalData, message, received, received)
         _ <- repo.insert(movement).asPresentation
-      } yield MovementResponse(movement._id, Some(movement.messages.get.head.id))).fold[Result](
+      } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         response => Ok(Json.toJson(response))
       )
@@ -101,22 +106,23 @@ class MovementsController @Inject() (
         message <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body).asPresentation
         movement = movementFactory.createDeparture(eori, MovementType.Departure, declarationData, message, received, received)
         _ <- repo.insert(movement).asPresentation
-      } yield MovementResponse(movement._id, Some(movement.messages.get.head.id))).fold[Result](
+      } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         response => Ok(Json.toJson(response))
       )
   }
 
-  private def createEmptyMovement(eori: EORINumber, movementType: MovementType) = {
-    val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-    val movement = movementFactory.createEmptyMovement(eori, movementType, received, received)
+  private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = Action.async(parse.anyContent) {
+    implicit requet =>
+      val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+      val movement = movementFactory.createEmptyMovement(eori, movementType, received, received)
 
-    (for {
-      _ <- repo.insert(movement).asPresentation
-    } yield MovementResponse(movement._id, None)).fold[Result](
-      baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-      response => Ok(Json.toJson(response))
-    )
+      (for {
+        _ <- repo.insert(movement).asPresentation
+      } yield MovementResponse(movement._id, None)).fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        response => Ok(Json.toJson(response))
+      )
   }
 
   def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =

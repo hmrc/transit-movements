@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,8 @@ class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar 
     "for BadRequest" in testStandard(PresentationError.badRequestError, "bad request", "BAD_REQUEST")
 
     "for NotFound" in testStandard(PresentationError.notFoundError, "not found", "NOT_FOUND")
+
+    "for UnsupportedMediaType" in testStandard(PresentationError.unsupportedMediaTypeError, "unsupported media type", "UNSUPPORTED_MEDIA_TYPE")
 
     Seq(Some(new IllegalStateException("message")), None).foreach {
       exception =>

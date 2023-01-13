@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,8 +105,8 @@ trait ModelGenerators extends BaseGenerators {
         movementReferenceNumber <- arbitrary[Option[MovementReferenceNumber]]
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
-        messages                <- nonEmptyListOfMaxLength[Message](2)
-      } yield Movement(id, movementType, eori, eori, movementReferenceNumber, created, updated, messages)
+        messages                <- arbitrary[Vector[Message]]
+      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, created, updated, messages)
     }
 
   implicit lazy val arbitraryMessageResponse: Arbitrary[MessageResponse] =

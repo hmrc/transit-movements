@@ -57,7 +57,7 @@ class MovementFactoryImplSpec
         val departure =
           sut.createDeparture(enrollmentEori, MovementType.Departure, DeclarationData(movementEori, instant), message, instant, instant)
 
-        departure.messages.get.length mustBe 1
+        departure.messages.length mustBe 1
         departure.movementReferenceNumber mustBe None
         departure.enrollmentEORINumber mustBe enrollmentEori
         departure.movementEORINumber mustBe Some(movementEori)
@@ -73,7 +73,7 @@ class MovementFactoryImplSpec
         val arrival =
           sut.createArrival(enrollmentEori, MovementType.Arrival, ArrivalData(movementEori, instant, mrn), message, instant, instant)
 
-        arrival.messages.get.length mustBe 1
+        arrival.messages.length mustBe 1
         arrival.movementReferenceNumber mustBe Some(mrn)
         arrival.enrollmentEORINumber mustBe enrollmentEori
         arrival.movementEORINumber mustBe Some(movementEori)
