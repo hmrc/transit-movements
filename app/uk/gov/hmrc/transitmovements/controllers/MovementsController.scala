@@ -160,10 +160,7 @@ class MovementsController @Inject() (
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        {
-          case Some(message) => Ok(Json.toJson(message))
-          case None          => NotFound
-        }
+        movements => if (movements.isEmpty) NotFound else Ok(Json.toJson(movements))
       )
   }
 
@@ -205,10 +202,7 @@ class MovementsController @Inject() (
         .asPresentation
         .fold[Result](
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-          {
-            case Some(arrivalMessages) => Ok(Json.toJson(arrivalMessages))
-            case None                  => NotFound
-          }
+          messages => if (messages.isEmpty) NotFound else Ok(Json.toJson(messages))
         )
     }
 

@@ -18,7 +18,6 @@ package uk.gov.hmrc.transitmovements.repositories
 
 import akka.pattern.retry
 import cats.data.EitherT
-import cats.data.NonEmptyList
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
@@ -83,14 +82,14 @@ trait MovementsRepository {
     movementId: MovementId,
     movementType: MovementType,
     received: Option[OffsetDateTime]
-  ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]]
+  ): EitherT[Future, MongoError, Vector[MessageResponse]]
 
   def getMovements(
     eoriNumber: EORINumber,
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime],
     movementEORI: Option[EORINumber]
-  ): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]]
+  ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]]
 
   def updateMessages(
     movementId: MovementId,
@@ -180,7 +179,7 @@ class MovementsRepositoryImpl @Inject() (
     movementId: MovementId,
     movementType: MovementType,
     receivedSince: Option[OffsetDateTime]
-  ): EitherT[Future, MongoError, Option[NonEmptyList[MessageResponse]]] = {
+  ): EitherT[Future, MongoError, Vector[MessageResponse]] = {
 
     val projection = MessageResponse.projection
 
@@ -205,7 +204,7 @@ class MovementsRepositoryImpl @Inject() (
         obs
           .toFuture()
           .map(
-            response => Right(NonEmptyList.fromList(response.toList))
+            response => Right(response.toVector)
           )
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
@@ -253,7 +252,7 @@ class MovementsRepositoryImpl @Inject() (
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime],
     movementEORI: Option[EORINumber]
-  ): EitherT[Future, MongoError, Option[NonEmptyList[MovementWithoutMessages]]] = {
+  ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]] = {
     val selector: Bson = mAnd(
       mEq("enrollmentEORINumber", eoriNumber.value),
       mEq("movementType", movementType.value),
@@ -274,7 +273,7 @@ class MovementsRepositoryImpl @Inject() (
         obs
           .toFuture()
           .map(
-            response => Right(NonEmptyList.fromList(response.toList))
+            response => Right(response.toVector)
           )
 
       case Failure(NonFatal(ex)) =>
