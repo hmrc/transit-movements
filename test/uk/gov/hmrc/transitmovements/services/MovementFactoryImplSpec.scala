@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,10 +57,10 @@ class MovementFactoryImplSpec
         val departure =
           sut.createDeparture(enrollmentEori, MovementType.Departure, DeclarationData(movementEori, instant), message, instant, instant)
 
-        departure.messages.length mustBe 1
+        departure.messages.get.length mustBe 1
         departure.movementReferenceNumber mustBe None
         departure.enrollmentEORINumber mustBe enrollmentEori
-        departure.movementEORINumber mustBe movementEori
+        departure.movementEORINumber mustBe Some(movementEori)
         departure.messages.head mustBe message
     }
   }
@@ -73,10 +73,10 @@ class MovementFactoryImplSpec
         val arrival =
           sut.createArrival(enrollmentEori, MovementType.Arrival, ArrivalData(movementEori, instant, mrn), message, instant, instant)
 
-        arrival.messages.length mustBe 1
+        arrival.messages.get.length mustBe 1
         arrival.movementReferenceNumber mustBe Some(mrn)
         arrival.enrollmentEORINumber mustBe enrollmentEori
-        arrival.movementEORINumber mustBe movementEori
+        arrival.movementEORINumber mustBe Some(movementEori)
         arrival.messages.head mustBe message
     }
   }
