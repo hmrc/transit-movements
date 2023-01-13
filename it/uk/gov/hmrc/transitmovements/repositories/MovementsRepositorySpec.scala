@@ -82,6 +82,26 @@ class MovementsRepositorySpec
     firstItem._id.value should be(departure._id.value)
   }
 
+  "insert" should "add an empty movement to the database" in {
+
+    lazy val emptyMovement = arbitrary[Movement].sample.value.copy(
+      _id = MovementId("2"),
+      movementEORINumber = None,
+      movementReferenceNumber = None,
+      messages = Vector.empty[Message]
+    )
+
+    await(
+      repository.insert(emptyMovement).value
+    )
+
+    val firstItem = await {
+      repository.collection.find(Filters.eq("_id", emptyMovement._id.value)).first().toFuture()
+    }
+
+    firstItem._id.value should be(emptyMovement._id.value)
+  }
+
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists" in {
     val movement = arbitrary[Movement].sample.value
 

@@ -41,6 +41,7 @@ import play.api.http.Status.OK
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
+import play.api.mvc.AnyContentAsEmpty
 import play.api.mvc.Headers
 import play.api.mvc.Request
 import play.api.test.FakeHeaders
@@ -55,7 +56,6 @@ import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.Invali
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
 import uk.gov.hmrc.transitmovements.fakes.utils.FakePreMaterialisedFutureProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
@@ -75,6 +75,7 @@ import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.MovementFactory
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError.InsertNotAcknowledged
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
@@ -391,193 +392,6 @@ class MovementsControllerSpec
     }
   }
 
-  "createMovement - Arrival" - {
-
-    val validXml: NodeSeq =
-      <CC007C>
-        <messageSender>ABC123</messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <TraderAtDestination>
-          <identificationNumber>eori</identificationNumber>
-        </TraderAtDestination>
-        <TransitOperation>
-          <MRN>movement reerence number</MRN>
-        </TransitOperation>
-      </CC007C>
-
-    lazy val arrivalData = ArrivalData(eoriNumber, OffsetDateTime.now(ZoneId.of("UTC")), mrn)
-
-    lazy val arrivalDataEither: EitherT[Future, ParseError, ArrivalData] =
-      EitherT.rightT(arrivalData)
-
-    "must return OK if XML data extraction is successful" in {
-
-      val tempFile = SingletonTemporaryFileCreator.create()
-      when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
-
-      when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
-        .thenReturn(arrivalDataEither)
-
-      when(
-        mockMovementFactory.createArrival(
-          any[String].asInstanceOf[EORINumber],
-          any[String].asInstanceOf[MovementType],
-          any[ArrivalData],
-          any[Message],
-          any[OffsetDateTime],
-          any[OffsetDateTime]
-        )
-      )
-        .thenReturn(movement)
-
-      when(
-        mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]])
-      )
-        .thenReturn(messageFactoryEither)
-
-      when(mockRepository.insert(any()))
-        .thenReturn(EitherT.rightT(Right(())))
-
-      val request = fakeRequest(POST, validXml, Some(MessageType.ArrivalNotification.code))
-
-      val result =
-        controller.createMovement(eoriNumber, MovementType.Arrival)(request)
-
-      status(result) mustBe OK
-      contentAsJson(result) mustBe Json.obj(
-        "movementId" -> movementId.value,
-        "messageId"  -> messageId.value
-      )
-    }
-
-    "must return BAD_REQUEST when XML data extraction fails" - {
-
-      "contains message to indicate element not found" in {
-
-        val elementNotFoundXml: NodeSeq =
-          <CC007C></CC007C>
-
-        when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
-          .thenReturn(EitherT.leftT(ParseError.NoElementFound("messageSender")))
-
-        when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
-
-        val request = fakeRequest(POST, elementNotFoundXml, Some(MessageType.ArrivalNotification.code))
-
-        val result =
-          controller.createMovement(eoriNumber, MovementType.Arrival)(request)
-
-        status(result) mustBe BAD_REQUEST
-        contentAsJson(result) mustBe Json.obj(
-          "code"    -> "BAD_REQUEST",
-          "message" -> "Element messageSender not found"
-        )
-      }
-
-      "contains message to indicate too many elements found" in {
-
-        val tooManyFoundXml: NodeSeq =
-          <CC007C>
-            <messageSender>GB1234</messageSender>
-            <messageSender>XI1234</messageSender>
-          </CC007C>
-
-        when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
-          .thenReturn(EitherT.leftT(ParseError.TooManyElementsFound("messageSender")))
-
-        when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
-
-        val request = fakeRequest(POST, tooManyFoundXml, Some(MessageType.ArrivalNotification.code))
-
-        val result =
-          controller.createMovement(eoriNumber, MovementType.Arrival)(request)
-
-        status(result) mustBe BAD_REQUEST
-        contentAsJson(result) mustBe Json.obj(
-          "code"    -> "BAD_REQUEST",
-          "message" -> "Found too many elements of type messageSender"
-        )
-      }
-
-      "contains message to indicate date time failure" in {
-
-        val tooManyFoundXml: NodeSeq =
-          <CC007C>
-            <messageSender>GB1234</messageSender>
-            <preparationDateAndTime>no</preparationDateAndTime>
-          </CC007C>
-
-        val cs: CharSequence = "no"
-
-        when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
-          .thenReturn(
-            EitherT.leftT(
-              ParseError.BadDateTime("preparationDateAndTime", new DateTimeParseException("Text 'no' could not be parsed at index 0", cs, 0))
-            )
-          )
-
-        when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
-
-        val request = fakeRequest(POST, tooManyFoundXml, Some(MessageType.ArrivalNotification.code))
-
-        val result =
-          controller.createMovement(eoriNumber, MovementType.Arrival)(request)
-
-        status(result) mustBe BAD_REQUEST
-        contentAsJson(result) mustBe Json.obj(
-          "code"    -> "BAD_REQUEST",
-          "message" -> "Could not parse datetime for preparationDateAndTime: Text 'no' could not be parsed at index 0"
-        )
-      }
-    }
-
-    "must return INTERNAL_SERVICE_ERROR" - {
-
-      "when an invalid xml causes an unknown ParseError to be thrown" in {
-
-        val unknownErrorXml: String =
-          "<CC007C><messageSender>GB1234</messageSender>"
-
-        when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
-          .thenReturn(EitherT.leftT(ParseError.UnexpectedError(Some(new IllegalArgumentException()))))
-
-        when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
-
-        val request = FakeRequest(
-          method = POST,
-          uri = routes.MovementsController.createMovement(eoriNumber, MovementType.Arrival).url,
-          headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> MessageType.ArrivalNotification.code)),
-          body = unknownErrorXml
-        )
-
-        val result =
-          controller.createMovement(eoriNumber, MovementType.Arrival)(request)
-
-        //status(result) mustBe INTERNAL_SERVER_ERROR
-        contentAsJson(result) mustBe Json.obj(
-          "code"    -> "INTERNAL_SERVER_ERROR",
-          "message" -> "Internal server error"
-        )
-      }
-
-      "when file creation fails" in {
-
-        when(mockTemporaryFileCreator.create()).thenThrow(new Exception("File creation failed"))
-
-        val request = fakeRequest(POST, validXml, Some(MessageType.ArrivalNotification.code))
-
-        val result =
-          controller.createMovement(eoriNumber, MovementType.Arrival)(request)
-
-        status(result) mustBe INTERNAL_SERVER_ERROR
-        contentAsJson(result) mustBe Json.obj(
-          "code"    -> "INTERNAL_SERVER_ERROR",
-          "message" -> "Internal server error"
-        )
-      }
-    }
-  }
-
   "createMovement - Departure" - {
 
     val validXml: NodeSeq =
@@ -759,6 +573,74 @@ class MovementsControllerSpec
           "message" -> "Internal server error"
         )
       }
+    }
+  }
+
+  "createEmptyMovement" - {
+
+    lazy val emptyMovement = arbitrary[Movement].sample.value.copy(
+      _id = movementId,
+      enrollmentEORINumber = eoriNumber,
+      movementEORINumber = None,
+      created = now,
+      updated = now,
+      messages = Vector.empty[Message]
+    )
+
+    lazy val request = FakeRequest(
+      method = "POST",
+      uri = routes.MovementsController.createMovement(eoriNumber, emptyMovement.movementType).url,
+      headers = FakeHeaders(Seq("X-Message-Type" -> emptyMovement.movementType.value)),
+      body = AnyContentAsEmpty
+    )
+
+    "must return OK if XML data extraction is successful" in {
+
+      when(
+        mockMovementFactory.createEmptyMovement(
+          any[String].asInstanceOf[EORINumber],
+          any[String].asInstanceOf[MovementType],
+          any[OffsetDateTime],
+          any[OffsetDateTime]
+        )
+      )
+        .thenReturn(movement)
+
+      when(mockRepository.insert(any()))
+        .thenReturn(EitherT.rightT(Right(())))
+
+      val result =
+        controller.createMovement(eoriNumber, MovementType.Departure)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.obj(
+        "movementId" -> movementId.value
+      )
+    }
+
+    "must return INTERNAL_SERVICE_ERROR when insert fails" in {
+
+      when(
+        mockMovementFactory.createEmptyMovement(
+          any[String].asInstanceOf[EORINumber],
+          any[String].asInstanceOf[MovementType],
+          any[OffsetDateTime],
+          any[OffsetDateTime]
+        )
+      )
+        .thenReturn(movement)
+
+      when(mockRepository.insert(any()))
+        .thenReturn(EitherT.leftT(MongoError.InsertNotAcknowledged(s"Insert failed")))
+
+      val result =
+        controller.createMovement(eoriNumber, emptyMovement.movementType)(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+      contentAsJson(result) mustBe Json.obj(
+        "code"    -> "INTERNAL_SERVER_ERROR",
+        "message" -> "Insert failed"
+      )
     }
   }
 

@@ -80,4 +80,23 @@ class MovementFactoryImplSpec
         arrival.messages.head mustBe message
     }
   }
+
+  "createEmptyMovement" - {
+    val sut = new MovementFactoryImpl(clock, random)
+
+    "will create a movement without a message, movementEORINumber and movementReferenceNumber" in forAll(
+      arbitrary[MovementType],
+      arbitrary[EORINumber]
+    ) {
+      (movementType, enrollmentEori) =>
+        val movement =
+          sut.createEmptyMovement(enrollmentEori, movementType, instant, instant)
+
+        movement.movementType mustBe movementType
+        movement.messages.length mustBe 0
+        movement.movementReferenceNumber mustBe None
+        movement.enrollmentEORINumber mustBe enrollmentEori
+        movement.movementEORINumber mustBe None
+    }
+  }
 }
