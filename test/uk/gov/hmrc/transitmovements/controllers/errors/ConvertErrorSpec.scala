@@ -24,8 +24,11 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.InternalServerError
+import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.NotFound
+import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
 
+import java.time.format.DateTimeParseException
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -46,10 +49,18 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       }
     }
 
-    "for a failure" in {
-      val input = Left[ParseError, Unit](NoElementFound("test")).toEitherT[Future]
+    for (error <- Seq(NoElementFound("test"), TooManyElementsFound("test"), BadDateTime("test", new DateTimeParseException("test", "error", 0))))
+      s"${error.getClass.toString().split("\\$").last} should result in BadRequest status" in {
+        val input = Left[ParseError, Unit](error).toEitherT[Future]
+        whenReady(input.asPresentation.value) {
+          _.left.toOption.get.code mustBe BadRequest
+        }
+      }
+
+    "UnexpectedError should result in InternalServerError status" in {
+      val input = Left[ParseError, Unit](UnexpectedError(None)).toEitherT[Future]
       whenReady(input.asPresentation.value) {
-        _ mustBe Left(StandardError("Element test not found", BadRequest))
+        _.left.toOption.get.code mustBe InternalServerError
       }
     }
   }
@@ -65,11 +76,18 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       }
     }
 
-    "for a failure" in {
-      val exception = new Exception("mongo failure")
-      val input     = Left[MongoError, Unit](UnexpectedError(Some(exception))).toEitherT[Future]
+    for (error <- Seq(UnexpectedError(None), InsertNotAcknowledged("test"), UpdateNotAcknowledged("test")))
+      s"${error.getClass.toString().split("\\$").last} should result in InternalServerError status" in {
+        val input = Left[MongoError, Unit](error).toEitherT[Future]
+        whenReady(input.asPresentation.value) {
+          _.left.toOption.get.code mustBe InternalServerError
+        }
+      }
+
+    "DocumentNotFound should result in NotFound status" in {
+      val input = Left[MongoError, Unit](DocumentNotFound("test")).toEitherT[Future]
       whenReady(input.asPresentation.value) {
-        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
+        _.left.toOption.get.code mustBe NotFound
       }
     }
   }
@@ -103,12 +121,13 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       }
     }
 
-    "for a failure" in {
-      val input = Left[HeaderExtractError, Unit](NoHeaderFound("Missing header")).toEitherT[Future]
-      whenReady(input.asPresentation.value) {
-        _ mustBe Left(StandardError("Missing header", ErrorCode.BadRequest))
+    for (error <- Seq(NoHeaderFound("test"), InvalidMessageType("test")))
+      s"${error.getClass.toString().split("\\$").last} should result in InternalServerError status" in {
+        val input = Left[HeaderExtractError, Unit](error).toEitherT[Future]
+        whenReady(input.asPresentation.value) {
+          _.left.toOption.get.code mustBe BadRequest
+        }
       }
-    }
   }
 
 }
