@@ -100,6 +100,8 @@ class MovementsRepositorySpec
     }
 
     firstItem._id.value should be(emptyMovement._id.value)
+    firstItem.movementEORINumber should be(None)
+    firstItem.messages.isEmpty should be(true)
   }
 
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists" in {
