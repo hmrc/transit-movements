@@ -43,7 +43,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
 
     val tempFile = SingletonTemporaryFileCreator.create()
 
-    val sut = new MessageFactoryImpl(clock, random)
+    val sut = new MessageFactoryImpl(clock, random)(materializer, materializer.executionContext)
 
     "will create a message with a body when given a stream" in {
       val stream    = FileIO.fromPath(tempFile.path)
