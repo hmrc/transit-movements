@@ -113,7 +113,7 @@ class MovementsController @Inject() (
   }
 
   private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = Action.async(parse.anyContent) {
-    implicit requet =>
+    implicit request =>
       val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       val movement = movementFactory.createEmptyMovement(eori, movementType, received, received)
 
