@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package uk.gov.hmrc.transitmovements.services
 
 import akka.stream.Materializer
-import cats.data.NonEmptyList
 import com.google.inject.ImplementedBy
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.models.ArrivalData
@@ -54,6 +53,8 @@ trait MovementFactory {
     updated: OffsetDateTime
   ): Movement
 
+  def createEmptyMovement(eori: EORINumber, movementType: MovementType, created: OffsetDateTime, updated: OffsetDateTime): Movement
+
 }
 
 class MovementFactoryImpl @Inject() (
@@ -75,11 +76,11 @@ class MovementFactoryImpl @Inject() (
       _id = MovementId(ShortUUID.next(clock, random)),
       enrollmentEORINumber = eori,
       movementType = movementType,
-      movementEORINumber = declarationData.movementEoriNumber,
+      movementEORINumber = Some(declarationData.movementEoriNumber),
       movementReferenceNumber = None,
       created = created,
       updated = updated,
-      messages = NonEmptyList.one(message)
+      messages = Vector(message)
     )
 
   def createArrival(
@@ -94,11 +95,22 @@ class MovementFactoryImpl @Inject() (
       _id = MovementId(ShortUUID.next(clock, random)),
       enrollmentEORINumber = eori,
       movementType = movementType,
-      movementEORINumber = arrivalData.movementEoriNumber,
+      movementEORINumber = Some(arrivalData.movementEoriNumber),
       movementReferenceNumber = Some(arrivalData.mrn),
       created = created,
       updated = updated,
-      messages = NonEmptyList.one(message)
+      messages = Vector(message)
     )
 
+  def createEmptyMovement(eori: EORINumber, movementType: MovementType, created: OffsetDateTime, updated: OffsetDateTime): Movement =
+    Movement(
+      _id = MovementId(ShortUUID.next(clock, random)),
+      enrollmentEORINumber = eori,
+      movementType = movementType,
+      movementEORINumber = None,
+      movementReferenceNumber = None,
+      created = created,
+      updated = updated,
+      messages = Vector.empty[Message]
+    )
 }

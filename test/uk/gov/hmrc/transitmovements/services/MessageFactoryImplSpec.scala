@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
 
     val tempFile = SingletonTemporaryFileCreator.create()
 
-    val sut = new MessageFactoryImpl(clock, random)
+    val sut = new MessageFactoryImpl(clock, random)(materializer, materializer.executionContext)
 
     "will create a message with a body when given a stream" in {
       val stream    = FileIO.fromPath(tempFile.path)

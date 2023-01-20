@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ class MovementFactoryImplSpec
         departure.messages.length mustBe 1
         departure.movementReferenceNumber mustBe None
         departure.enrollmentEORINumber mustBe enrollmentEori
-        departure.movementEORINumber mustBe movementEori
+        departure.movementEORINumber mustBe Some(movementEori)
         departure.messages.head mustBe message
     }
   }
@@ -76,8 +76,27 @@ class MovementFactoryImplSpec
         arrival.messages.length mustBe 1
         arrival.movementReferenceNumber mustBe Some(mrn)
         arrival.enrollmentEORINumber mustBe enrollmentEori
-        arrival.movementEORINumber mustBe movementEori
+        arrival.movementEORINumber mustBe Some(movementEori)
         arrival.messages.head mustBe message
+    }
+  }
+
+  "createEmptyMovement" - {
+    val sut = new MovementFactoryImpl(clock, random)
+
+    "will create a movement without a message, movementEORINumber and movementReferenceNumber" in forAll(
+      arbitrary[MovementType],
+      arbitrary[EORINumber]
+    ) {
+      (movementType, enrollmentEori) =>
+        val movement =
+          sut.createEmptyMovement(enrollmentEori, movementType, instant, instant)
+
+        movement.movementType mustBe movementType
+        movement.messages.length mustBe 0
+        movement.movementReferenceNumber mustBe None
+        movement.enrollmentEORINumber mustBe enrollmentEori
+        movement.movementEORINumber mustBe None
     }
   }
 }

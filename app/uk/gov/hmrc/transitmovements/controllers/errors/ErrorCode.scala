@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,18 +26,20 @@ import play.api.libs.json.Writes
 sealed abstract class ErrorCode(val code: String, val statusCode: Int) extends Product with Serializable
 
 object ErrorCode {
-  case object BadRequest          extends ErrorCode("BAD_REQUEST", BAD_REQUEST)
-  case object NotFound            extends ErrorCode("NOT_FOUND", NOT_FOUND)
-  case object Forbidden           extends ErrorCode("FORBIDDEN", FORBIDDEN)
-  case object InternalServerError extends ErrorCode("INTERNAL_SERVER_ERROR", INTERNAL_SERVER_ERROR)
-  case object GatewayTimeout      extends ErrorCode("GATEWAY_TIMEOUT", GATEWAY_TIMEOUT)
+  case object BadRequest           extends ErrorCode("BAD_REQUEST", BAD_REQUEST)
+  case object NotFound             extends ErrorCode("NOT_FOUND", NOT_FOUND)
+  case object Forbidden            extends ErrorCode("FORBIDDEN", FORBIDDEN)
+  case object InternalServerError  extends ErrorCode("INTERNAL_SERVER_ERROR", INTERNAL_SERVER_ERROR)
+  case object GatewayTimeout       extends ErrorCode("GATEWAY_TIMEOUT", GATEWAY_TIMEOUT)
+  case object UnsupportedMediaType extends ErrorCode("UNSUPPORTED_MEDIA_TYPE", UNSUPPORTED_MEDIA_TYPE)
 
   lazy val errorCodes: Seq[ErrorCode] = Seq(
     BadRequest,
     NotFound,
     Forbidden,
     InternalServerError,
-    GatewayTimeout
+    GatewayTimeout,
+    UnsupportedMediaType
   )
 
   implicit val errorCodeWrites: Writes[ErrorCode] = Writes {

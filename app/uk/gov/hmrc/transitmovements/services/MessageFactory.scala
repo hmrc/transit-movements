@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import java.security.SecureRandom
 import java.time.Clock
 import java.time.OffsetDateTime
 import javax.inject.Inject
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
@@ -52,7 +52,8 @@ class MessageFactoryImpl @Inject() (
   clock: Clock,
   random: SecureRandom
 )(implicit
-  val materializer: Materializer
+  val materializer: Materializer,
+  ec: ExecutionContext
 ) extends MessageFactory {
 
   def create(

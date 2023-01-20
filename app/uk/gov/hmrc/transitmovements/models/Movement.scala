@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,15 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import cats.data.NonEmptyList
-
 import java.time.OffsetDateTime
 
 case class Movement(
   _id: MovementId,
   movementType: MovementType,
   enrollmentEORINumber: EORINumber,
-  movementEORINumber: EORINumber,
+  movementEORINumber: Option[EORINumber],
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
   created: OffsetDateTime,
   updated: OffsetDateTime,
-  messages: NonEmptyList[Message]
+  messages: Vector[Message]
 )

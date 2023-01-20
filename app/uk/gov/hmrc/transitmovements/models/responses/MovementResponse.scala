@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,4 +26,4 @@ object MovementResponse extends PresentationFormats {
   implicit val movementResponseFormat: OFormat[MovementResponse] = Json.format[MovementResponse]
 }
 
-case class MovementResponse(movementId: MovementId, messageId: MessageId)
+case class MovementResponse(movementId: MovementId, messageId: Option[MessageId])

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.transitmovements.repositories
 
-import cats.data.NonEmptyList
 import org.mongodb.scala.model.Filters
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.OptionValues
@@ -83,13 +82,35 @@ class MovementsRepositorySpec
     firstItem._id.value should be(departure._id.value)
   }
 
+  "insert" should "add an empty movement to the database" in {
+
+    lazy val emptyMovement = arbitrary[Movement].sample.value.copy(
+      _id = MovementId("2"),
+      movementEORINumber = None,
+      movementReferenceNumber = None,
+      messages = Vector.empty[Message]
+    )
+
+    await(
+      repository.insert(emptyMovement).value
+    )
+
+    val firstItem = await {
+      repository.collection.find(Filters.eq("_id", emptyMovement._id.value)).first().toFuture()
+    }
+
+    firstItem._id.value should be(emptyMovement._id.value)
+    firstItem.movementEORINumber should be(None)
+    firstItem.messages.isEmpty should be(true)
+  }
+
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists" in {
     val movement = arbitrary[Movement].sample.value
 
     await(repository.insert(movement).value)
 
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
-    result.right.get.get should be(MovementWithoutMessages.fromMovement(movement))
+    result.toOption.get.get should be(MovementWithoutMessages.fromMovement(movement))
   }
 
   "getMovementWithoutMessages" should "return none if the movement doesn't exist" in {
@@ -99,7 +120,7 @@ class MovementsRepositorySpec
 
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, MovementId("2"), movement.movementType).value)
 
-    result.right.get.isEmpty should be(true)
+    result.toOption.get.isEmpty should be(true)
   }
 
   "getSingleMessage" should "return message response if it exists" in {
@@ -108,7 +129,7 @@ class MovementsRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id, departure.movementType).value)
-    result.right.get.get should be(MessageResponse.fromMessageWithBody(departure.messages.head))
+    result.toOption.get.get should be(MessageResponse.fromMessageWithBody(departure.messages.head))
   }
 
   "getSingleMessage" should "return none if the message doesn't exist" in {
@@ -117,24 +138,21 @@ class MovementsRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, MessageId("X"), departure.movementType).value)
-    result.right.get.isEmpty should be(true)
+    result.toOption.get.isEmpty should be(true)
   }
 
   "getMessages" should "return message responses if there are messages" in {
     val messages =
-      NonEmptyList
-        .fromList(
-          List(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value)
-            .sortBy(_.received)
-            .reverse
-        )
-        .value
+      Vector(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value)
+        .sortBy(_.received)
+        .reverse
+
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None).value)
-    result.right.get.get should be(
+    result.toOption.get should be(
       departure.messages.map(
         message => MessageResponse.fromMessageWithoutBody(message)
       )
@@ -145,22 +163,18 @@ class MovementsRepositorySpec
     val dateTime = arbitrary[OffsetDateTime].sample.value
 
     val messages =
-      NonEmptyList
-        .fromList(
-          List(
-            arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1)),
-            arbitraryMessage.arbitrary.sample.value.copy(received = dateTime),
-            arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1))
-          )
-        )
-        .value
+      Vector(
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1)),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1))
+      )
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, Some(dateTime)).value)
-    result.right.get.get should be(
+    result.toOption.get should be(
       departure.messages
         .map(
           message => MessageResponse.fromMessageWithoutBody(message)
@@ -170,7 +184,7 @@ class MovementsRepositorySpec
 
   "getMessages" should "return none if the movement doesn't exist" in {
     val result = await(repository.getMessages(EORINumber("NONEXISTENT_EORI"), MovementId("NONEXISTENT_ID"), MovementType.Departure, None).value)
-    result.right.get.isEmpty should be(true)
+    result.toOption.get.isEmpty should be(true)
   }
 
   "getDepartures" should
@@ -178,10 +192,10 @@ class MovementsRepositorySpec
       GetMovementsSetup.setup()
       val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None).value)
 
-      result.right.get.value should be(
-        NonEmptyList(
+      result.toOption.get should be(
+        Vector(
           MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
-          List(MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1))
+          MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
         )
       )
     }
@@ -192,10 +206,10 @@ class MovementsRepositorySpec
     await(repository.insert(GetMovementsSetup.departureGB3).value)
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime), None).value)
 
-    result.right.get.value should be(
-      NonEmptyList(
+    result.toOption.get should be(
+      Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
-        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1))
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
       )
     )
   }
@@ -205,10 +219,10 @@ class MovementsRepositorySpec
     await(repository.insert(GetMovementsSetup.departureGB4).value)
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, Some(GetMovementsSetup.movementEORI)).value)
 
-    result.right.get.value should be(
-      NonEmptyList(
+    result.toOption.get should be(
+      Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
-        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1))
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
       )
     )
   }
@@ -219,10 +233,10 @@ class MovementsRepositorySpec
     await(repository.insert(GetMovementsSetup.departureGB3).value)
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime), Some(GetMovementsSetup.movementEORI)).value)
 
-    result.right.get.value should be(
-      NonEmptyList(
+    result.toOption.get should be(
+      Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
-        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1))
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
       )
     )
   }
@@ -231,13 +245,13 @@ class MovementsRepositorySpec
     GetMovementsSetup.setup()
     val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None).value)
 
-    result.right.get should be(None)
+    result.toOption.get should be(Vector.empty[MovementWithoutMessages])
   }
 
   it should "return no movement ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
     val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None).value)
-    result.right.get should be(None)
+    result.toOption.get should be(Vector.empty[MovementWithoutMessages])
   }
 
   "getArrivals" should
@@ -245,10 +259,10 @@ class MovementsRepositorySpec
       GetMovementsSetup.setup()
       val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None).value)
 
-      result.right.get.value should be(
-        NonEmptyList(
+      result.toOption.get should be(
+        Vector(
           MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
-          List(MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1))
+          MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
         )
       )
     }
@@ -259,10 +273,10 @@ class MovementsRepositorySpec
     await(repository.insert(GetMovementsSetup.arrivalGB3).value)
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), None).value)
 
-    result.right.get.value should be(
-      NonEmptyList(
+    result.toOption.get should be(
+      Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
-        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1))
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
       )
     )
   }
@@ -272,10 +286,10 @@ class MovementsRepositorySpec
     await(repository.insert(GetMovementsSetup.arrivalGB4).value)
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, Some(GetMovementsSetup.movementEORI)).value)
 
-    result.right.get.value should be(
-      NonEmptyList(
+    result.toOption.get should be(
+      Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
-        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1))
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
       )
     )
   }
@@ -286,10 +300,10 @@ class MovementsRepositorySpec
     await(repository.insert(GetMovementsSetup.arrivalGB3).value)
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), Some(GetMovementsSetup.movementEORI)).value)
 
-    result.right.get.value should be(
-      NonEmptyList(
+    result.toOption.get should be(
+      Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
-        List(MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1))
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
       )
     )
   }
@@ -298,13 +312,13 @@ class MovementsRepositorySpec
     GetMovementsSetup.setup()
     val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None).value)
 
-    result.right.get should be(None)
+    result.toOption.get should be(Vector.empty[MovementWithoutMessages])
   }
 
   it should "return no arrival ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
     val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None).value)
-    result.right.get should be(None)
+    result.toOption.get should be(Vector.empty[MovementWithoutMessages])
   }
 
   object GetMovementsSetup {
@@ -317,21 +331,21 @@ class MovementsRepositorySpec
     val departureGB1 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
         created = instant,
         updated = instant,
-        messages = NonEmptyList(message, List.empty)
+        messages = Vector(message)
       )
 
     val arrivalGB1 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
         created = instant,
         updated = instant,
-        messages = NonEmptyList(message, List.empty)
+        messages = Vector(message)
       )
 
     val mrnGen = arbitrary[MovementReferenceNumber]
@@ -339,7 +353,7 @@ class MovementsRepositorySpec
     val departureXi1 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriXI,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample
       )
@@ -347,7 +361,7 @@ class MovementsRepositorySpec
     val departureXi2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriXI,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
       )
@@ -355,7 +369,7 @@ class MovementsRepositorySpec
     val departureGB2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample
@@ -364,7 +378,7 @@ class MovementsRepositorySpec
     val departureGB3 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
@@ -373,7 +387,7 @@ class MovementsRepositorySpec
     val departureGB4 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = EORINumber("1234AB"),
+        movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
@@ -382,7 +396,7 @@ class MovementsRepositorySpec
     val arrivalGB2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample
@@ -391,7 +405,7 @@ class MovementsRepositorySpec
     val arrivalGB3 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = movementEORI,
+        movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
@@ -400,7 +414,7 @@ class MovementsRepositorySpec
     val arrivalGB4 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
-        movementEORINumber = EORINumber("1234AB"),
+        movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
@@ -430,7 +444,7 @@ class MovementsRepositorySpec
           _id = departureID,
           created = instant,
           updated = instant,
-          messages = NonEmptyList(message1, List.empty)
+          messages = Vector(message1)
         )
 
     await(
@@ -474,7 +488,7 @@ class MovementsRepositorySpec
           created = instant,
           updated = instant,
           movementReferenceNumber = None,
-          messages = NonEmptyList(message1, List.empty)
+          messages = Vector(message1)
         )
 
     await(
