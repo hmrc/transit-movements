@@ -26,14 +26,17 @@ import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
 import play.api.mvc.Result
+import sttp.model.StatusCode.Processing
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.MessageStatus.Processing
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
@@ -49,7 +52,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
-import scala.concurrent.Future
+import scala.util.Success
 
 @Singleton
 class MovementsController @Inject() (
@@ -88,7 +91,9 @@ class MovementsController @Inject() (
         arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
         _           <- awaitFileWrite
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-        message <- messageFactory.create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body).asPresentation
+        message <- messageFactory
+          .create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body, MessageStatus.Processing)
+          .asPresentation
         movement = movementFactory.createArrival(eori, MovementType.Arrival, arrivalData, message, received, received)
         _ <- repo.insert(movement).asPresentation
       } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
@@ -103,7 +108,9 @@ class MovementsController @Inject() (
         declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
         _               <- awaitFileWrite
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-        message <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body).asPresentation
+        message <- messageFactory
+          .create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body, MessageStatus.Processing)
+          .asPresentation
         movement = movementFactory.createDeparture(eori, MovementType.Departure, declarationData, message, received, received)
         _ <- repo.insert(movement).asPresentation
       } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
@@ -139,7 +146,8 @@ class MovementsController @Inject() (
               messageData.generationDate,
               received,
               triggerId,
-              request.body
+              request.body,
+              MessageStatus.Processing
             )
             .asPresentation
           _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation

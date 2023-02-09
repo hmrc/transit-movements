@@ -62,6 +62,7 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
@@ -197,7 +198,14 @@ class MovementsControllerSpec
         .thenReturn(messageDataEither)
 
       when(
-        mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]])
+        mockMessageFactory.create(
+          any[MessageType],
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          any[Option[MessageId]],
+          any[Source[ByteString, Future[IOResult]]],
+          any[MessageStatus]
+        )
       )
         .thenReturn(messageFactoryEither)
 
@@ -243,7 +251,8 @@ class MovementsControllerSpec
             any[OffsetDateTime],
             any[OffsetDateTime],
             any[Option[MessageId]],
-            any[Source[ByteString, Future[IOResult]]]
+            any[Source[ByteString, Future[IOResult]]],
+            any[MessageStatus]
           )
         )
           .thenReturn(messageFactoryEither)
@@ -280,7 +289,8 @@ class MovementsControllerSpec
             any[OffsetDateTime],
             any[OffsetDateTime],
             any[Option[MessageId]],
-            any[Source[ByteString, Future[IOResult]]]
+            any[Source[ByteString, Future[IOResult]]],
+            any[MessageStatus]
           )
         )
           .thenReturn(messageFactoryEither)
@@ -429,7 +439,14 @@ class MovementsControllerSpec
         .thenReturn(movement)
 
       when(
-        mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]])
+        mockMessageFactory.create(
+          any[MessageType],
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          any[Option[MessageId]],
+          any[Source[ByteString, Future[IOResult]]],
+          any[MessageStatus]
+        )
       )
         .thenReturn(messageFactoryEither)
 
@@ -615,7 +632,14 @@ class MovementsControllerSpec
         .thenReturn(movement)
 
       when(
-        mockMessageFactory.create(any[MessageType], any[OffsetDateTime], any[OffsetDateTime], any[Option[MessageId]], any[Source[ByteString, Future[IOResult]]])
+        mockMessageFactory.create(
+          any[MessageType],
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          any[Option[MessageId]],
+          any[Source[ByteString, Future[IOResult]]],
+          any[MessageStatus]
+        )
       )
         .thenReturn(messageFactoryEither)
 

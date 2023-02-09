@@ -20,14 +20,17 @@ import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
+
 import java.time.OffsetDateTime
 
 case class MessageResponse(
   id: MessageId,
   received: OffsetDateTime,
   messageType: MessageType,
-  body: Option[String]
+  body: Option[String],
+  status: MessageStatus
 )
 
 object MessageResponse {
@@ -36,7 +39,8 @@ object MessageResponse {
     BsonDocument(
       "id"          -> 1,
       "received"    -> 1,
-      "messageType" -> 1
+      "messageType" -> 1,
+      "status"      -> 1
     )
 
   def fromMessageWithBody(message: Message) =
@@ -44,7 +48,8 @@ object MessageResponse {
       message.id,
       message.received,
       message.messageType,
-      message.body
+      message.body,
+      message.status
     )
 
   def fromMessageWithoutBody(message: Message) =
@@ -52,6 +57,7 @@ object MessageResponse {
       message.id,
       message.received,
       message.messageType,
-      None
+      None,
+      message.status
     )
 }
