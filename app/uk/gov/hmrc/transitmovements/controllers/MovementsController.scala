@@ -30,6 +30,7 @@ import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
@@ -37,6 +38,7 @@ import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
+import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageFactory
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
@@ -115,11 +117,16 @@ class MovementsController @Inject() (
   private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = Action.async(parse.anyContent) {
     implicit request =>
       val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-      val movement = movementFactory.createEmptyMovement(eori, movementType, received, received)
+      val messageType = movementType match {
+        case MovementType.Arrival   => MessageType.ArrivalNotification
+        case MovementType.Departure => MessageType.DeclarationData
+      }
+      val message  = messageFactory.createEmptyMessage(messageType, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC), None)
+      val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received)
 
       (for {
         _ <- repo.insert(movement).asPresentation
-      } yield MovementResponse(movement._id, None)).fold[Result](
+      } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         response => Ok(Json.toJson(response))
       )

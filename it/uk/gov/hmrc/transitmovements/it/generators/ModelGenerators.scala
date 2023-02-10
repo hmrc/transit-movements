@@ -91,7 +91,7 @@ trait ModelGenerators extends BaseGenerators {
       for {
         id          <- arbitrary[MessageId]
         received    <- arbitrary[OffsetDateTime]
-        generated   <- arbitrary[OffsetDateTime]
+        generated   <- arbitrary[Option[OffsetDateTime]]
         messageType <- arbitrary[MessageType]
         triggerId   <- arbitrary[Option[MessageId]]
         url         <- arbitrary[Option[URI]]

@@ -84,16 +84,17 @@ class MovementFactoryImplSpec
   "createEmptyMovement" - {
     val sut = new MovementFactoryImpl(clock, random)
 
-    "will create a movement without a message, movementEORINumber and movementReferenceNumber" in forAll(
+    "will create a movement with message, movementEORINumber and movementReferenceNumber" in forAll(
       arbitrary[MovementType],
-      arbitrary[EORINumber]
+      arbitrary[EORINumber],
+      arbitrary[Message]
     ) {
-      (movementType, enrollmentEori) =>
+      (movementType, enrollmentEori, message) =>
         val movement =
-          sut.createEmptyMovement(enrollmentEori, movementType, instant, instant)
+          sut.createEmptyMovement(enrollmentEori, movementType, message, instant, instant)
 
         movement.movementType mustBe movementType
-        movement.messages.length mustBe 0
+        movement.messages.length mustBe 1
         movement.movementReferenceNumber mustBe None
         movement.enrollmentEORINumber mustBe enrollmentEori
         movement.movementEORINumber mustBe None

@@ -55,7 +55,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
         r =>
           r.isRight mustBe true
           val message = r.right.get
-          message mustBe Message(message.id, message.received, instant, MessageType.DestinationOfficeRejection, triggerId, None, Some(""))
+          message mustBe Message(message.id, message.received, Some(instant), MessageType.DestinationOfficeRejection, triggerId, None, Some(""))
       }
     }
 
@@ -72,5 +72,23 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
       }
 
     }
+  }
+
+  "createEmptyMessage" - {
+    val instant: OffsetDateTime = OffsetDateTime.of(2022, 8, 26, 9, 0, 0, 0, ZoneOffset.UTC)
+    val clock: Clock            = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
+    val random                  = new SecureRandom
+
+    val sut = new MessageFactoryImpl(clock, random)(materializer, materializer.executionContext)
+
+    "will create a message without a body" in {
+      val triggerId = Some(MessageId("123"))
+
+      val result = sut.createEmptyMessage(MessageType.ArrivalNotification, instant, None)
+
+      result mustBe Message(result.id, result.received, None, MessageType.ArrivalNotification, None, None, None)
+
+    }
+
   }
 }

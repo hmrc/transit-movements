@@ -120,7 +120,7 @@ class MovementsControllerSpec
 
   val now = OffsetDateTime.now
 
-  lazy val message = arbitraryMessage.arbitrary.sample.get.copy(id = messageId, generated = now, received = now, triggerId = Some(triggerId))
+  lazy val message = arbitraryMessage.arbitrary.sample.get.copy(id = messageId, generated = Some(now), received = now, triggerId = Some(triggerId))
 
   lazy val messageFactoryEither: EitherT[Future, StreamError, Message] =
     EitherT.rightT(message)
@@ -786,6 +786,7 @@ class MovementsControllerSpec
         mockMovementFactory.createEmptyMovement(
           any[String].asInstanceOf[EORINumber],
           any[String].asInstanceOf[MovementType],
+          any[Message],
           any[OffsetDateTime],
           any[OffsetDateTime]
         )
@@ -800,7 +801,8 @@ class MovementsControllerSpec
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
-        "movementId" -> movementId.value
+        "movementId" -> movementId.value,
+        "messageId"  -> messageId.value
       )
     }
 
@@ -810,6 +812,7 @@ class MovementsControllerSpec
         mockMovementFactory.createEmptyMovement(
           any[String].asInstanceOf[EORINumber],
           any[String].asInstanceOf[MovementType],
+          any[Message],
           any[OffsetDateTime],
           any[OffsetDateTime]
         )
