@@ -22,7 +22,6 @@ import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
 import play.api.libs.json.Reads
 import play.api.libs.json.Writes
-import uk.gov.hmrc.transitmovements.models.MessageStatus._
 
 sealed trait MessageStatus
 
