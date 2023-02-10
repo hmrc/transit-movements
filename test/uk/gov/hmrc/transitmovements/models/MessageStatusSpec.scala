@@ -24,11 +24,11 @@ import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 
 class MessageStatusSpec extends AnyFlatSpec with Matchers with PresentationFormats {
 
-  "MessageStatus" should "be serialise correctly" in {
+  "MessageStatus" should "serialise correctly" in {
     Json.toJson[MessageStatus](MessageStatus.Processing) should be(JsString("Processing"))
   }
 
-  "MessageStatus" should "be deserialize correctly" in {
+  "MessageStatus" should "deserialize correctly" in {
     JsString("Processing").validate[MessageStatus].get should be(MessageStatus.Processing)
   }
 }
