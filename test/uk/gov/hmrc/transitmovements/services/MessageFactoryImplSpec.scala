@@ -55,7 +55,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
       whenReady(result.value) {
         r =>
           r.isRight mustBe true
-          val message = r.right.get
+          val message = r.toOption.get
           message mustBe Message(message.id, message.received, instant, MessageType.DestinationOfficeRejection, triggerId, None, Some(""), Received)
       }
     }
