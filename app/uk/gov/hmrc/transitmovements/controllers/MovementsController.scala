@@ -137,6 +137,7 @@ class MovementsController @Inject() (
           messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
           _           <- awaitFileWrite
           received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+          status   = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
           message <- messageFactory
             .create(
               messageType,
@@ -144,7 +145,7 @@ class MovementsController @Inject() (
               received,
               triggerId,
               request.body,
-              MessageStatus.Processing
+              status
             )
             .asPresentation
           _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
@@ -165,7 +166,7 @@ class MovementsController @Inject() (
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        movements => if (movements.isEmpty) NotFound else Ok(Json.toJson(movements))
+        movements => { println(Json.toJson(movements)); if (movements.isEmpty) NotFound else Ok(Json.toJson(movements)) }
       )
   }
 
