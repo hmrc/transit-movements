@@ -166,7 +166,7 @@ class MovementsController @Inject() (
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        movements => { println(Json.toJson(movements)); if (movements.isEmpty) NotFound else Ok(Json.toJson(movements)) }
+        movements => if (movements.isEmpty) NotFound else Ok(Json.toJson(movements))
       )
   }
 
