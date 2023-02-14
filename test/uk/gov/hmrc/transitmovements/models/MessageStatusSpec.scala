@@ -16,11 +16,19 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-sealed abstract class MovementType(val value: String, val urlFragment: String)
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+import play.api.libs.json.JsString
+import play.api.libs.json.Json
+import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 
-object MovementType {
-  final case object Departure extends MovementType("departure", "departures")
-  final case object Arrival   extends MovementType("arrival", "arrivals")
+class MessageStatusSpec extends AnyFlatSpec with Matchers with PresentationFormats {
 
-  lazy val movementTypes: Set[MovementType] = Set(Arrival, Departure)
+  "MessageStatus" should "serialise correctly" in {
+    Json.toJson[MessageStatus](MessageStatus.Processing) should be(JsString("Processing"))
+  }
+
+  "MessageStatus" should "deserialize correctly" in {
+    JsString("Processing").validate[MessageStatus].get should be(MessageStatus.Processing)
+  }
 }

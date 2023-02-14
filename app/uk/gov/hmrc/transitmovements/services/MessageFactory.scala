@@ -24,6 +24,7 @@ import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
@@ -44,7 +45,8 @@ trait MessageFactory {
     generationDate: OffsetDateTime,
     received: OffsetDateTime,
     triggerId: Option[MessageId],
-    tempFile: Source[ByteString, _]
+    tempFile: Source[ByteString, _],
+    status: MessageStatus
   ): EitherT[Future, StreamError, Message]
 }
 
@@ -61,7 +63,8 @@ class MessageFactoryImpl @Inject() (
     generationDate: OffsetDateTime,
     received: OffsetDateTime,
     triggerId: Option[MessageId],
-    source: Source[ByteString, _]
+    source: Source[ByteString, _],
+    status: MessageStatus
   ): EitherT[Future, StreamError, Message] =
     getMessageBody(source).map {
       message =>
@@ -72,7 +75,8 @@ class MessageFactoryImpl @Inject() (
           messageType = messageType,
           triggerId = triggerId,
           url = None,
-          body = Some(message)
+          body = Some(message),
+          status = status
         )
     }
 

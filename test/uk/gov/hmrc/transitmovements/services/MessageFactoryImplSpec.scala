@@ -27,6 +27,7 @@ import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import java.io.File
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageStatus.Received
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -49,13 +50,13 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
       val stream    = FileIO.fromPath(tempFile.path)
       val triggerId = Some(MessageId("123"))
 
-      val result = sut.create(MessageType.DestinationOfficeRejection, instant, instant, triggerId, stream)
+      val result = sut.create(MessageType.DestinationOfficeRejection, instant, instant, triggerId, stream, Received)
 
       whenReady(result.value) {
         r =>
           r.isRight mustBe true
-          val message = r.right.get
-          message mustBe Message(message.id, message.received, instant, MessageType.DestinationOfficeRejection, triggerId, None, Some(""))
+          val message = r.toOption.get
+          message mustBe Message(message.id, message.received, instant, MessageType.DestinationOfficeRejection, triggerId, None, Some(""), Received)
       }
     }
 
@@ -63,7 +64,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
       val stream    = FileIO.fromPath(new File("").toPath, 5)
       val triggerId = Some(MessageId("456"))
 
-      val result = sut.create(MessageType.RequestOfRelease, instant, instant, triggerId, stream)
+      val result = sut.create(MessageType.RequestOfRelease, instant, instant, triggerId, stream, Received)
 
       whenReady(result.value) {
         r =>

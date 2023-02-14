@@ -31,6 +31,7 @@ import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
@@ -49,7 +50,6 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
-import scala.concurrent.Future
 
 @Singleton
 class MovementsController @Inject() (
@@ -88,7 +88,9 @@ class MovementsController @Inject() (
         arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
         _           <- awaitFileWrite
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-        message <- messageFactory.create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body).asPresentation
+        message <- messageFactory
+          .create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body, MessageStatus.Processing)
+          .asPresentation
         movement = movementFactory.createArrival(eori, MovementType.Arrival, arrivalData, message, received, received)
         _ <- repo.insert(movement).asPresentation
       } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
@@ -103,7 +105,9 @@ class MovementsController @Inject() (
         declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
         _               <- awaitFileWrite
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-        message <- messageFactory.create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body).asPresentation
+        message <- messageFactory
+          .create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body, MessageStatus.Processing)
+          .asPresentation
         movement = movementFactory.createDeparture(eori, MovementType.Departure, declarationData, message, received, received)
         _ <- repo.insert(movement).asPresentation
       } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
@@ -133,13 +137,15 @@ class MovementsController @Inject() (
           messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
           _           <- awaitFileWrite
           received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+          status   = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
           message <- messageFactory
             .create(
               messageType,
               messageData.generationDate,
               received,
               triggerId,
-              request.body
+              request.body,
+              status
             )
             .asPresentation
           _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
