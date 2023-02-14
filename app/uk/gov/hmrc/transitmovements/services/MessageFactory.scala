@@ -49,8 +49,7 @@ trait MessageFactory {
 
   def createEmptyMessage(
     messageType: MessageType,
-    received: OffsetDateTime,
-    triggerId: Option[MessageId]
+    received: OffsetDateTime
   ): Message
 }
 
@@ -84,15 +83,14 @@ class MessageFactoryImpl @Inject() (
 
   def createEmptyMessage(
     messageType: MessageType,
-    received: OffsetDateTime,
-    triggerId: Option[MessageId]
+    received: OffsetDateTime
   ): Message =
     Message(
       id = MessageId(ShortUUID.next(clock, random)),
       received = received,
       generated = None,
       messageType = messageType,
-      triggerId = triggerId,
+      triggerId = None,
       url = None,
       body = None
     )

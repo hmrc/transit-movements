@@ -82,9 +82,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
     val sut = new MessageFactoryImpl(clock, random)(materializer, materializer.executionContext)
 
     "will create a message without a body" in {
-      val triggerId = Some(MessageId("123"))
-
-      val result = sut.createEmptyMessage(MessageType.ArrivalNotification, instant, None)
+      val result = sut.createEmptyMessage(MessageType.ArrivalNotification, instant)
 
       result mustBe Message(result.id, result.received, None, MessageType.ArrivalNotification, None, None, None)
 
