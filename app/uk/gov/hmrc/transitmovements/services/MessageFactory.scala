@@ -51,7 +51,8 @@ trait MessageFactory {
 
   def createEmptyMessage(
     messageType: MessageType,
-    received: OffsetDateTime
+    received: OffsetDateTime,
+    status: MessageStatus
   ): Message
 }
 
@@ -87,7 +88,8 @@ class MessageFactoryImpl @Inject() (
 
   def createEmptyMessage(
     messageType: MessageType,
-    received: OffsetDateTime
+    received: OffsetDateTime,
+    status: MessageStatus
   ): Message =
     Message(
       id = MessageId(ShortUUID.next(clock, random)),
@@ -96,7 +98,8 @@ class MessageFactoryImpl @Inject() (
       messageType = messageType,
       triggerId = None,
       url = None,
-      body = None
+      body = None,
+      status = status
     )
 
   private def getMessageBody(tempFile: Source[ByteString, _]): EitherT[Future, StreamError, String] =

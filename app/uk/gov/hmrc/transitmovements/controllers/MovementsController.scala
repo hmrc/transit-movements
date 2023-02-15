@@ -125,7 +125,7 @@ class MovementsController @Inject() (
         case MovementType.Arrival   => MessageType.ArrivalNotification
         case MovementType.Departure => MessageType.DeclarationData
       }
-      val message  = messageFactory.createEmptyMessage(messageType, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
+      val message  = messageFactory.createEmptyMessage(messageType, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC), MessageStatus.Pending)
       val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received)
 
       (for {

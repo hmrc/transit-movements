@@ -28,6 +28,7 @@ import java.io.File
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus.Received
+import uk.gov.hmrc.transitmovements.models.MessageStatus.Pending
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -83,9 +84,9 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
     val sut = new MessageFactoryImpl(clock, random)(materializer, materializer.executionContext)
 
     "will create a message without a body" in {
-      val result = sut.createEmptyMessage(MessageType.ArrivalNotification, instant)
+      val result = sut.createEmptyMessage(MessageType.ArrivalNotification, instant, Pending)
 
-      result mustBe Message(result.id, result.received, None, MessageType.ArrivalNotification, None, None, None)
+      result mustBe Message(result.id, result.received, None, MessageType.ArrivalNotification, None, None, None, Pending)
 
     }
 
