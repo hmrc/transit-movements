@@ -22,6 +22,7 @@ import org.scalacheck.Gen
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
@@ -93,7 +94,8 @@ trait ModelGenerators extends BaseGenerators {
         triggerId   <- arbitrary[Option[MessageId]]
         url         <- arbitrary[Option[URI]]
         body        <- arbitrary[Option[String]]
-      } yield Message(id, received, generated, messageType, triggerId, url, body)
+        status      <- Gen.oneOf(MessageStatus.statusValues)
+      } yield Message(id, received, generated, messageType, triggerId, url, body, status)
     }
 
   implicit lazy val arbitraryMovement: Arbitrary[Movement] =
@@ -115,6 +117,7 @@ trait ModelGenerators extends BaseGenerators {
         id             <- arbitrary[MessageId]
         offsetDateTime <- arbitrary[OffsetDateTime]
         messageType    <- arbitrary[MessageType]
-      } yield MessageResponse(id, offsetDateTime, messageType, None)
+        status         <- Gen.oneOf(MessageStatus.statusValues)
+      } yield MessageResponse(id, offsetDateTime, messageType, None, status)
     }
 }
