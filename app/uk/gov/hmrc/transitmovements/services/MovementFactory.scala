@@ -53,7 +53,7 @@ trait MovementFactory {
     updated: OffsetDateTime
   ): Movement
 
-  def createEmptyMovement(eori: EORINumber, movementType: MovementType, created: OffsetDateTime, updated: OffsetDateTime): Movement
+  def createEmptyMovement(eori: EORINumber, movementType: MovementType, message: Message, created: OffsetDateTime, updated: OffsetDateTime): Movement
 
 }
 
@@ -102,7 +102,7 @@ class MovementFactoryImpl @Inject() (
       messages = Vector(message)
     )
 
-  def createEmptyMovement(eori: EORINumber, movementType: MovementType, created: OffsetDateTime, updated: OffsetDateTime): Movement =
+  def createEmptyMovement(eori: EORINumber, movementType: MovementType, message: Message, created: OffsetDateTime, updated: OffsetDateTime): Movement =
     Movement(
       _id = MovementId(ShortUUID.next(clock, random)),
       enrollmentEORINumber = eori,
@@ -111,6 +111,6 @@ class MovementFactoryImpl @Inject() (
       movementReferenceNumber = None,
       created = created,
       updated = updated,
-      messages = Vector.empty[Message]
+      messages = Vector(message)
     )
 }
