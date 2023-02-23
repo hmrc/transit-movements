@@ -95,7 +95,7 @@ trait ModelGenerators extends BaseGenerators {
         url         <- arbitrary[Option[URI]]
         body        <- arbitrary[Option[String]]
         status      <- Gen.oneOf(MessageStatus.statusValues)
-      } yield Message(id, received, generated, messageType, triggerId, url, body, status)
+      } yield Message(id, received, generated, messageType, triggerId, url, body, Some(status))
     }
 
   implicit lazy val arbitraryMovement: Arbitrary[Movement] =
@@ -118,6 +118,6 @@ trait ModelGenerators extends BaseGenerators {
         offsetDateTime <- arbitrary[OffsetDateTime]
         messageType    <- arbitrary[MessageType]
         status         <- Gen.oneOf(MessageStatus.statusValues)
-      } yield MessageResponse(id, offsetDateTime, messageType, None, status)
+      } yield MessageResponse(id, offsetDateTime, messageType, None, Some(status))
     }
 }

@@ -81,7 +81,7 @@ class MessageFactoryImpl @Inject() (
           triggerId = triggerId,
           url = None,
           body = Some(message),
-          status = status
+          status = Some(status)
         )
     }
 
@@ -97,7 +97,7 @@ class MessageFactoryImpl @Inject() (
       triggerId = None,
       url = None,
       body = None,
-      status = MessageStatus.Pending
+      status = Some(MessageStatus.Pending)
     )
 
   private def getMessageBody(tempFile: Source[ByteString, _]): EitherT[Future, StreamError, String] =
