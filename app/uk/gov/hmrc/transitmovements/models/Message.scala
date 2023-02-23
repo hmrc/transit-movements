@@ -27,5 +27,5 @@ case class Message(
   triggerId: Option[MessageId],
   url: Option[URI],
   body: Option[String],
-  status: MessageStatus
+  status: Option[MessageStatus]
 )

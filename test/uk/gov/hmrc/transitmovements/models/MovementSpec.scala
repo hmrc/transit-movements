@@ -46,7 +46,7 @@ class MovementSpec extends AnyFlatSpec with Matchers with PresentationFormats {
           triggerId = Some(MessageId("888")),
           url = Some(URI.create("xyz")),
           body = Some("body"),
-          status = MessageStatus.Processing
+          status = Some(MessageStatus.Processing)
         )
       )
     )

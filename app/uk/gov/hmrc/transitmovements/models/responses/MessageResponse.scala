@@ -30,7 +30,7 @@ case class MessageResponse(
   received: OffsetDateTime,
   messageType: MessageType,
   body: Option[String],
-  status: MessageStatus
+  status: Option[MessageStatus]
 )
 
 object MessageResponse {

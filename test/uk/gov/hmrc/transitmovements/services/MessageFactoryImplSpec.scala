@@ -57,7 +57,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
         r =>
           r.isRight mustBe true
           val message = r.toOption.get
-          message mustBe Message(message.id, message.received, Some(instant), MessageType.DestinationOfficeRejection, triggerId, None, Some(""), Received)
+          message mustBe Message(message.id, message.received, Some(instant), MessageType.DestinationOfficeRejection, triggerId, None, Some(""), Some(Received))
       }
     }
 
@@ -86,7 +86,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
     "will create a message without a body" in {
       val result = sut.createEmptyMessage(MessageType.ArrivalNotification, instant)
 
-      result mustBe Message(result.id, result.received, None, MessageType.ArrivalNotification, None, None, None, Pending)
+      result mustBe Message(result.id, result.received, None, MessageType.ArrivalNotification, None, None, None, Some(Pending))
 
     }
 
