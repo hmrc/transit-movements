@@ -16,44 +16,48 @@
 
 package uk.gov.hmrc.transitmovements.services
 
+import akka.NotUsed
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
-import play.api.http.Status.NOT_FOUND
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.http.UpstreamErrorResponse
-import uk.gov.hmrc.transitmovements.connectors.ObjectStoreConnector
+import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClient
+import uk.gov.hmrc.objectstore.client.play.Implicits._
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
+import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 
 import javax.inject._
 import scala.concurrent._
+import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[ObjectStoreServiceImpl])
 trait ObjectStoreService {
 
   def getObjectStoreFile(
-    objectStoreURI: String
+    objectStoreURI: ObjectStoreURI
   )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]]
 
 }
 
 @Singleton
-class ObjectStoreServiceImpl @Inject() (client: ObjectStoreConnector) extends ObjectStoreService {
+class ObjectStoreServiceImpl @Inject() (client: PlayObjectStoreClient) extends ObjectStoreService {
 
   override def getObjectStoreFile(
-    objectStoreURI: String
-  )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]] =
+    objectStoreURI: ObjectStoreURI
+  )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]] = {
+    val objectStoreFilePath = if (objectStoreURI.value.contains("/")) objectStoreURI.value.split("/", 2).apply(1) else objectStoreURI.value
     EitherT(
       client
-        .getObjectStoreFile(objectStoreURI)
-        .map {
-          objectStoreFile => Right(objectStoreFile)
+        .getObject[Source[ByteString, NotUsed]](Path.File(objectStoreFilePath), "common-transit-conversion-traders")
+        .flatMap {
+          case Some(source) => Future.successful(Right(source.content))
+          case _            => Future.successful(Left(ObjectStoreError.FileNotFound(objectStoreFilePath)))
         }
         .recover {
-          case UpstreamErrorResponse(_, NOT_FOUND, _, _) => Left(ObjectStoreError.FileNotFound(objectStoreURI))
-          case thr                                       => Left(ObjectStoreError.UnexpectedError(Some(thr)))
+          case NonFatal(ex) => Left(ObjectStoreError.UnexpectedError(Some(ex)))
         }
     )
-
+  }
 }

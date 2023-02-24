@@ -21,15 +21,16 @@ import play.api.mvc.Headers
 import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 
 import scala.concurrent.Future
 
 trait ObjectStoreURIHeaderExtractor {
 
-  def extractObjectStoreURI(headers: Headers): EitherT[Future, HeaderExtractError, String] =
+  def extractObjectStoreURI(headers: Headers): EitherT[Future, HeaderExtractError, ObjectStoreURI] =
     EitherT {
       headers.get(Constants.ObjectStoreURI) match {
-        case Some(headerValue) => Future.successful(Right(headerValue))
+        case Some(headerValue) => Future.successful(Right(ObjectStoreURI.apply(headerValue)))
         case None              => Future.successful(Left(NoHeaderFound("Missing X-Object-Store-Uri header value")))
       }
     }

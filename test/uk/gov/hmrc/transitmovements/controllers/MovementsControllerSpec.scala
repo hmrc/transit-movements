@@ -1038,9 +1038,9 @@ class MovementsControllerSpec
       when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
         .thenReturn(EitherT.rightT(messageType))
 
-      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT("object-store-uri"))
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI("object-store-uri")))
 
-      when(mockObjectStoreService.getObjectStoreFile(any[String])(any[ExecutionContext], any[HeaderCarrier]))
+      when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreURI])(any[ExecutionContext], any[HeaderCarrier]))
         .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
 
       when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
@@ -1052,7 +1052,7 @@ class MovementsControllerSpec
           any[OffsetDateTime],
           any[OffsetDateTime],
           any[Option[MessageId]],
-          any[URI]
+          any[String].asInstanceOf[ObjectStoreURI]
         )
       )
         .thenReturn(messageFactory)
@@ -1104,8 +1104,8 @@ class MovementsControllerSpec
       when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
         .thenReturn(EitherT.rightT(messageType))
 
-      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT("object-store-uri"))
-      when(mockObjectStoreService.getObjectStoreFile(any[String])(any[ExecutionContext], any[HeaderCarrier]))
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI("object-store-uri")))
+      when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreURI])(any[ExecutionContext], any[HeaderCarrier]))
         .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound("common-transit-conversion-traders/movements/text.xml")))
       lazy val request = FakeRequest(
         method = "POST",
@@ -1117,9 +1117,9 @@ class MovementsControllerSpec
       val result =
         controller.updateMovement(movementId, Some(triggerId))(request)
 
-      status(result) mustBe NOT_FOUND
+      status(result) mustBe BAD_REQUEST
       contentAsJson(result) mustBe Json.obj(
-        "code"    -> "NOT_FOUND",
+        "code"    -> "BAD_REQUEST",
         "message" -> "file not found at location: common-transit-conversion-traders/movements/text.xml"
       )
     }
@@ -1129,9 +1129,9 @@ class MovementsControllerSpec
       when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
         .thenReturn(EitherT.rightT(messageType))
 
-      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT("object-store-uri"))
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI("object-store-uri")))
 
-      when(mockObjectStoreService.getObjectStoreFile(any[String])(any[ExecutionContext], any[HeaderCarrier]))
+      when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreURI])(any[ExecutionContext], any[HeaderCarrier]))
         .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
 
       when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))

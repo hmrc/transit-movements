@@ -139,10 +139,9 @@ class MovementsController @Inject() (
     implicit request =>
       (for {
         messageType    <- extract(request.headers).asPresentation
-        objectStoreURL <- extractObjectStoreURI(request.headers).asPresentation
-        objectStoreFilePath = if (objectStoreURL.contains("/")) objectStoreURL.split("/", 2).apply(1) else objectStoreURL
-        sourceFile  <- objectStoreService.getObjectStoreFile(objectStoreFilePath).asPresentation
-        messageData <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
+        objectStoreURI <- extractObjectStoreURI(request.headers).asPresentation
+        sourceFile     <- objectStoreService.getObjectStoreFile(objectStoreURI).asPresentation
+        messageData    <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
         message = messageFactory
           .createLargeMessage(
@@ -150,7 +149,7 @@ class MovementsController @Inject() (
             messageData.generationDate,
             received,
             triggerId,
-            new URI(objectStoreURL)
+            objectStoreURI
           )
         _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
       } yield message.id).fold[Result](

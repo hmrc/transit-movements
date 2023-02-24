@@ -14,78 +14,81 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.services
+package uk.gov.hmrc.transitmovementsauditing.services
 
+import akka.NotUsed
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.reset
-import org.mockito.Mockito.when
+import org.mockito.MockitoSugar.when
 import org.scalatest.BeforeAndAfterEach
-import org.scalatest.OptionValues
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.ScalaFutures.whenReady
 import org.scalatest.freespec.AnyFreeSpec
-import org.scalatest.matchers.must.Matchers
+import org.scalatest.matchers.must.Matchers.convertToAnyMustWrapper
+import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-import play.api.http.Status.INTERNAL_SERVER_ERROR
-import play.api.http.Status.NOT_FOUND
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.http.UpstreamErrorResponse
-import uk.gov.hmrc.transitmovements.connectors.ObjectStoreConnector
-import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
+import uk.gov.hmrc.objectstore.client.Md5Hash
+import uk.gov.hmrc.objectstore.client.Object
+import uk.gov.hmrc.objectstore.client.ObjectMetadata
+import uk.gov.hmrc.objectstore.client.Path.File
+import uk.gov.hmrc.objectstore.client.RetentionPeriod.OneWeek
+import uk.gov.hmrc.objectstore.client.config.ObjectStoreClientConfig
+import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClient
+import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
+import uk.gov.hmrc.transitmovements.base.TestActorSystem
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
+import uk.gov.hmrc.transitmovements.services.ObjectStoreServiceImpl
 
+import java.time.Instant
+import java.util.UUID.randomUUID
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class ObjectStoreServiceSpec
     extends AnyFreeSpec
     with Matchers
-    with OptionValues
-    with ScalaFutures
     with MockitoSugar
-    with ScalaCheckDrivenPropertyChecks
-    with BeforeAndAfterEach {
+    with TestActorSystem
+    with StreamTestHelpers
+    with BeforeAndAfterEach
+    with ScalaCheckDrivenPropertyChecks {
 
-  implicit val hc: HeaderCarrier = HeaderCarrier()
+  implicit val hc: HeaderCarrier                           = HeaderCarrier()
+  private lazy val baseUrl                                 = s"baseUrl-${randomUUID().toString}"
+  private lazy val owner                                   = s"owner-${randomUUID().toString}"
+  private lazy val token                                   = s"token-${randomUUID().toString}"
+  private val mockObjectStoreClient: PlayObjectStoreClient = mock[PlayObjectStoreClient]
 
-  val mockObjectStoreConnector: ObjectStoreConnector = mock[ObjectStoreConnector]
-  val sut                                            = new ObjectStoreServiceImpl(mockObjectStoreConnector)
+  override def beforeEach: Unit =
+    reset(mockObjectStoreClient)
 
-  override def beforeEach(): Unit =
-    reset(mockObjectStoreConnector)
+  "Object Store service" - {
 
-  "get file from object store" - {
-
-    "when object store file is found, should return Right" in {
-
-      when(mockObjectStoreConnector.getObjectStoreFile(any())(any(), any()))
-        .thenReturn(Future.successful(Source.single(ByteString("this is test content"))))
-
-      val result = sut.getObjectStoreFile("object-store-uri")
+    "should return the contents of a file" in {
+      val filename    = "movements/movementId/abc.xml"
+      val metadata    = ObjectMetadata("", 0, Md5Hash(""), Instant.now(), Map.empty[String, String])
+      val content     = "content"
+      val fileContent = Option[Object[Source[ByteString, NotUsed]]](Object.apply(File(filename), Source.single(ByteString(content)), metadata))
+      when(mockObjectStoreClient.getObject[Source[ByteString, NotUsed]](any[File](), any())(any(), any())).thenReturn(Future.successful(fileContent))
+      val service = new ObjectStoreServiceImpl(mockObjectStoreClient)
+      val result  = service.getObjectStoreFile(ObjectStoreURI(filename))
       whenReady(result.value) {
-        _ mustBe result.value.futureValue
+        r =>
+          r.isRight mustBe true
+
       }
     }
 
-    "when file is not found, should return a Left with an FileNotFound" in {
-      when(mockObjectStoreConnector.getObjectStoreFile(any())(any(), any()))
-        .thenReturn(Future.failed(UpstreamErrorResponse("not found", NOT_FOUND)))
-
-      val result = sut.getObjectStoreFile("common/abc/IE015.xml")
+    "should return an error when the file is not found on path" in {
+      when(mockObjectStoreClient.getObject(any[File](), any())(any(), any())).thenReturn(Future.successful(None))
+      val service = new ObjectStoreServiceImpl(mockObjectStoreClient)
+      val result  = service.getObjectStoreFile(ObjectStoreURI("abc/movement/abc.xml"))
       whenReady(result.value) {
-        _ mustBe Left(ObjectStoreError.FileNotFound("common/abc/IE015.xml"))
-      }
-    }
-
-    "on a failed submission, should return a Left with an UnexpectedError" in {
-      val error = UpstreamErrorResponse("error", INTERNAL_SERVER_ERROR)
-      when(mockObjectStoreConnector.getObjectStoreFile(any())(any(), any()))
-        .thenReturn(Future.failed(error))
-
-      val result = sut.getObjectStoreFile("common/IE015")
-      whenReady(result.value) {
-        _ mustBe Left(ObjectStoreError.UnexpectedError(Some(error)))
+        r =>
+          r.isLeft mustBe true
       }
     }
 

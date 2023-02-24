@@ -14,18 +14,6 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.connectors
+package uk.gov.hmrc.transitmovements.models
 
-import akka.actor.ActorSystem
-import akka.stream.Materializer
-import uk.gov.hmrc.http.HeaderCarrier
-
-import scala.concurrent.ExecutionContext
-import scala.concurrent.ExecutionContext.global
-
-trait BaseUnitSpec {
-  implicit protected val ec: ExecutionContext         = global
-  implicit protected val system: ActorSystem          = ActorSystem()
-  implicit protected val materializer: Materializer   = Materializer(system)
-  implicit protected val headerCarrier: HeaderCarrier = HeaderCarrier()
-}
+case class ObjectStoreURI(value: String) extends AnyVal

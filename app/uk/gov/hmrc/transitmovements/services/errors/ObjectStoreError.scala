@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.services.errors
 
-sealed abstract class ObjectStoreError
+sealed abstract class ObjectStoreError extends Throwable
 
 object ObjectStoreError {
   case class UnexpectedError(caughtException: Option[Throwable] = None) extends ObjectStoreError

@@ -149,10 +149,10 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       }
     }
 
-    "FileNotFound should result NotFound status" in {
+    "FileNotFound should result BadRequest status" in {
       val input = Left[ObjectStoreError, Unit](FileNotFound("test")).toEitherT[Future]
       whenReady(input.asPresentation.value) {
-        _.left.toOption.get.code mustBe NotFound
+        _.left.toOption.get.code mustBe BadRequest
       }
     }
   }
