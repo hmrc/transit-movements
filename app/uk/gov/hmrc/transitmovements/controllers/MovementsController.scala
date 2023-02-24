@@ -29,24 +29,15 @@ import play.api.mvc.Result
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageStatus
-import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
-import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
-import uk.gov.hmrc.transitmovements.services.MessageFactory
-import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
-import uk.gov.hmrc.transitmovements.services.MovementFactory
-import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
+import uk.gov.hmrc.transitmovements.services._
 import uk.gov.hmrc.transitmovements.utils.PreMaterialisedFutureProvider
 
+import java.net.URI
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -61,6 +52,7 @@ class MovementsController @Inject() (
   repo: MovementsRepository,
   movementsXmlParsingService: MovementsXmlParsingService,
   messagesXmlParsingService: MessagesXmlParsingService,
+  objectStoreService: ObjectStoreService,
   val preMaterialisedFutureProvider: PreMaterialisedFutureProvider
 )(implicit
   val materializer: Materializer,
@@ -72,7 +64,8 @@ class MovementsController @Inject() (
     with ConvertError
     with MessageTypeHeaderExtractor
     with PresentationFormats
-    with ContentTypeRouting {
+    with ContentTypeRouting
+    with ObjectStoreURIHeaderExtractor {
 
   def createMovement(eori: EORINumber, movementType: MovementType) =
     contentTypeRoute {
@@ -136,7 +129,37 @@ class MovementsController @Inject() (
       )
   }
 
-  def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
+  def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None) =
+    contentTypeRoute {
+      case Some(_) => updateMovementSmallMessage(movementId, triggerId)
+      case None    => updateMovementLargeMessage(movementId, triggerId)
+    }
+
+  def updateMovementLargeMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[AnyContent] = Action.async(parse.anyContent) {
+    implicit request =>
+      (for {
+        messageType    <- extract(request.headers).asPresentation
+        objectStoreURL <- extractObjectStoreURI(request.headers).asPresentation
+        objectStoreFilePath = if (objectStoreURL.contains("/")) objectStoreURL.split("/", 2).apply(1) else objectStoreURL
+        sourceFile  <- objectStoreService.getObjectStoreFile(objectStoreFilePath).asPresentation
+        messageData <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
+        received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+        message = messageFactory
+          .createLargeMessage(
+            messageType,
+            messageData.generationDate,
+            received,
+            triggerId,
+            new URI(objectStoreURL)
+          )
+        _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
+      } yield message.id).fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        id => Ok(Json.toJson(UpdateMovementResponse(id)))
+      )
+  }
+
+  private def updateMovementSmallMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
     Action.streamWithAwait {
       awaitFileWrite => implicit request =>
         (for {

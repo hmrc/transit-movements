@@ -19,24 +19,18 @@ package uk.gov.hmrc.transitmovements.controllers
 import cats.data.EitherT
 import play.api.mvc.Headers
 import uk.gov.hmrc.transitmovements.config.Constants
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
-import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError
+import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
 
 import scala.concurrent.Future
 
-trait MessageTypeHeaderExtractor {
+trait ObjectStoreURIHeaderExtractor {
 
-  def extract(headers: Headers): EitherT[Future, HeaderExtractError, MessageType] =
+  def extractObjectStoreURI(headers: Headers): EitherT[Future, HeaderExtractError, String] =
     EitherT {
-      headers.get(Constants.MessageType) match {
-        case None => Future.successful(Left(NoHeaderFound("Missing X-Message-Type header value")))
-        case Some(headerValue) =>
-          MessageType.fromHeaderValue(headerValue) match {
-            case None              => Future.successful(Left(InvalidMessageType(s"Invalid X-Message-Type header value: $headerValue")))
-            case Some(messageType) => Future.successful(Right(messageType))
-          }
+      headers.get(Constants.ObjectStoreURI) match {
+        case Some(headerValue) => Future.successful(Right(headerValue))
+        case None              => Future.successful(Left(NoHeaderFound("Missing X-Object-Store-Uri header value")))
       }
     }
 }

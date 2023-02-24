@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovements.controllers.errors
 
 import cats.data.EitherT
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
+import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -64,6 +65,16 @@ trait ConvertError {
 
     def convert(streamError: StreamError): PresentationError = streamError match {
       case UnexpectedError(ex) => PresentationError.internalServiceError(cause = ex)
+    }
+  }
+
+  implicit val objectStoreErrorConverter = new Converter[ObjectStoreError] {
+
+    import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError._
+
+    def convert(objectStoreError: ObjectStoreError): PresentationError = objectStoreError match {
+      case FileNotFound(fileLocation) => PresentationError.notFoundError("File not found at location" + fileLocation)
+      case UnexpectedError(ex)        => PresentationError.internalServiceError(cause = ex)
     }
   }
 

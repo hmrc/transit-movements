@@ -23,10 +23,10 @@ import akka.util.Timeout
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchersSugar.eqTo
-import org.mockito.MockitoSugar.reset
-import org.mockito.MockitoSugar.when
 import org.mockito.Mockito.atLeastOnce
 import org.mockito.Mockito.verify
+import org.mockito.MockitoSugar.reset
+import org.mockito.MockitoSugar.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
@@ -51,6 +51,7 @@ import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
@@ -58,38 +59,25 @@ import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.Invali
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
 import uk.gov.hmrc.transitmovements.fakes.utils.FakePreMaterialisedFutureProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.ArrivalData
-import uk.gov.hmrc.transitmovements.models.DeclarationData
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.MessageData
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageStatus
-import uk.gov.hmrc.transitmovements.models.MessageStatus
-import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.Movement
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.MovementType
-import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
+import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
-import uk.gov.hmrc.transitmovements.services.MessageFactory
-import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
-import uk.gov.hmrc.transitmovements.services.MovementFactory
-import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
-import uk.gov.hmrc.transitmovements.services.errors.MongoError
+import uk.gov.hmrc.transitmovements.services._
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
+import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import java.net.URI
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.xml.NodeSeq
@@ -107,13 +95,14 @@ class MovementsControllerSpec
 
   implicit val timeout: Timeout = 5.seconds
 
-  val mrn             = arbitraryMovementReferenceNumber.arbitrary.sample.get
-  lazy val movementId = arbitraryMovementId.arbitrary.sample.get
-  lazy val messageId  = arbitraryMessageId.arbitrary.sample.get
-  lazy val triggerId  = arbitraryMessageId.arbitrary.sample.get
-  lazy val eoriNumber = arbitrary[EORINumber].sample.get
+  val mrn: MovementReferenceNumber = arbitraryMovementReferenceNumber.arbitrary.sample.get
+  lazy val movementId: MovementId  = arbitraryMovementId.arbitrary.sample.get
+  lazy val messageId: MessageId    = arbitraryMessageId.arbitrary.sample.get
+  lazy val triggerId: MessageId    = arbitraryMessageId.arbitrary.sample.get
+  lazy val eoriNumber: EORINumber  = arbitrary[EORINumber].sample.get
+  lazy val objectStoreURI: URI     = arbitrary[URI].sample.get
 
-  lazy val movement = arbitrary[Movement].sample.value.copy(
+  lazy val movement: Movement = arbitrary[Movement].sample.value.copy(
     _id = movementId,
     enrollmentEORINumber = eoriNumber,
     movementEORINumber = Some(eoriNumber),
@@ -122,9 +111,9 @@ class MovementsControllerSpec
     messages = Vector(message)
   )
 
-  val now = OffsetDateTime.now
+  val now: OffsetDateTime = OffsetDateTime.now
 
-  lazy val message = arbitraryMessage.arbitrary.sample.get.copy(id = messageId, generated = Some(now), received = now, triggerId = Some(triggerId))
+  lazy val message: Message = arbitraryMessage.arbitrary.sample.get.copy(id = messageId, generated = Some(now), received = now, triggerId = Some(triggerId))
 
   lazy val messageFactoryEither: EitherT[Future, StreamError, Message] =
     EitherT.rightT(message)
@@ -142,13 +131,16 @@ class MovementsControllerSpec
       body = body
     )
 
-  val mockMessagesXmlParsingService     = mock[MessagesXmlParsingService]
-  val mockMovementsXmlParsingService    = mock[MovementsXmlParsingService]
-  val mockRepository                    = mock[MovementsRepository]
-  val mockMessageFactory                = mock[MessageFactory]
-  val mockMovementFactory               = mock[MovementFactory]
-  val mockMessageTypeHeaderExtractor    = mock[MessageTypeHeaderExtractor]
-  implicit val mockTemporaryFileCreator = mock[TemporaryFileCreator]
+  val mockMessagesXmlParsingService: MessagesXmlParsingService         = mock[MessagesXmlParsingService]
+  val mockMovementsXmlParsingService: MovementsXmlParsingService       = mock[MovementsXmlParsingService]
+  val mockRepository: MovementsRepository                              = mock[MovementsRepository]
+  val mockMessageFactory: MessageFactory                               = mock[MessageFactory]
+  val mockMovementFactory: MovementFactory                             = mock[MovementFactory]
+  val mockMessageTypeHeaderExtractor: MessageTypeHeaderExtractor       = mock[MessageTypeHeaderExtractor]
+  val mockObjectStoreURIHeaderExtractor: ObjectStoreURIHeaderExtractor = mock[ObjectStoreURIHeaderExtractor]
+
+  val mockObjectStoreService: ObjectStoreService              = mock[ObjectStoreService]
+  implicit val mockTemporaryFileCreator: TemporaryFileCreator = mock[TemporaryFileCreator]
 
   override def afterEach() {
     reset(mockTemporaryFileCreator)
@@ -158,7 +150,7 @@ class MovementsControllerSpec
   }
 
   val instant: OffsetDateTime = OffsetDateTime.of(2022, 8, 26, 9, 0, 0, 0, ZoneOffset.UTC)
-  implicit val clock          = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
+  implicit val clock: Clock   = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
 
   val controller =
     new MovementsController(
@@ -168,6 +160,7 @@ class MovementsControllerSpec
       mockRepository,
       mockMovementsXmlParsingService,
       mockMessagesXmlParsingService,
+      mockObjectStoreService,
       FakePreMaterialisedFutureProvider
     )
 
@@ -1025,6 +1018,140 @@ class MovementsControllerSpec
           "message" -> "Internal server error"
         )
       }
+    }
+  }
+
+  "updateMovement for Large message" - {
+
+    val messageType = MessageType.DeclarationData
+
+    lazy val messageData: MessageData = MessageData(OffsetDateTime.now(ZoneId.of("UTC")), None)
+
+    lazy val messageDataEither: EitherT[Future, ParseError, MessageData] =
+      EitherT.rightT(messageData)
+
+    lazy val messageFactory =
+      arbitraryMessage.arbitrary.sample.get.copy(id = messageId, generated = Some(now), received = now, triggerId = Some(triggerId), url = Some(objectStoreURI))
+
+    "must return OK if XML data extraction is successful" in {
+
+      when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
+        .thenReturn(EitherT.rightT(messageType))
+
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT("object-store-uri"))
+
+      when(mockObjectStoreService.getObjectStoreFile(any[String])(any[ExecutionContext], any[HeaderCarrier]))
+        .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
+
+      when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
+        .thenReturn(messageDataEither)
+
+      when(
+        mockMessageFactory.createLargeMessage(
+          any[MessageType],
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          any[Option[MessageId]],
+          any[URI]
+        )
+      )
+        .thenReturn(messageFactory)
+
+      when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+        .thenReturn(EitherT.rightT(()))
+
+      lazy val request = FakeRequest(
+        method = "POST",
+        uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
+        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> "object-store-url")),
+        body = AnyContentAsEmpty
+      )
+
+      val result =
+        controller.updateMovement(movementId, Some(triggerId))(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.obj("messageId" -> messageId.value)
+    }
+
+    "must return BAD_REQUEST when Object Store uri header not supplied" in {
+
+      when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
+        .thenReturn(EitherT.rightT(messageType))
+
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers]))
+        .thenReturn(EitherT.leftT(NoHeaderFound("Missing X-Object-Store-Uri header value")))
+
+      lazy val request = FakeRequest(
+        method = "POST",
+        uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
+        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code)),
+        body = AnyContentAsEmpty
+      )
+
+      val result =
+        controller.updateMovement(movementId, Some(triggerId))(request)
+
+      status(result) mustBe BAD_REQUEST
+      contentAsJson(result) mustBe Json.obj(
+        "code"    -> "BAD_REQUEST",
+        "message" -> "Missing X-Object-Store-Uri header value"
+      )
+    }
+
+    "must return NOT_FOUND when file not found on object store uri location" in {
+
+      when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
+        .thenReturn(EitherT.rightT(messageType))
+
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT("object-store-uri"))
+      when(mockObjectStoreService.getObjectStoreFile(any[String])(any[ExecutionContext], any[HeaderCarrier]))
+        .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound("common-transit-conversion-traders/movements/text.xml")))
+      lazy val request = FakeRequest(
+        method = "POST",
+        uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
+        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> "common-transit-conversion-traders/movements/text.xml")),
+        body = AnyContentAsEmpty
+      )
+
+      val result =
+        controller.updateMovement(movementId, Some(triggerId))(request)
+
+      status(result) mustBe NOT_FOUND
+      contentAsJson(result) mustBe Json.obj(
+        "code"    -> "NOT_FOUND",
+        "message" -> "File not found at locationcommon-transit-conversion-traders/movements/text.xml"
+      )
+    }
+
+    "must return INTERNAL_SERVICE_ERROR when an invalid xml causes an unknown ParseError to be thrown" in {
+
+      when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
+        .thenReturn(EitherT.rightT(messageType))
+
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT("object-store-uri"))
+
+      when(mockObjectStoreService.getObjectStoreFile(any[String])(any[ExecutionContext], any[HeaderCarrier]))
+        .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
+
+      when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
+        .thenReturn(EitherT.leftT(ParseError.UnexpectedError(Some(new IllegalArgumentException()))))
+
+      lazy val request = FakeRequest(
+        method = "POST",
+        uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
+        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> "object-store-url")),
+        body = AnyContentAsEmpty
+      )
+
+      val result =
+        controller.updateMovement(movementId, Some(triggerId))(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+      contentAsJson(result) mustBe Json.obj(
+        "code"    -> "INTERNAL_SERVER_ERROR",
+        "message" -> "Internal server error"
+      )
     }
   }
 }
