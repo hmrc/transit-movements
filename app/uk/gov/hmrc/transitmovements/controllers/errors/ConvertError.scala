@@ -73,7 +73,7 @@ trait ConvertError {
     import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError._
 
     def convert(objectStoreError: ObjectStoreError): PresentationError = objectStoreError match {
-      case FileNotFound(fileLocation) => PresentationError.notFoundError("File not found at location" + fileLocation)
+      case FileNotFound(fileLocation) => PresentationError.notFoundError(s"file not found at location: $fileLocation")
       case UnexpectedError(ex)        => PresentationError.internalServiceError(cause = ex)
     }
   }

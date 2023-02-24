@@ -1120,7 +1120,7 @@ class MovementsControllerSpec
       status(result) mustBe NOT_FOUND
       contentAsJson(result) mustBe Json.obj(
         "code"    -> "NOT_FOUND",
-        "message" -> "File not found at locationcommon-transit-conversion-traders/movements/text.xml"
+        "message" -> "file not found at location: common-transit-conversion-traders/movements/text.xml"
       )
     }
 

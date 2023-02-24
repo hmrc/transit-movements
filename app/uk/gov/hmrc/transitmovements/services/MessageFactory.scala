@@ -109,7 +109,7 @@ class MessageFactoryImpl @Inject() (
       triggerId = triggerId,
       url = Some(objectStoreURI),
       body = None,
-      status = MessageStatus.Received
+      status = Some(MessageStatus.Received)
     )
 
   def createEmptyMessage(
