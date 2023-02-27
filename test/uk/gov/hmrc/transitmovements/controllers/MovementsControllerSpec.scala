@@ -1068,7 +1068,7 @@ class MovementsControllerSpec
       lazy val request = FakeRequest(
         method = "POST",
         uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
-        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> "object-store-url")),
+        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> ObjectStoreURI(filePath).value)),
         body = AnyContentAsEmpty
       )
 
@@ -1145,7 +1145,7 @@ class MovementsControllerSpec
       lazy val request = FakeRequest(
         method = "POST",
         uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
-        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> "object-store-url")),
+        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> ObjectStoreURI(filePath).value)),
         body = AnyContentAsEmpty
       )
 

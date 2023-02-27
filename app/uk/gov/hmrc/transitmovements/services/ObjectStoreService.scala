@@ -50,12 +50,12 @@ class ObjectStoreServiceImpl @Inject() (client: PlayObjectStoreClient) extends O
     EitherT(
       client
         .getObject[Source[ByteString, NotUsed]](
-          Path.File(objectStoreURI.path.map(_.mkString).getOrElse(objectStoreURI.value)),
+          Path.File(objectStoreURI.value),
           "common-transit-conversion-traders"
         )
         .flatMap {
           case Some(source) => Future.successful(Right(source.content))
-          case _            => Future.successful(Left(ObjectStoreError.FileNotFound(objectStoreURI.path.map(_.mkString).getOrElse(objectStoreURI.value))))
+          case _            => Future.successful(Left(ObjectStoreError.FileNotFound(objectStoreURI.value)))
         }
         .recover {
           case NonFatal(ex) => Left(ObjectStoreError.UnexpectedError(Some(ex)))

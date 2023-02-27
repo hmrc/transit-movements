@@ -20,6 +20,7 @@ import cats.data.EitherT
 import play.api.mvc.Headers
 import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError
+import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidObjectStoreURI
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 
@@ -30,8 +31,12 @@ trait ObjectStoreURIHeaderExtractor {
   def extractObjectStoreURI(headers: Headers): EitherT[Future, HeaderExtractError, ObjectStoreURI] =
     EitherT {
       headers.get(Constants.ObjectStoreURI) match {
-        case Some(headerValue) => Future.successful(Right(ObjectStoreURI.apply(headerValue)))
-        case None              => Future.successful(Left(NoHeaderFound("Missing X-Object-Store-Uri header value")))
+        case None => Future.successful(Left(NoHeaderFound("Missing X-Object-Store-Uri header value")))
+        case Some(headerValue) =>
+          ObjectStoreURI(headerValue).path match {
+            case None                 => Future.successful(Left(InvalidObjectStoreURI(s"Invalid X-Object-Store-Uri header value: $headerValue")))
+            case Some(objectStoreURI) => Future.successful(Right(ObjectStoreURI(objectStoreURI)))
+          }
       }
     }
 }

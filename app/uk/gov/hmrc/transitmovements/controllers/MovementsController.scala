@@ -27,6 +27,7 @@ import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
 import play.api.mvc.Result
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
+import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models._
@@ -37,7 +38,6 @@ import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
 import uk.gov.hmrc.transitmovements.utils.PreMaterialisedFutureProvider
 
-import java.net.URI
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -149,7 +149,7 @@ class MovementsController @Inject() (
             messageData.generationDate,
             received,
             triggerId,
-            objectStoreURI
+            ObjectStoreURI(request.headers.get(Constants.ObjectStoreURI).get)
           )
         _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
       } yield message.id).fold[Result](

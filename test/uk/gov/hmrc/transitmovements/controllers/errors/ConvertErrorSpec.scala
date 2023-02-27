@@ -26,6 +26,7 @@ import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.InternalServerError
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.NotFound
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
+import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidObjectStoreURI
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
 
 import java.time.format.DateTimeParseException
@@ -121,7 +122,7 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       }
     }
 
-    for (error <- Seq(NoHeaderFound("test"), InvalidMessageType("test")))
+    for (error <- Seq(NoHeaderFound("test"), InvalidMessageType("test"), InvalidObjectStoreURI("test")))
       s"${error.getClass.toString().split("\\$").last} should result in InternalServerError status" in {
         val input = Left[HeaderExtractError, Unit](error).toEitherT[Future]
         whenReady(input.asPresentation.value) {

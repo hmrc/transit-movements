@@ -16,14 +16,14 @@
 
 package uk.gov.hmrc.transitmovements.controllers
 
-import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
+import play.api.http.HeaderNames
+import play.api.http.MimeTypes
 import play.api.mvc.Headers
-import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovements.base.SpecBase
+import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidObjectStoreURI
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
-
-import java.util.UUID.randomUUID
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 
 class ObjectStoreURIHeaderExtractorSpec extends SpecBase with ModelGenerators {
 
@@ -43,16 +43,25 @@ class ObjectStoreURIHeaderExtractorSpec extends SpecBase with ModelGenerators {
       }
     }
 
-    "if object store uri header is supplied, return Right" in {
-      val filePath =
-        Path.Directory(s"common-transit-convention-traders/movements/${arbitraryMovementId.arbitrary.sample.get}").file(randomUUID.toString).asUri
+    "if object store uri supplied is invalid, return InvalidObjectStoreURI" in {
+      val invalidObjectStoreURIHeader = Headers(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Object-Store-Uri" -> "invalid")
+
+      val result = objectStoreURIExtractor.extractObjectStoreURI(invalidObjectStoreURIHeader)
+
+      whenReady(result.value) {
+        _ mustBe Left(InvalidObjectStoreURI(s"Invalid X-Object-Store-Uri header value: invalid"))
+      }
+    }
+
+    "if object store uri supplied is valid, return Right" in {
+      val filePath                  = "common-transit-convention-traders/movements/movementId/abc.xml"
       val objectStoreURI            = ObjectStoreURI(filePath).value
       val validObjectStoreURIHeader = Headers("X-Object-Store-Uri" -> objectStoreURI)
 
       val result = objectStoreURIExtractor.extractObjectStoreURI(validObjectStoreURIHeader)
 
       whenReady(result.value) {
-        _ mustBe Right(ObjectStoreURI(filePath))
+        _ mustBe Right(ObjectStoreURI("movements/movementId/abc.xml"))
       }
     }
 
