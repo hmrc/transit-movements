@@ -36,6 +36,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
+import uk.gov.hmrc.objectstore.client.Path
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
@@ -76,6 +77,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
+import java.util.UUID.randomUUID
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -101,6 +103,9 @@ class MovementsControllerSpec
   lazy val triggerId: MessageId    = arbitraryMessageId.arbitrary.sample.get
   lazy val eoriNumber: EORINumber  = arbitrary[EORINumber].sample.get
   lazy val objectStoreURI: URI     = arbitrary[URI].sample.get
+
+  lazy val filePath =
+    Path.Directory(s"common-transit-convention-traders/movements/${arbitraryMovementId.arbitrary.sample.get}").file(randomUUID.toString).asUri
 
   lazy val movement: Movement = arbitrary[Movement].sample.value.copy(
     _id = movementId,
@@ -1038,7 +1043,7 @@ class MovementsControllerSpec
       when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
         .thenReturn(EitherT.rightT(messageType))
 
-      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI("object-store-uri")))
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI(filePath)))
 
       when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreURI])(any[ExecutionContext], any[HeaderCarrier]))
         .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
@@ -1099,18 +1104,18 @@ class MovementsControllerSpec
       )
     }
 
-    "must return NOT_FOUND when file not found on object store uri location" in {
+    "must return BAD_REQUEST when file not found on object store uri location" in {
 
       when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
         .thenReturn(EitherT.rightT(messageType))
 
-      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI("object-store-uri")))
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI(filePath)))
       when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreURI])(any[ExecutionContext], any[HeaderCarrier]))
-        .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound("common-transit-conversion-traders/movements/text.xml")))
+        .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound(filePath)))
       lazy val request = FakeRequest(
         method = "POST",
         uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
-        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> "common-transit-conversion-traders/movements/text.xml")),
+        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> ObjectStoreURI(filePath).value)),
         body = AnyContentAsEmpty
       )
 
@@ -1120,7 +1125,7 @@ class MovementsControllerSpec
       status(result) mustBe BAD_REQUEST
       contentAsJson(result) mustBe Json.obj(
         "code"    -> "BAD_REQUEST",
-        "message" -> "file not found at location: common-transit-conversion-traders/movements/text.xml"
+        "message" -> s"file not found at location: $filePath"
       )
     }
 
@@ -1129,7 +1134,7 @@ class MovementsControllerSpec
       when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
         .thenReturn(EitherT.rightT(messageType))
 
-      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI("object-store-uri")))
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI(filePath)))
 
       when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreURI])(any[ExecutionContext], any[HeaderCarrier]))
         .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))

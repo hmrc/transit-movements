@@ -18,10 +18,14 @@ package uk.gov.hmrc.transitmovements.controllers
 
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import play.api.mvc.Headers
+import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
+import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 
-class ObjectStoreURIHeaderExtractorSpec extends SpecBase {
+import java.util.UUID.randomUUID
+
+class ObjectStoreURIHeaderExtractorSpec extends SpecBase with ModelGenerators {
 
   class ObjectStoreURIHeaderExtractorImpl extends ObjectStoreURIHeaderExtractor
 
@@ -40,13 +44,15 @@ class ObjectStoreURIHeaderExtractorSpec extends SpecBase {
     }
 
     "if object store uri header is supplied, return Right" in {
-      val objectStoreURI            = ObjectStoreURI("object-store-uri").value
+      val filePath =
+        Path.Directory(s"common-transit-convention-traders/movements/${arbitraryMovementId.arbitrary.sample.get}").file(randomUUID.toString).asUri
+      val objectStoreURI            = ObjectStoreURI(filePath).value
       val validObjectStoreURIHeader = Headers("X-Object-Store-Uri" -> objectStoreURI)
 
       val result = objectStoreURIExtractor.extractObjectStoreURI(validObjectStoreURIHeader)
 
       whenReady(result.value) {
-        _ mustBe Right(ObjectStoreURI("object-store-uri"))
+        _ mustBe Right(ObjectStoreURI(filePath))
       }
     }
 
