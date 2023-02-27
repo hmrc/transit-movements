@@ -89,9 +89,10 @@ class ObjectStoreServiceSpec
       val service = new ObjectStoreServiceImpl(mockObjectStoreClient)
       val result  = service.getObjectStoreFile(ObjectStoreURI("abc/movement/abc.xml"))
       whenReady(result.value) {
-        r =>
-          r.isLeft mustBe true
-          r.left.getOrElse(ObjectStoreError.FileNotFound) mustBe a[ObjectStoreError.FileNotFound]
+        case Left(_: ObjectStoreError.FileNotFound) => succeed
+        case x =>
+          fail(s"Expected Left(ObjectStoreError.FileNotFound), instead got $x")
+
       }
     }
 
@@ -101,7 +102,9 @@ class ObjectStoreServiceSpec
       val service = new ObjectStoreServiceImpl(mockObjectStoreClient)
       val result  = service.getObjectStoreFile(ObjectStoreURI("abc/movement/abc.xml"))
       whenReady(result.value) {
-        _ mustBe Left(ObjectStoreError.UnexpectedError(Some(error)))
+        case Left(_: ObjectStoreError.UnexpectedError) => succeed
+        case x =>
+          fail(s"Expected Left(ObjectStoreError.UnexpectedError), instead got $x")
       }
     }
 

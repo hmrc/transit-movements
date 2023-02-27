@@ -16,4 +16,22 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-case class ObjectStoreURI(value: String) extends AnyVal
+import scala.util.matching.Regex
+
+object ObjectStoreURI {
+
+  // The URI consists of the service name in the first part of the path, followed
+  // by the location of the object in the context of that service. As this service
+  // targets common-transit-convention-traders' objects exclusively, we ensure
+  // the URI is targeting that context. This regex ensures that this is the case.
+  val expectedUriPattern: Regex = "^common-transit-convention-traders/(.+)$".r
+
+}
+
+case class ObjectStoreURI(value: String) extends AnyVal {
+
+  def path: Option[String] = value match {
+    case ObjectStoreURI.expectedUriPattern(path) => Some(path)
+    case _                                       => None
+  }
+}

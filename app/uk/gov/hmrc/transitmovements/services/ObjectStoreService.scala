@@ -46,18 +46,19 @@ class ObjectStoreServiceImpl @Inject() (client: PlayObjectStoreClient) extends O
 
   override def getObjectStoreFile(
     objectStoreURI: ObjectStoreURI
-  )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]] = {
-    val objectStoreFilePath = if (objectStoreURI.value.contains("/")) objectStoreURI.value.split("/", 2).apply(1) else objectStoreURI.value
+  )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]] =
     EitherT(
       client
-        .getObject[Source[ByteString, NotUsed]](Path.File(objectStoreFilePath), "common-transit-conversion-traders")
+        .getObject[Source[ByteString, NotUsed]](
+          Path.File(objectStoreURI.path.map(_.mkString).getOrElse(objectStoreURI.value)),
+          "common-transit-conversion-traders"
+        )
         .flatMap {
           case Some(source) => Future.successful(Right(source.content))
-          case _            => Future.successful(Left(ObjectStoreError.FileNotFound(objectStoreFilePath)))
+          case _            => Future.successful(Left(ObjectStoreError.FileNotFound(objectStoreURI.path.map(_.mkString).getOrElse(objectStoreURI.value))))
         }
         .recover {
           case NonFatal(ex) => Left(ObjectStoreError.UnexpectedError(Some(ex)))
         }
     )
-  }
 }
