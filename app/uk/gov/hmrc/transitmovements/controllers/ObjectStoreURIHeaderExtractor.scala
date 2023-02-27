@@ -17,26 +17,44 @@
 package uk.gov.hmrc.transitmovements.controllers
 
 import cats.data.EitherT
+import play.api.mvc.BaseController
 import play.api.mvc.Headers
 import uk.gov.hmrc.transitmovements.config.Constants
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidObjectStoreURI
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
-import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
+import uk.gov.hmrc.transitmovements.controllers.ObjectStoreURIHeaderExtractor.expectedUriPattern
+import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
+import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
 
 import scala.concurrent.Future
+import scala.util.matching.Regex
+
+object ObjectStoreURIHeaderExtractor {
+
+  // The URI consists of the service name in the first part of the path, followed
+  // by the location of the object in the context of that service. As this service
+  // targets common-transit-convention-traders' objects exclusively, we ensure
+  // the URI is targeting that context. This regex ensures that this is the case.
+  val expectedUriPattern: Regex = "^common-transit-convention-traders/(.+)$".r
+}
 
 trait ObjectStoreURIHeaderExtractor {
+  self: BaseController =>
 
-  def extractObjectStoreURI(headers: Headers): EitherT[Future, HeaderExtractError, ObjectStoreURI] =
-    EitherT {
-      headers.get(Constants.ObjectStoreURI) match {
-        case None => Future.successful(Left(NoHeaderFound("Missing X-Object-Store-Uri header value")))
-        case Some(headerValue) =>
-          ObjectStoreURI(headerValue).path match {
-            case None                 => Future.successful(Left(InvalidObjectStoreURI(s"Invalid X-Object-Store-Uri header value: $headerValue")))
-            case Some(objectStoreURI) => Future.successful(Right(ObjectStoreURI(objectStoreURI)))
-          }
-      }
-    }
+  def extractObjectStoreURI(headers: Headers): EitherT[Future, PresentationError, ObjectStoreResourceLocation] =
+    EitherT(
+      Future.successful(
+        for {
+          headerValue                 <- getHeader(headers.get(Constants.ObjectStoreURI))
+          objectStoreResourceLocation <- getObjectStoreResourceLocation(headerValue)
+        } yield ObjectStoreResourceLocation(objectStoreResourceLocation)
+      )
+    )
+
+  def getHeader(objectStoreURI: Option[String]) =
+    objectStoreURI.toRight(PresentationError.badRequestError("Missing X-Object-Store-Uri header value"))
+
+  def getObjectStoreResourceLocation(headerValue: String) =
+    expectedUriPattern
+      .findFirstMatchIn(headerValue)
+      .map(_.group(1))
+      .toRight(PresentationError.badRequestError(s"X-Object-Store-Uri header value does not start with common-transit-convention-traders/ (got $headerValue)"))
 }

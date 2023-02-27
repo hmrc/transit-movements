@@ -138,10 +138,10 @@ class MovementsController @Inject() (
   def updateMovementLargeMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[AnyContent] = Action.async(parse.anyContent) {
     implicit request =>
       (for {
-        messageType    <- extract(request.headers).asPresentation
-        objectStoreURI <- extractObjectStoreURI(request.headers).asPresentation
-        sourceFile     <- objectStoreService.getObjectStoreFile(objectStoreURI).asPresentation
-        messageData    <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
+        messageType                 <- extract(request.headers).asPresentation
+        objectStoreResourceLocation <- extractObjectStoreURI(request.headers)
+        sourceFile                  <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
+        messageData                 <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
         message = messageFactory
           .createLargeMessage(
@@ -149,7 +149,7 @@ class MovementsController @Inject() (
             messageData.generationDate,
             received,
             triggerId,
-            ObjectStoreURI(request.headers.get(Constants.ObjectStoreURI).get)
+            ObjectStoreResourceLocation(request.headers.get(Constants.ObjectStoreURI).get)
           )
         _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
       } yield message.id).fold[Result](

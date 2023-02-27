@@ -58,6 +58,7 @@ import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
+import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.fakes.utils.FakePreMaterialisedFutureProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
@@ -1043,9 +1044,9 @@ class MovementsControllerSpec
       when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
         .thenReturn(EitherT.rightT(messageType))
 
-      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI(filePath)))
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreResourceLocation(filePath)))
 
-      when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreURI])(any[ExecutionContext], any[HeaderCarrier]))
+      when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[ExecutionContext], any[HeaderCarrier]))
         .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
 
       when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
@@ -1057,7 +1058,7 @@ class MovementsControllerSpec
           any[OffsetDateTime],
           any[OffsetDateTime],
           any[Option[MessageId]],
-          any[String].asInstanceOf[ObjectStoreURI]
+          any[String].asInstanceOf[ObjectStoreResourceLocation]
         )
       )
         .thenReturn(messageFactory)
@@ -1068,7 +1069,7 @@ class MovementsControllerSpec
       lazy val request = FakeRequest(
         method = "POST",
         uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
-        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> ObjectStoreURI(filePath).value)),
+        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> ObjectStoreResourceLocation(filePath).value)),
         body = AnyContentAsEmpty
       )
 
@@ -1085,7 +1086,7 @@ class MovementsControllerSpec
         .thenReturn(EitherT.rightT(messageType))
 
       when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers]))
-        .thenReturn(EitherT.leftT(NoHeaderFound("Missing X-Object-Store-Uri header value")))
+        .thenReturn(EitherT.leftT(PresentationError.badRequestError("Missing X-Object-Store-Uri header value")))
 
       lazy val request = FakeRequest(
         method = "POST",
@@ -1104,18 +1105,18 @@ class MovementsControllerSpec
       )
     }
 
-    "must return BAD_REQUEST when file not found on object store uri location" in {
+    "must return BAD_REQUEST when file not found on object store resource location" in {
 
       when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
         .thenReturn(EitherT.rightT(messageType))
 
-      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI(filePath)))
-      when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreURI])(any[ExecutionContext], any[HeaderCarrier]))
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreResourceLocation(filePath)))
+      when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[ExecutionContext], any[HeaderCarrier]))
         .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound(filePath)))
       lazy val request = FakeRequest(
         method = "POST",
         uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
-        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> ObjectStoreURI(filePath).value)),
+        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> ObjectStoreResourceLocation(filePath).value)),
         body = AnyContentAsEmpty
       )
 
@@ -1134,9 +1135,9 @@ class MovementsControllerSpec
       when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
         .thenReturn(EitherT.rightT(messageType))
 
-      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreURI(filePath)))
+      when(mockObjectStoreURIHeaderExtractor.extractObjectStoreURI(any[Headers])).thenReturn(EitherT.rightT(ObjectStoreResourceLocation(filePath)))
 
-      when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreURI])(any[ExecutionContext], any[HeaderCarrier]))
+      when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[ExecutionContext], any[HeaderCarrier]))
         .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
 
       when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
@@ -1145,7 +1146,7 @@ class MovementsControllerSpec
       lazy val request = FakeRequest(
         method = "POST",
         uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
-        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> ObjectStoreURI(filePath).value)),
+        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> ObjectStoreResourceLocation(filePath).value)),
         body = AnyContentAsEmpty
       )
 

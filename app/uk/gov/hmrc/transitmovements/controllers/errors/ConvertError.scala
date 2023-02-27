@@ -82,9 +82,8 @@ trait ConvertError {
     import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError._
 
     def convert(headerExtractError: HeaderExtractError): PresentationError = headerExtractError match {
-      case NoHeaderFound(message)                 => PresentationError.badRequestError(message)
-      case InvalidMessageType(message)            => PresentationError.badRequestError(message)
-      case InvalidObjectStoreURI(objectStorePath) => PresentationError.badRequestError(objectStorePath)
+      case NoHeaderFound(message)      => PresentationError.badRequestError(message)
+      case InvalidMessageType(message) => PresentationError.badRequestError(message)
     }
   }
 

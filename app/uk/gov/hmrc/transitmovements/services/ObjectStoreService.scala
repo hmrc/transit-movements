@@ -26,7 +26,7 @@ import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClient
 import uk.gov.hmrc.objectstore.client.play.Implicits._
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.objectstore.client.Path
-import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
+import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
 
 import javax.inject._
 import scala.concurrent._
@@ -36,7 +36,7 @@ import scala.util.control.NonFatal
 trait ObjectStoreService {
 
   def getObjectStoreFile(
-    objectStoreURI: ObjectStoreURI
+    objectStoreResourceLocation: ObjectStoreResourceLocation
   )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]]
 
 }
@@ -45,17 +45,17 @@ trait ObjectStoreService {
 class ObjectStoreServiceImpl @Inject() (client: PlayObjectStoreClient) extends ObjectStoreService {
 
   override def getObjectStoreFile(
-    objectStoreURI: ObjectStoreURI
+    objectStoreResourceLocation: ObjectStoreResourceLocation
   )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]] =
     EitherT(
       client
         .getObject[Source[ByteString, NotUsed]](
-          Path.File(objectStoreURI.value),
+          Path.File(objectStoreResourceLocation.value),
           "common-transit-conversion-traders"
         )
         .flatMap {
           case Some(source) => Future.successful(Right(source.content))
-          case _            => Future.successful(Left(ObjectStoreError.FileNotFound(objectStoreURI.value)))
+          case _            => Future.successful(Left(ObjectStoreError.FileNotFound(objectStoreResourceLocation.value)))
         }
         .recover {
           case NonFatal(ex) => Left(ObjectStoreError.UnexpectedError(Some(ex)))

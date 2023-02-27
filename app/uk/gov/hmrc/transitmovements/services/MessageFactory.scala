@@ -26,7 +26,7 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
+import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -61,7 +61,7 @@ trait MessageFactory {
     generationDate: OffsetDateTime,
     received: OffsetDateTime,
     triggerId: Option[MessageId],
-    objectStoreURI: ObjectStoreURI
+    objectStoreURI: ObjectStoreResourceLocation
   ): Message
 }
 
@@ -100,7 +100,7 @@ class MessageFactoryImpl @Inject() (
     generationDate: OffsetDateTime,
     received: OffsetDateTime,
     triggerId: Option[MessageId],
-    objectStoreURI: ObjectStoreURI
+    objectStoreURI: ObjectStoreResourceLocation
   ): Message =
     Message(
       id = MessageId(ShortUUID.next(clock, random)),

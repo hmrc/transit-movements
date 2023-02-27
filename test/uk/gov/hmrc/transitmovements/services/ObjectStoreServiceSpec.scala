@@ -41,7 +41,7 @@ import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClient
 import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
+import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 
 import java.time.Instant
@@ -69,13 +69,13 @@ class ObjectStoreServiceSpec
 
     "should return the contents of a file" in {
       val filePath =
-        Path.Directory(s"common-transit-convention-traders/movements/${arbitraryMovementId.arbitrary.sample.get}").file(randomUUID.toString).asUri
+        Path.Directory(s"movements/${arbitraryMovementId.arbitrary.sample.get}").file(randomUUID.toString).asUri
       val metadata    = ObjectMetadata("", 0, Md5Hash(""), Instant.now(), Map.empty[String, String])
       val content     = "content"
       val fileContent = Option[Object[Source[ByteString, NotUsed]]](Object.apply(File(filePath), Source.single(ByteString(content)), metadata))
       when(mockObjectStoreClient.getObject[Source[ByteString, NotUsed]](any[File](), any())(any(), any())).thenReturn(Future.successful(fileContent))
       val service = new ObjectStoreServiceImpl(mockObjectStoreClient)
-      val result  = service.getObjectStoreFile(ObjectStoreURI(filePath))
+      val result  = service.getObjectStoreFile(ObjectStoreResourceLocation(filePath))
       whenReady(result.value) {
         r =>
           r.isRight mustBe true
@@ -87,7 +87,7 @@ class ObjectStoreServiceSpec
     "should return an error when the file is not found on path" in {
       when(mockObjectStoreClient.getObject(any[File](), any())(any(), any())).thenReturn(Future.successful(None))
       val service = new ObjectStoreServiceImpl(mockObjectStoreClient)
-      val result  = service.getObjectStoreFile(ObjectStoreURI("abc/movement/abc.xml"))
+      val result  = service.getObjectStoreFile(ObjectStoreResourceLocation("abc/movement/abc.xml"))
       whenReady(result.value) {
         case Left(_: ObjectStoreError.FileNotFound) => succeed
         case x =>
@@ -100,7 +100,7 @@ class ObjectStoreServiceSpec
       val error = UpstreamErrorResponse("error", INTERNAL_SERVER_ERROR)
       when(mockObjectStoreClient.getObject(any[File](), any())(any(), any())).thenReturn(Future.failed(error))
       val service = new ObjectStoreServiceImpl(mockObjectStoreClient)
-      val result  = service.getObjectStoreFile(ObjectStoreURI("abc/movement/abc.xml"))
+      val result  = service.getObjectStoreFile(ObjectStoreResourceLocation("abc/movement/abc.xml"))
       whenReady(result.value) {
         case Left(_: ObjectStoreError.UnexpectedError) => succeed
         case x =>
