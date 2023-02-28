@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovements.controllers
 
 import cats.data.EitherT
 import play.api.mvc.Headers
+import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
 import uk.gov.hmrc.transitmovements.models.MessageType
@@ -29,7 +30,7 @@ trait MessageTypeHeaderExtractor {
 
   def extract(headers: Headers): EitherT[Future, HeaderExtractError, MessageType] =
     EitherT {
-      headers.get("X-Message-Type") match {
+      headers.get(Constants.MessageType) match {
         case None => Future.successful(Left(NoHeaderFound("Missing X-Message-Type header value")))
         case Some(headerValue) =>
           MessageType.fromHeaderValue(headerValue) match {

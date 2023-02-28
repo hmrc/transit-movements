@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.controllers.errors
+package uk.gov.hmrc.transitmovements.config
 
-sealed abstract class HeaderExtractError
+object Constants {
 
-object HeaderExtractError {
-  case class NoHeaderFound(element: String)      extends HeaderExtractError
-  case class InvalidMessageType(element: String) extends HeaderExtractError
+  val ObjectStoreURI = "X-Object-Store-Uri"
+  val MessageType    = "X-Message-Type"
 
 }

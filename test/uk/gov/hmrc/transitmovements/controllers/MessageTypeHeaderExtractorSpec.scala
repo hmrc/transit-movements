@@ -34,7 +34,7 @@ class MessageTypeHeaderExtractorSpec extends SpecBase {
   "extract" - {
 
     "if message type header is not supplied, return NoHeaderFound" in {
-      val noMessageTypeHeader = Headers((HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
+      val noMessageTypeHeader = Headers(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)
 
       val result = messageTypeExtractor.extract(noMessageTypeHeader)
 
@@ -44,7 +44,7 @@ class MessageTypeHeaderExtractorSpec extends SpecBase {
     }
 
     "if message type supplied is invalid, return InvalidMessageType" in {
-      val invalidMessageTypeHeader = Headers((HeaderNames.CONTENT_TYPE -> MimeTypes.XML), ("X-Message-Type" -> "invalid"))
+      val invalidMessageTypeHeader = Headers(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> "invalid")
 
       val result = messageTypeExtractor.extract(invalidMessageTypeHeader)
 
@@ -55,7 +55,7 @@ class MessageTypeHeaderExtractorSpec extends SpecBase {
 
     "if message type is valid, return Right" in {
       val messageType            = Gen.oneOf(MessageType.values).sample.get
-      val validMessageTypeHeader = Headers((HeaderNames.CONTENT_TYPE -> MimeTypes.XML), ("X-Message-Type" -> s"${messageType.code}"))
+      val validMessageTypeHeader = Headers(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> s"${messageType.code}")
 
       val result = messageTypeExtractor.extract(validMessageTypeHeader)
 

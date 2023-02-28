@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.controllers.errors
+package uk.gov.hmrc.transitmovements.models
 
-sealed abstract class HeaderExtractError
-
-object HeaderExtractError {
-  case class NoHeaderFound(element: String)      extends HeaderExtractError
-  case class InvalidMessageType(element: String) extends HeaderExtractError
-
-}
+case class ObjectStoreResourceLocation(value: String) extends AnyVal

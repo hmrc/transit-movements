@@ -26,9 +26,11 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
+import java.net.URI
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -52,6 +54,14 @@ trait MessageFactory {
   def createEmptyMessage(
     messageType: MessageType,
     received: OffsetDateTime
+  ): Message
+
+  def createLargeMessage(
+    messageType: MessageType,
+    generationDate: OffsetDateTime,
+    received: OffsetDateTime,
+    triggerId: Option[MessageId],
+    objectStoreURI: ObjectStoreResourceLocation
   ): Message
 }
 
@@ -84,6 +94,24 @@ class MessageFactoryImpl @Inject() (
           status = Some(status)
         )
     }
+
+  def createLargeMessage(
+    messageType: MessageType,
+    generationDate: OffsetDateTime,
+    received: OffsetDateTime,
+    triggerId: Option[MessageId],
+    objectStoreURI: ObjectStoreResourceLocation
+  ): Message =
+    Message(
+      id = MessageId(ShortUUID.next(clock, random)),
+      received = received,
+      generated = Some(generationDate),
+      messageType = messageType,
+      triggerId = triggerId,
+      url = Some(new URI(objectStoreURI.value)),
+      body = None,
+      status = Some(MessageStatus.Received)
+    )
 
   def createEmptyMessage(
     messageType: MessageType,

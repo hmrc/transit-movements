@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.controllers.errors
+package uk.gov.hmrc.transitmovements.services.errors
 
-sealed abstract class HeaderExtractError
+sealed abstract class ObjectStoreError extends Throwable
 
-object HeaderExtractError {
-  case class NoHeaderFound(element: String)      extends HeaderExtractError
-  case class InvalidMessageType(element: String) extends HeaderExtractError
-
+object ObjectStoreError {
+  case class UnexpectedError(caughtException: Option[Throwable] = None) extends ObjectStoreError
+  case class FileNotFound(fileLocation: String)                         extends ObjectStoreError
 }
