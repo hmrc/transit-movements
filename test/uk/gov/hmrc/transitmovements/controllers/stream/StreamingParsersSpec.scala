@@ -25,6 +25,7 @@ import org.scalacheck.Gen
 import org.scalatest.OptionValues
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.Status.OK
 import play.api.libs.Files.SingletonTemporaryFileCreator
@@ -38,23 +39,20 @@ import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.base.TestSourceProvider
-import uk.gov.hmrc.transitmovements.fakes.utils.FakePreMaterialisedFutureProvider
 
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
-import scala.collection.immutable
 import scala.concurrent.Future
 
 class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSystem with OptionValues with TestSourceProvider {
 
   lazy val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "text/plain", HeaderNames.ACCEPT -> "application/vnd.hmrc.2.0+json"))
 
-  object Harness extends BaseController with StreamingParsers {
+  object Harness extends BaseController with StreamingParsers with Logging {
 
-    override val controllerComponents          = stubControllerComponents()
-    override val preMaterialisedFutureProvider = FakePreMaterialisedFutureProvider
-    implicit val temporaryFileCreator          = SingletonTemporaryFileCreator
-    implicit val materializer                  = Materializer(TestActorSystem.system)
+    override val controllerComponents = stubControllerComponents()
+    implicit val temporaryFileCreator = SingletonTemporaryFileCreator
+    implicit val materializer         = Materializer(TestActorSystem.system)
 
     def testFromMemory: Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
       request => result.apply(request).run(request.body)(materializer)
@@ -76,17 +74,6 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
           )
     }
 
-    def resultStreamAwait: Action[Source[ByteString, _]] = Action.streamWithAwait {
-      await => request =>
-        (for {
-          a <- request.body.runWith(Sink.head)
-          _ <- await.value
-          b <- request.body.runWith(Sink.head)
-        } yield (a ++ b).utf8String)
-          .map(
-            r => Ok(r)
-          )
-    }
   }
 
   @tailrec
@@ -118,14 +105,6 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
       val string  = Gen.stringOfN(20, Gen.alphaNumChar).sample.value
       val request = FakeRequest("POST", "/", headers, singleUseStringSource(string))
       val result  = Harness.resultStream()(request)
-      status(result) mustBe OK
-      contentAsString(result) mustBe (string ++ string)
-    }
-
-    "via the streamWithAwait extension method" in {
-      val string  = Gen.stringOfN(2000, Gen.alphaNumChar).sample.value
-      val request = FakeRequest("POST", "/", headers, singleUseStringSource(string))
-      val result  = Harness.resultStreamAwait()(request)
       status(result) mustBe OK
       contentAsString(result) mustBe (string ++ string)
     }
