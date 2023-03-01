@@ -36,7 +36,6 @@ import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
-import uk.gov.hmrc.transitmovements.utils.PreMaterialisedFutureProvider
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -52,8 +51,7 @@ class MovementsController @Inject() (
   repo: MovementsRepository,
   movementsXmlParsingService: MovementsXmlParsingService,
   messagesXmlParsingService: MessagesXmlParsingService,
-  objectStoreService: ObjectStoreService,
-  val preMaterialisedFutureProvider: PreMaterialisedFutureProvider
+  objectStoreService: ObjectStoreService
 )(implicit
   val materializer: Materializer,
   clock: Clock,
@@ -77,11 +75,10 @@ class MovementsController @Inject() (
       case None => createEmptyMovement(eori, movementType)
     }
 
-  private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithAwait {
-    awaitFileWrite => implicit request =>
+  private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = Action.stream {
+    implicit request =>
       (for {
         arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
-        _           <- awaitFileWrite
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
         message <- messageFactory
           .create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body, MessageStatus.Processing)
@@ -94,11 +91,10 @@ class MovementsController @Inject() (
       )
   }
 
-  private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithAwait {
-    awaitFileWrite => implicit request =>
+  private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.stream {
+    implicit request =>
       (for {
         declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
-        _               <- awaitFileWrite
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
         message <- messageFactory
           .create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body, MessageStatus.Processing)
@@ -159,12 +155,11 @@ class MovementsController @Inject() (
   }
 
   private def updateMovementSmallMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
-    Action.streamWithAwait {
-      awaitFileWrite => implicit request =>
+    Action.stream {
+      implicit request =>
         (for {
           messageType <- extract(request.headers).asPresentation
           messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
-          _           <- awaitFileWrite
           received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
           status   = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
           message <- messageFactory

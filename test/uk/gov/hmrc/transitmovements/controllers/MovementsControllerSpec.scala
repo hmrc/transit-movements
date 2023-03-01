@@ -59,7 +59,6 @@ import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
-import uk.gov.hmrc.transitmovements.fakes.utils.FakePreMaterialisedFutureProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
@@ -166,8 +165,7 @@ class MovementsControllerSpec
       mockRepository,
       mockMovementsXmlParsingService,
       mockMessagesXmlParsingService,
-      mockObjectStoreService,
-      FakePreMaterialisedFutureProvider
+      mockObjectStoreService
     )
 
   "createMovement - Departure" - {
