@@ -63,6 +63,16 @@ trait MessageFactory {
     triggerId: Option[MessageId],
     objectStoreURI: ObjectStoreResourceLocation
   ): Message
+
+  def updateLargeMessage(
+    messageType: MessageType,
+    generationDate: Option[OffsetDateTime],
+    received: OffsetDateTime,
+    messageId: MessageId,
+    objectStoreURI: Option[ObjectStoreResourceLocation],
+    status: MessageStatus
+  ): Message
+
 }
 
 class MessageFactoryImpl @Inject() (
@@ -112,6 +122,31 @@ class MessageFactoryImpl @Inject() (
       body = None,
       status = Some(MessageStatus.Received)
     )
+
+  def updateLargeMessage(
+    messageType: MessageType,
+    generationDate: Option[OffsetDateTime],
+    received: OffsetDateTime,
+    messageId: MessageId,
+    objectStoreURI: Option[ObjectStoreResourceLocation],
+    status: MessageStatus
+  ): Message = {
+
+    val uri = objectStoreURI match {
+      case Some(_) => Some(new URI(objectStoreURI.get.value))
+      case None    => None
+    }
+    Message(
+      id = messageId,
+      received = received,
+      generated = generationDate,
+      messageType = messageType,
+      triggerId = None,
+      url = uri,
+      body = None,
+      status = Some(status)
+    )
+  }
 
   def createEmptyMessage(
     messageType: MessageType,

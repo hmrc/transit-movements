@@ -12,3 +12,5 @@ GET        /traders/:EORI/movements/:movementType/:movementId/messages/:messageI
 
 POST       /traders/movements/:movementId/messages                                 uk.gov.hmrc.transitmovements.controllers.MovementsController.updateMovement(movementId: MovementId, triggerId: Option[MessageId] ?= None)
 
+PATCH      /traders/movements/:movementId/messages/:messageId                             uk.gov.hmrc.transitmovements.controllers.MovementsController.updateMessage(movementId: MovementId, messageId: MessageId)
+

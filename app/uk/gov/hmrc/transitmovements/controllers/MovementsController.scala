@@ -19,17 +19,23 @@ package uk.gov.hmrc.transitmovements.controllers
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import cats.data.EitherT
 import play.api.Logging
 import play.api.libs.Files.TemporaryFileCreator
+import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
+import play.api.mvc.Request
 import play.api.mvc.Result
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
+import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovements.models.LargeMessageMetadata
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
@@ -43,6 +49,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
+import scala.concurrent.Future
 
 @Singleton
 class MovementsController @Inject() (
@@ -133,6 +140,62 @@ class MovementsController @Inject() (
     contentTypeRoute {
       case Some(_) => updateMovementSmallMessage(movementId, triggerId)
       case None    => updateMovementLargeMessage(movementId, triggerId)
+    }
+
+  def updateMessage(movementId: MovementId, messageId: MessageId) =
+    Action.async(parse.json) {
+      implicit request =>
+        mapRequest(request.body)
+          .flatMap {
+            largeMessageMetadata => handleUpdateMessage(largeMessageMetadata, request, movementId, messageId)
+          }
+          .fold[Result](
+            presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
+            x => x
+          )
+    }
+
+  private def handleUpdateMessage(largeMessageMetadata: LargeMessageMetadata, request: Request[JsValue], movementId: MovementId, messageId: MessageId)(implicit
+    hc: HeaderCarrier
+  ) =
+    largeMessageMetadata match {
+      case LargeMessageMetadata(Some(_), status) =>
+        (for {
+          messageType <- extract(request.headers).asPresentation
+          sourceFile  <- objectStoreService.getObjectStoreFile(largeMessageMetadata.objectStoreURI.get).asPresentation
+          messageData <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
+          received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+          message = messageFactory.updateLargeMessage(
+            messageType,
+            Some(messageData.generationDate),
+            received,
+            messageId,
+            largeMessageMetadata.objectStoreURI,
+            status
+          )
+          _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
+        } yield Ok)
+
+      case LargeMessageMetadata(None, status) =>
+        (for {
+          messageType <- extract(request.headers).asPresentation
+          received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+          message  = messageFactory.updateLargeMessage(messageType, None, received, messageId, None, status)
+          _ <- repo.updateMessages(movementId, message, None, received).asPresentation
+        } yield Ok)
+    }
+
+  private def mapRequest(responseBody: JsValue): EitherT[Future, PresentationError, LargeMessageMetadata] =
+    EitherT {
+      responseBody
+        .validate[LargeMessageMetadata]
+        .map(
+          largeMessageMetadata => Future.successful(Right(largeMessageMetadata))
+        )
+        .getOrElse {
+          logger.error("Unable to parse unexpected request")
+          Future.successful(Left(PresentationError.badRequestError("Could not parse the request")))
+        }
     }
 
   def updateMovementLargeMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[AnyContent] = Action.async(parse.anyContent) {
