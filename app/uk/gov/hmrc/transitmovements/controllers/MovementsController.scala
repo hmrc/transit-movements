@@ -173,7 +173,7 @@ class MovementsController @Inject() (
             largeMessageMetadata.objectStoreURI,
             status
           )
-          _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
+          _ <- repo.updateMessage(movementId, message, messageData.mrn, received).asPresentation
         } yield Ok)
 
       case LargeMessageMetadata(None, status) =>
@@ -181,7 +181,7 @@ class MovementsController @Inject() (
           messageType <- extract(request.headers).asPresentation
           received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
           message  = messageFactory.updateLargeMessage(messageType, None, received, messageId, None, status)
-          _ <- repo.updateMessages(movementId, message, None, received).asPresentation
+          _ <- repo.updateMessage(movementId, message, None, received).asPresentation
         } yield Ok)
     }
 

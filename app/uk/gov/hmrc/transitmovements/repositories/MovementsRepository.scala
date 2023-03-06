@@ -26,7 +26,10 @@ import com.mongodb.client.model.Filters.empty
 import com.mongodb.client.model.Updates.{push => mPush}
 import com.mongodb.client.model.Updates.{set => mSet}
 import com.mongodb.client.model.Updates.{combine => mCombine}
+import com.mongodb.client.model.UpdateOptions
 import org.bson.conversions.Bson
+import org.mongodb.scala.MongoClient
+import org.mongodb.scala.MongoClient.DEFAULT_CODEC_REGISTRY
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
 import play.api.Logging
@@ -51,6 +54,7 @@ import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.util.Collections
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -98,6 +102,13 @@ trait MovementsRepository {
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
+  def updateMessage(
+    movementId: MovementId,
+    message: Message,
+    mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit]
+
 }
 
 object MovementsRepositoryImpl {
@@ -121,6 +132,7 @@ class MovementsRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.movementWithoutMessagesFormat),
         Codecs.playFormatCodec(MongoFormats.messageResponseFormat),
         Codecs.playFormatCodec(MongoFormats.messageFormat),
+        //Codecs.playFormatCodec(MongoFormats.messageStatusFormat),
         Codecs.playFormatCodec(MongoFormats.movementIdFormat),
         Codecs.playFormatCodec(MongoFormats.mrnFormat),
         Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
@@ -307,6 +319,42 @@ class MovementsRepositoryImpl @Inject() (
       .getOrElse(Seq())
 
     mongoRetry(Try(collection.updateOne(filter, mCombine(combined: _*))) match {
+      case Success(obs) =>
+        obs.toFuture().map {
+          result =>
+            if (result.wasAcknowledged()) {
+              if (result.getModifiedCount == 0) Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+              else Right(())
+            } else {
+              Left(UpdateNotAcknowledged(s"Message update failed for movement: $movementId"))
+            }
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+  }
+
+  def updateMessage(
+    movementId: MovementId,
+    message: Message,
+    mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit] = {
+
+    val filter: Bson = mEq(movementId.value)
+
+    val setUpdated = mSet("updated", received)
+    val setStatus  = mSet("messages.$[element].status", message.status.get.toString)
+
+    val arrayFilters = new UpdateOptions().arrayFilters(Collections.singletonList(Filters.in("element.id", message.id.value)))
+
+    val combined = Seq(setUpdated, setStatus) ++ message.url
+      .map(
+        x => Seq(mSet("messages.$[element].url", x.toString))
+      )
+      .getOrElse(Seq())
+
+    mongoRetry(Try(collection.updateOne(filter, mCombine(combined: _*), arrayFilters)) match {
       case Success(obs) =>
         obs.toFuture().map {
           result =>
