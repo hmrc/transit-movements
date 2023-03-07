@@ -609,4 +609,19 @@ class MovementsRepositorySpec
 
   }
 
+  "updateMessage" should "return error if there is no matching movement with the given id" in {
+
+    val movementId = arbitrary[MovementId].sample.value
+
+    val message =
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(movementId.value)))
+
+    val result = await(
+      repository.updateMessage(movementId, message.id, UpdateMessageMetadata(None, MessageStatus.Failed), instant).value
+    )
+
+    result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
+
+  }
+
 }
