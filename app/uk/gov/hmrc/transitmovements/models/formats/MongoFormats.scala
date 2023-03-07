@@ -24,7 +24,6 @@ import uk.gov.hmrc.mongo.play.json.formats.MongoBinaryFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
 import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
@@ -54,7 +53,6 @@ trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
   implicit val movementFormat: Format[Movement]                               = Json.format[Movement]
   implicit val movementWithoutMessagesFormat: Format[MovementWithoutMessages] = Json.format[MovementWithoutMessages]
   implicit val messageResponseFormat: Format[MessageResponse]                 = Json.format[MessageResponse]
-  //implicit val messageStatusFormat: Format[MessageStatus]                     = Json.format[MessageStatus]
 
 }
 
