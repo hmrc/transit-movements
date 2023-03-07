@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovements.repositories
 import org.mongodb.scala.model.Filters
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.OptionValues
+import org.scalatest.stats
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -35,6 +36,7 @@ import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
+import java.net.URI
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -536,4 +538,75 @@ class MovementsRepositorySpec
     result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
 
   }
+
+  "updateMessage" should "update the existing message with both status and object store url" in {
+
+    val message1 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None, status = Some(MessageStatus.Pending))
+
+    val departureMovement =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(message1)
+        )
+
+    await(
+      repository.insert(departureMovement).value
+    )
+
+    val message2 = UpdateMessageMetadata(Some(ObjectStoreResourceLocation("some-url")), MessageStatus.Success)
+
+    val result = await(
+      repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
+    }
+
+    movement.updated shouldEqual receivedInstant
+    movement.messages.length should be(1)
+    movement.messages.head.status shouldBe Some(message2.status)
+    movement.messages.head.url.value.toString shouldBe message2.objectStoreURI.get.value
+
+  }
+
+  "updateMessage" should "update an existing message with status only" in {
+    val message1 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None, status = Some(MessageStatus.Pending))
+
+    val departureMovement =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(message1)
+        )
+
+    await(
+      repository.insert(departureMovement).value
+    )
+
+    val message2 = UpdateMessageMetadata(None, MessageStatus.Failed)
+
+    val result = await(
+      repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
+    }
+
+    movement.updated shouldEqual receivedInstant
+    movement.messages.length should be(1)
+    movement.messages.head.status shouldBe Some(message2.status)
+
+  }
+
 }

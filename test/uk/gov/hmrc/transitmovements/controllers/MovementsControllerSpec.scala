@@ -1184,30 +1184,12 @@ class MovementsControllerSpec
 
     "must return OK, if the update message is successful, given both object store uri and status provided in the request" in {
 
-      when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
-        .thenReturn(EitherT.rightT(messageType))
-
-      when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[ExecutionContext], any[HeaderCarrier]))
-        .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
-
-      when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
-        .thenReturn(messageDataEither)
-
       when(
-        mockMessageFactory.updateLargeMessage(
-          any[MessageType],
-          any[Option[OffsetDateTime]],
-          any[OffsetDateTime],
-          any[String].asInstanceOf[MessageId],
-          any[Option[ObjectStoreResourceLocation]],
-          any[MessageStatus]
-        )
-      ).thenReturn(messageFactory)
-
-      when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+        mockRepository.updateMessage(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any[UpdateMessageMetadata], any[OffsetDateTime])
+      )
         .thenReturn(EitherT.rightT(()))
 
-      val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON, ("X-Message-Type" -> messageType.code)))
+      val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
       val body = Json.obj(
         "objectStoreURI" -> "somepath",
         "status"         -> "Success"
@@ -1227,35 +1209,12 @@ class MovementsControllerSpec
 
     "must return OK, if the update message is successful, given Only status is provided in the request" in {
 
-      lazy val messageFactory =
-        arbitraryMessage.arbitrary.sample.get.copy(
-          id = messageId,
-          generated = None,
-          received = now,
-          triggerId = None,
-          url = None,
-          body = None,
-          status = Some(MessageStatus.Failed)
-        )
-
-      when(mockMessageTypeHeaderExtractor.extract(any[Headers]))
-        .thenReturn(EitherT.rightT(messageType))
-
       when(
-        mockMessageFactory.updateLargeMessage(
-          any[MessageType],
-          any[Option[OffsetDateTime]],
-          any[OffsetDateTime],
-          any[String].asInstanceOf[MessageId],
-          any[Option[ObjectStoreResourceLocation]],
-          any[MessageStatus]
-        )
-      ).thenReturn(messageFactory)
-
-      when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+        mockRepository.updateMessage(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any[UpdateMessageMetadata], any[OffsetDateTime])
+      )
         .thenReturn(EitherT.rightT(()))
 
-      val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON, ("X-Message-Type" -> messageType.code)))
+      val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
       val body = Json.obj(
         "status" -> "Failed"
       )
@@ -1273,7 +1232,7 @@ class MovementsControllerSpec
     }
 
     "must return BAD_REQUEST when JSON data extraction fails" in {
-      val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON, ("X-Message-Type" -> messageType.code)))
+      val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
       val body = Json.obj(
         "objectStoreURI" -> "somepath"
       )

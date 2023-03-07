@@ -27,15 +27,11 @@ import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import java.io.File
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
-import uk.gov.hmrc.transitmovements.models.MessageStatus.Failed
-import uk.gov.hmrc.transitmovements.models.MessageStatus.Success
 import uk.gov.hmrc.transitmovements.models.MessageStatus.Received
 import uk.gov.hmrc.transitmovements.models.MessageStatus.Pending
+import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
-import java.net.URI
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -92,39 +88,6 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
 
       result mustBe Message(result.id, result.received, None, MessageType.ArrivalNotification, None, None, None, Some(Pending))
 
-    }
-
-  }
-
-  "updateLargeMessage" - {
-    val instant: OffsetDateTime = OffsetDateTime.of(2022, 8, 26, 9, 0, 0, 0, ZoneOffset.UTC)
-    val clock: Clock            = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
-    val random                  = new SecureRandom
-
-    val sut = new MessageFactoryImpl(clock, random)(materializer, materializer.executionContext)
-
-    "will create a message with both ObjectStoreResourceLocation and Status" in {
-      lazy val objectStoreURI: URI = URI.create("some-url")
-      val messageId                = MessageId("asdfghj123456789")
-
-      val result = sut.updateLargeMessage(
-        MessageType.DeclarationData,
-        Some(instant),
-        instant,
-        messageId,
-        Some(ObjectStoreResourceLocation("some-url")),
-        Success
-      )
-
-      result mustBe Message(result.id, result.received, Some(instant), MessageType.DeclarationData, None, Some(objectStoreURI), None, Some(Success))
-    }
-
-    "will create a message with only Status" in {
-      val messageId = MessageId("asdfghj123456789")
-
-      val result = sut.updateLargeMessage(MessageType.DeclarationData, None, instant, messageId, None, Failed)
-
-      result mustBe Message(result.id, result.received, None, MessageType.DeclarationData, None, None, None, Some(Failed))
     }
 
   }

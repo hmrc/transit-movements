@@ -18,8 +18,8 @@ package uk.gov.hmrc.transitmovements.models
 
 import play.api.libs.json.Json
 
-object LargeMessageMetadata {
-  implicit val largeMessageMetadata = Json.format[LargeMessageMetadata]
+object UpdateMessageMetadata {
+  implicit val updateMessageMetadata = Json.format[UpdateMessageMetadata]
 }
 
-final case class LargeMessageMetadata(objectStoreURI: Option[ObjectStoreResourceLocation] = None, status: MessageStatus)
+final case class UpdateMessageMetadata(objectStoreURI: Option[ObjectStoreResourceLocation] = None, status: MessageStatus)

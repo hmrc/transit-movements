@@ -37,6 +37,7 @@ import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.Movement
@@ -104,8 +105,8 @@ trait MovementsRepository {
 
   def updateMessage(
     movementId: MovementId,
-    message: Message,
-    mrn: Option[MovementReferenceNumber],
+    messageId: MessageId,
+    message: UpdateMessageMetadata,
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
@@ -336,21 +337,21 @@ class MovementsRepositoryImpl @Inject() (
 
   def updateMessage(
     movementId: MovementId,
-    message: Message,
-    mrn: Option[MovementReferenceNumber],
+    messageId: MessageId,
+    message: UpdateMessageMetadata,
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit] = {
 
     val filter: Bson = mEq(movementId.value)
 
     val setUpdated = mSet("updated", received)
-    val setStatus  = mSet("messages.$[element].status", message.status.get.toString)
+    val setStatus  = mSet("messages.$[element].status", message.status.toString)
 
-    val arrayFilters = new UpdateOptions().arrayFilters(Collections.singletonList(Filters.in("element.id", message.id.value)))
+    val arrayFilters = new UpdateOptions().arrayFilters(Collections.singletonList(Filters.in("element.id", messageId.value)))
 
-    val combined = Seq(setUpdated, setStatus) ++ message.url
+    val combined = Seq(setUpdated, setStatus) ++ message.objectStoreURI
       .map(
-        x => Seq(mSet("messages.$[element].url", x.toString))
+        x => Seq(mSet("messages.$[element].url", x.value))
       )
       .getOrElse(Seq())
 

@@ -35,7 +35,7 @@ import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovements.models.LargeMessageMetadata
+import uk.gov.hmrc.transitmovements.models.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
@@ -147,7 +147,7 @@ class MovementsController @Inject() (
       implicit request =>
         mapRequest(request.body)
           .flatMap {
-            largeMessageMetadata => handleUpdateMessage(largeMessageMetadata, request, movementId, messageId)
+            largeMessageMetadata => handleUpdateMessage(largeMessageMetadata, movementId, messageId)
           }
           .fold[Result](
             presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
@@ -155,40 +155,15 @@ class MovementsController @Inject() (
           )
     }
 
-  private def handleUpdateMessage(largeMessageMetadata: LargeMessageMetadata, request: Request[JsValue], movementId: MovementId, messageId: MessageId)(implicit
-    hc: HeaderCarrier
-  ) =
-    largeMessageMetadata match {
-      case LargeMessageMetadata(Some(_), status) =>
-        (for {
-          messageType <- extract(request.headers).asPresentation
-          sourceFile  <- objectStoreService.getObjectStoreFile(largeMessageMetadata.objectStoreURI.get).asPresentation
-          messageData <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
-          received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-          message = messageFactory.updateLargeMessage(
-            messageType,
-            Some(messageData.generationDate),
-            received,
-            messageId,
-            largeMessageMetadata.objectStoreURI,
-            status
-          )
-          _ <- repo.updateMessage(movementId, message, messageData.mrn, received).asPresentation
-        } yield Ok)
+  private def handleUpdateMessage(largeMessageMetadata: UpdateMessageMetadata, movementId: MovementId, messageId: MessageId) =
+    for {
+      _ <- repo.updateMessage(movementId, messageId, largeMessageMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
+    } yield Ok
 
-      case LargeMessageMetadata(None, status) =>
-        (for {
-          messageType <- extract(request.headers).asPresentation
-          received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-          message  = messageFactory.updateLargeMessage(messageType, None, received, messageId, None, status)
-          _ <- repo.updateMessage(movementId, message, None, received).asPresentation
-        } yield Ok)
-    }
-
-  private def mapRequest(responseBody: JsValue): EitherT[Future, PresentationError, LargeMessageMetadata] =
+  private def mapRequest(responseBody: JsValue): EitherT[Future, PresentationError, UpdateMessageMetadata] =
     EitherT {
       responseBody
-        .validate[LargeMessageMetadata]
+        .validate[UpdateMessageMetadata]
         .map(
           largeMessageMetadata => Future.successful(Right(largeMessageMetadata))
         )
