@@ -28,8 +28,6 @@ import com.mongodb.client.model.Updates.{set => mSet}
 import com.mongodb.client.model.Updates.{combine => mCombine}
 import com.mongodb.client.model.UpdateOptions
 import org.bson.conversions.Bson
-import org.mongodb.scala.MongoClient
-import org.mongodb.scala.MongoClient.DEFAULT_CODEC_REGISTRY
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
 import play.api.Logging
@@ -133,7 +131,6 @@ class MovementsRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.movementWithoutMessagesFormat),
         Codecs.playFormatCodec(MongoFormats.messageResponseFormat),
         Codecs.playFormatCodec(MongoFormats.messageFormat),
-        //Codecs.playFormatCodec(MongoFormats.messageStatusFormat),
         Codecs.playFormatCodec(MongoFormats.movementIdFormat),
         Codecs.playFormatCodec(MongoFormats.mrnFormat),
         Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
