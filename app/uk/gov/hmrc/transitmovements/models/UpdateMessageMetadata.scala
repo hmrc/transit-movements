@@ -18,8 +18,8 @@ package uk.gov.hmrc.transitmovements.models
 
 import play.api.libs.json.Json
 
-object ObjectStoreResourceLocation {
-  implicit val objectStoreResourceLocationFormat = Json.valueFormat[ObjectStoreResourceLocation]
+object UpdateMessageMetadata {
+  implicit val updateMessageMetadata = Json.format[UpdateMessageMetadata]
 }
 
-case class ObjectStoreResourceLocation(value: String) extends AnyVal
+final case class UpdateMessageMetadata(objectStoreURI: Option[ObjectStoreResourceLocation] = None, status: MessageStatus)

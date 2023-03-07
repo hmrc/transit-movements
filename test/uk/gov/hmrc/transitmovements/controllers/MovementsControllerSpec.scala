@@ -151,6 +151,7 @@ class MovementsControllerSpec
     reset(mockTemporaryFileCreator)
     reset(mockMessagesXmlParsingService)
     reset(mockMessageFactory)
+    reset(mockObjectStoreService)
     super.afterEach()
   }
 
@@ -1157,5 +1158,98 @@ class MovementsControllerSpec
         "message" -> "Internal server error"
       )
     }
+  }
+
+  "updateMessage" - {
+
+    val messageType = MessageType.DeclarationData
+
+    lazy val messageData: MessageData = MessageData(OffsetDateTime.now(ZoneId.of("UTC")), None)
+
+    lazy val messageDataEither: EitherT[Future, ParseError, MessageData] =
+      EitherT.rightT(messageData)
+
+    lazy val messageFactory =
+      arbitraryMessage.arbitrary.sample.get.copy(
+        id = messageId,
+        generated = Some(now),
+        received = now,
+        triggerId = None,
+        url = Some(objectStoreURI),
+        body = None,
+        status = Some(MessageStatus.Success)
+      )
+
+    "must return OK, if the update message is successful, given both object store uri and status provided in the request" in {
+
+      when(
+        mockRepository.updateMessage(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any[UpdateMessageMetadata], any[OffsetDateTime])
+      )
+        .thenReturn(EitherT.rightT(()))
+
+      val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
+      val body = Json.obj(
+        "objectStoreURI" -> "somepath",
+        "status"         -> "Success"
+      )
+      val request = FakeRequest(
+        method = POST,
+        uri = routes.MovementsController.updateMessage(movementId, messageId).url,
+        headers = headers,
+        body = body
+      )
+
+      val result =
+        controller.updateMessage(movementId, messageId)(request)
+
+      status(result) mustBe OK
+    }
+
+    "must return OK, if the update message is successful, given Only status is provided in the request" in {
+
+      when(
+        mockRepository.updateMessage(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any[UpdateMessageMetadata], any[OffsetDateTime])
+      )
+        .thenReturn(EitherT.rightT(()))
+
+      val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
+      val body = Json.obj(
+        "status" -> "Failed"
+      )
+      val request = FakeRequest(
+        method = POST,
+        uri = routes.MovementsController.updateMessage(movementId, messageId).url,
+        headers = headers,
+        body = body
+      )
+
+      val result =
+        controller.updateMessage(movementId, messageId)(request)
+
+      status(result) mustBe OK
+    }
+
+    "must return BAD_REQUEST when JSON data extraction fails" in {
+      val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
+      val body = Json.obj(
+        "objectStoreURI" -> "somepath"
+      )
+      val request = FakeRequest(
+        method = POST,
+        uri = routes.MovementsController.updateMessage(movementId, messageId).url,
+        headers = headers,
+        body = body
+      )
+
+      val result =
+        controller.updateMessage(movementId, messageId)(request)
+
+      status(result) mustBe BAD_REQUEST
+      contentAsJson(result) mustBe Json.obj(
+        "code"    -> "BAD_REQUEST",
+        "message" -> "Could not parse the request"
+      )
+    }
+
   }
 }

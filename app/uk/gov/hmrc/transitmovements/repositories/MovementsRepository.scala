@@ -26,6 +26,7 @@ import com.mongodb.client.model.Filters.empty
 import com.mongodb.client.model.Updates.{push => mPush}
 import com.mongodb.client.model.Updates.{set => mSet}
 import com.mongodb.client.model.Updates.{combine => mCombine}
+import com.mongodb.client.model.UpdateOptions
 import org.bson.conversions.Bson
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
@@ -34,6 +35,7 @@ import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.Movement
@@ -51,6 +53,7 @@ import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.util.Collections
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -95,6 +98,13 @@ trait MovementsRepository {
     movementId: MovementId,
     message: Message,
     mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit]
+
+  def updateMessage(
+    movementId: MovementId,
+    messageId: MessageId,
+    message: UpdateMessageMetadata,
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
@@ -307,6 +317,42 @@ class MovementsRepositoryImpl @Inject() (
       .getOrElse(Seq())
 
     mongoRetry(Try(collection.updateOne(filter, mCombine(combined: _*))) match {
+      case Success(obs) =>
+        obs.toFuture().map {
+          result =>
+            if (result.wasAcknowledged()) {
+              if (result.getModifiedCount == 0) Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+              else Right(())
+            } else {
+              Left(UpdateNotAcknowledged(s"Message update failed for movement: $movementId"))
+            }
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+  }
+
+  def updateMessage(
+    movementId: MovementId,
+    messageId: MessageId,
+    message: UpdateMessageMetadata,
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit] = {
+
+    val filter: Bson = mEq(movementId.value)
+
+    val setUpdated = mSet("updated", received)
+    val setStatus  = mSet("messages.$[element].status", message.status.toString)
+
+    val arrayFilters = new UpdateOptions().arrayFilters(Collections.singletonList(Filters.in("element.id", messageId.value)))
+
+    val combined = Seq(setUpdated, setStatus) ++ message.objectStoreURI
+      .map(
+        x => Seq(mSet("messages.$[element].url", x.value))
+      )
+      .getOrElse(Seq())
+
+    mongoRetry(Try(collection.updateOne(filter, mCombine(combined: _*), arrayFilters)) match {
       case Success(obs) =>
         obs.toFuture().map {
           result =>
