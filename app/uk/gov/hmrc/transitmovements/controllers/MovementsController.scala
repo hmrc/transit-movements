@@ -145,27 +145,21 @@ class MovementsController @Inject() (
   def updateMessage(movementId: MovementId, messageId: MessageId) =
     Action.async(parse.json) {
       implicit request =>
-        mapRequest(request.body)
-          .flatMap {
-            largeMessageMetadata => handleUpdateMessage(largeMessageMetadata, movementId, messageId)
-          }
-          .fold[Result](
-            presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-            x => x
-          )
+        (for {
+          updateMessageMetadata <- mapRequest(request.body)
+          update                <- repo.updateMessage(movementId, messageId, updateMessageMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
+        } yield update).fold[Result](
+          presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
+          _ => Ok
+        )
     }
-
-  private def handleUpdateMessage(largeMessageMetadata: UpdateMessageMetadata, movementId: MovementId, messageId: MessageId) =
-    for {
-      _ <- repo.updateMessage(movementId, messageId, largeMessageMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
-    } yield Ok
 
   private def mapRequest(responseBody: JsValue): EitherT[Future, PresentationError, UpdateMessageMetadata] =
     EitherT {
       responseBody
         .validate[UpdateMessageMetadata]
         .map(
-          largeMessageMetadata => Future.successful(Right(largeMessageMetadata))
+          updateMessageMetadata => Future.successful(Right(updateMessageMetadata))
         )
         .getOrElse {
           logger.error("Unable to parse unexpected request")
