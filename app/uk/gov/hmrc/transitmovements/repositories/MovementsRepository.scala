@@ -348,7 +348,7 @@ class MovementsRepositoryImpl @Inject() (
 
     val combined = Seq(setUpdated, setStatus) ++ message.objectStoreURI
       .map(
-        x => Seq(mSet("messages.$[element].url", x.value))
+        x => Seq(mSet("messages.$[element].uri", x.value))
       )
       .getOrElse(Seq())
 

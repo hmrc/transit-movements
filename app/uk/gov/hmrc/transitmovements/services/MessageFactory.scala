@@ -89,7 +89,7 @@ class MessageFactoryImpl @Inject() (
           generated = Some(generationDate),
           messageType = messageType,
           triggerId = triggerId,
-          url = None,
+          uri = None,
           body = Some(message),
           status = Some(status)
         )
@@ -108,7 +108,7 @@ class MessageFactoryImpl @Inject() (
       generated = Some(generationDate),
       messageType = messageType,
       triggerId = triggerId,
-      url = Some(new URI(objectStoreURI.value)),
+      uri = Some(new URI(objectStoreURI.value)),
       body = None,
       status = Some(MessageStatus.Received)
     )
@@ -123,7 +123,7 @@ class MessageFactoryImpl @Inject() (
       generated = None,
       messageType = messageType,
       triggerId = None,
-      url = None,
+      uri = None,
       body = None,
       status = Some(MessageStatus.Pending)
     )
