@@ -283,7 +283,7 @@ class MovementsControllerSpec
         .thenReturn(departureDataEither)
 
       when(
-        mockObjectStoreService.addMessage(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any[Source[ByteString, _]])(
+        mockObjectStoreService.putObjectStoreFile(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any[Source[ByteString, _]])(
           any[ExecutionContext],
           any[HeaderCarrier]
         )
@@ -552,7 +552,7 @@ class MovementsControllerSpec
         .thenReturn(arrivalDataEither)
 
       when(
-        mockObjectStoreService.addMessage(
+        mockObjectStoreService.putObjectStoreFile(
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
           any[Source[ByteString, _]]
@@ -1056,7 +1056,7 @@ class MovementsControllerSpec
           .thenReturn(EitherT.rightT(MessageData(now, None)))
 
         when(
-          mockObjectStoreService.addMessage(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Source[ByteString, _]])(
+          mockObjectStoreService.putObjectStoreFile(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Source[ByteString, _]])(
             any(),
             any()
           )

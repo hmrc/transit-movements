@@ -39,6 +39,7 @@ import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
+import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
@@ -114,7 +115,7 @@ class MovementsController @Inject() (
       received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       movementId = movementFactory.generateId()
       messageId  = messageFactory.generateId()
-      objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
+      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
       message = messageFactory
         .createSmallMessage(
           messageId,
@@ -161,7 +162,7 @@ class MovementsController @Inject() (
       received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       movementId = movementFactory.generateId()
       messageId  = messageFactory.generateId()
-      objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
+      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
       message = messageFactory
         .createSmallMessage(
           messageId,
@@ -281,7 +282,7 @@ class MovementsController @Inject() (
       messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation //request.body
       received  = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       messageId = messageFactory.generateId()
-      objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
+      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
       status = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
       message = messageFactory
         .createSmallMessage(
@@ -389,6 +390,58 @@ class MovementsController @Inject() (
           logger.error("Unable to parse unexpected request")
           Future.successful(Left(PresentationError.badRequestError("Could not parse the request")))
         }
+    }
+
+  def getMessageBody(
+    eoriNumber: EORINumber,
+    movementType: MovementType,
+    movementId: MovementId,
+    messageId: MessageId
+  ): Action[AnyContent] =
+    Action.async {
+      implicit request =>
+        (for {
+          messageData <- repo.getSingleMessage(eoriNumber, movementId, messageId, movementType).asPresentation
+          body        <- getBody(messageData)
+        } yield Ok.chunked(body)).valueOr[Result](
+          baseError => Status(baseError.code.statusCode)(Json.toJson(baseError))
+        )
+    }
+
+  def putMessageBody(
+    eoriNumber: EORINumber,
+    movementType: MovementType,
+    movementId: MovementId,
+    messageId: MessageId
+  ): Action[Source[ByteString, _]] =
+    Action.stream {
+      implicit request =>
+        (for {
+          // check to see we have the message in the database before we do anything
+          _                  <- repo.getSingleMessage(eoriNumber, movementId, messageId, movementType).asPresentation
+          objectStoreSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
+          _ <- repo
+            .updateMessage(
+              movementId,
+              messageId,
+              UpdateMessageMetadata(Some(ObjectStoreURI(objectStoreSummary.location.asUri)), MessageStatus.Processing),
+              OffsetDateTime.now(clock)
+            )
+            .asPresentation
+        } yield NoContent).valueOr {
+          baseError => Status(baseError.code.statusCode)(Json.toJson(baseError))
+        }
+    }
+
+  private def getBody(messageResponse: Option[MessageResponse])(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Source[ByteString, _]] =
+    messageResponse match {
+      case None                                                => EitherT.leftT(PresentationError.notFoundError("Message not found"))
+      case Some(MessageResponse(_, _, _, Some(body), _, None)) => EitherT.rightT(Source.single(ByteString(body)))
+      case Some(MessageResponse(_, _, _, None, _, Some(uri))) =>
+        for {
+          resourceLocation <- extractResourceLocation(ObjectStoreURI(uri.toString))
+          stream           <- objectStoreService.getObjectStoreFile(resourceLocation).asPresentation
+        } yield stream
     }
 
 }

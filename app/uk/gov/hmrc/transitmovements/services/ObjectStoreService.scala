@@ -23,6 +23,7 @@ import akka.util.ByteString
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClient
 import uk.gov.hmrc.objectstore.client.play.Implicits._
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
@@ -49,15 +50,17 @@ trait ObjectStoreService {
     objectStoreResourceLocation: ObjectStoreResourceLocation
   )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]]
 
-  def addMessage(movementId: MovementId, messageId: MessageId, source: Source[ByteString, _])(implicit
+  def putObjectStoreFile(movementId: MovementId, messageId: MessageId, source: Source[ByteString, _])(implicit
     ec: ExecutionContext,
     hc: HeaderCarrier
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
-
 }
 
 @Singleton
 class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clock: Clock, client: PlayObjectStoreClient) extends ObjectStoreService {
+
+  private val owner             = "transit-movements"
+  private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
 
   override def getObjectStoreFile(
     objectStoreResourceLocation: ObjectStoreResourceLocation
@@ -77,9 +80,7 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
         }
     )
 
-  private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
-
-  override def addMessage(
+  override def putObjectStoreFile(
     movementId: MovementId,
     messageId: MessageId,
     source: Source[ByteString, _]

@@ -12,6 +12,10 @@ GET        /traders/:EORI/movements/:movementType/:movementId/messages/:messageI
 
 PATCH      /traders/:EORI/movements/:movementType/:movementId/messages/:messageId     uk.gov.hmrc.transitmovements.controllers.MovementsController.updateMessage(EORI: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId)
 
+GET        /traders/:EORI/movements/:movementType/:movementId/messages/:messageId/body     uk.gov.hmrc.transitmovements.controllers.MovementsController.getMessageBody(EORI: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId)
+
+PUT        /traders/:EORI/movements/:movementType/:movementId/messages/:messageId/body     uk.gov.hmrc.transitmovements.controllers.MovementsController.putMessageBody(EORI: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId)
+
 POST       /traders/movements/:movementId/messages                                 uk.gov.hmrc.transitmovements.controllers.MovementsController.updateMovement(movementId: MovementId, triggerId: Option[MessageId] ?= None)
 
 
