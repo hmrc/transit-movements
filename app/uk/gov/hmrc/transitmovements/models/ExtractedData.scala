@@ -18,4 +18,16 @@ package uk.gov.hmrc.transitmovements.models
 
 import java.time.OffsetDateTime
 
-case class DeclarationData(movementEoriNumber: EORINumber, generationDate: OffsetDateTime)
+sealed trait ExtractedData {
+  def movementEoriNumber: EORINumber
+  def generationDate: OffsetDateTime
+  def movementReferenceNumber: Option[MovementReferenceNumber]
+}
+
+case class ArrivalData(movementEoriNumber: EORINumber, generationDate: OffsetDateTime, mrn: MovementReferenceNumber) extends ExtractedData {
+  lazy val movementReferenceNumber = Some(mrn)
+}
+
+case class DeclarationData(movementEoriNumber: EORINumber, generationDate: OffsetDateTime) extends ExtractedData {
+  lazy val movementReferenceNumber = None
+}

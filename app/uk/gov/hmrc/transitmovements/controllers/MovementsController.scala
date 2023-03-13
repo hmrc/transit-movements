@@ -27,7 +27,6 @@ import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
-import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -138,29 +137,19 @@ class MovementsController @Inject() (
       case None    => updateMovementLargeMessage(movementId, triggerId)
     }
 
-  def updateMessage(movementId: MovementId, messageId: MessageId) =
+  def updateMessage(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
     Action.async(parse.json) {
       implicit request =>
         (for {
           updateMessageMetadata <- mapRequest(request.body)
-          update                <- repo.updateMessage(movementId, messageId, updateMessageMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
-        } yield update).fold[Result](
-          presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-          _ => Ok
-        )
-    }
-
-  private def mapRequest(responseBody: JsValue): EitherT[Future, PresentationError, UpdateMessageMetadata] =
-    EitherT {
-      responseBody
-        .validate[UpdateMessageMetadata]
-        .map(
-          updateMessageMetadata => Future.successful(Right(updateMessageMetadata))
-        )
-        .getOrElse {
-          logger.error("Unable to parse unexpected request")
-          Future.successful(Left(PresentationError.badRequestError("Could not parse the request")))
-        }
+          maybeMovementToUpdate <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
+          movementToUpdate      <- ensureMovement(maybeMovementToUpdate, movementId)
+          _                     <- updateMetadataIfRequired(movementId, movementType, movementToUpdate, updateMessageMetadata.objectStoreURI)
+          _                     <- repo.updateMessage(movementId, messageId, updateMessageMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
+        } yield Ok)
+          .valueOr[Result](
+            presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError))
+          )
     }
 
   def updateMovementLargeMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[AnyContent] = Action.async(parse.anyContent) {
@@ -266,6 +255,43 @@ class MovementsController @Inject() (
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
           messages => if (messages.isEmpty) NotFound else Ok(Json.toJson(messages))
         )
+    }
+
+  private def ensureMovement(movement: Option[MovementWithoutMessages], movementId: MovementId): EitherT[Future, PresentationError, MovementWithoutMessages] =
+    EitherT(
+      Future.successful(movement.map(Right.apply).getOrElse(Left(PresentationError.notFoundError(s"Movement with ID ${movementId.value} was not found"))))
+    )
+
+  // Large Messages: Only perform this step if we haven't updated the movement EORI and we have an Object Store reference
+  private def updateMetadataIfRequired(
+    movementId: MovementId,
+    movementType: MovementType,
+    movementToUpdate: MovementWithoutMessages,
+    objectStoreResourceLocation: Option[ObjectStoreResourceLocation]
+  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Unit] =
+    (movementToUpdate.movementEORINumber, objectStoreResourceLocation) match {
+      case (None, Some(location)) =>
+        for {
+          source        <- objectStoreService.getObjectStoreFile(location).asPresentation
+          extractedData <- movementsXmlParsingService.extractData(movementType, source).asPresentation
+          _ <- repo
+            .updateMovement(movementId, Some(extractedData.movementEoriNumber), extractedData.movementReferenceNumber, extractedData.generationDate)
+            .asPresentation
+        } yield ()
+      case _ => EitherT.rightT((): Unit)
+    }
+
+  private def mapRequest(responseBody: JsValue): EitherT[Future, PresentationError, UpdateMessageMetadata] =
+    EitherT {
+      responseBody
+        .validate[UpdateMessageMetadata]
+        .map(
+          updateMessageMetadata => Future.successful(Right(updateMessageMetadata))
+        )
+        .getOrElse {
+          logger.error("Unable to parse unexpected request")
+          Future.successful(Left(PresentationError.badRequestError("Could not parse the request")))
+        }
     }
 
 }

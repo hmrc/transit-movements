@@ -57,6 +57,7 @@ import java.util.Collections
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import scala.annotation.nowarn
 import scala.concurrent._
 import scala.util.Failure
 import scala.util.Success
@@ -94,6 +95,13 @@ trait MovementsRepository {
     movementEORI: Option[EORINumber]
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]]
 
+  def updateMovement(
+    movementId: MovementId,
+    movementEORI: Option[EORINumber],
+    mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit]
+
   def updateMessages(
     movementId: MovementId,
     message: Message,
@@ -115,6 +123,7 @@ object MovementsRepositoryImpl {
 }
 
 @Singleton
+@nowarn("msg=It would fail on the following input: Failure\\(_\\)") // this would be fatal exceptions -- we don't want to catch those
 class MovementsRepositoryImpl @Inject() (
   appConfig: AppConfig,
   mongoComponent: MongoComponent
@@ -352,7 +361,41 @@ class MovementsRepositoryImpl @Inject() (
       )
       .getOrElse(Seq())
 
-    mongoRetry(Try(collection.updateOne(filter, mCombine(combined: _*), arrayFilters)) match {
+    executeUpdate(movementId, filter, combined, arrayFilters)
+  }
+
+  override def updateMovement(
+    movementId: MovementId,
+    movementEORI: Option[EORINumber],
+    mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit] = {
+    val filter: Bson = mEq(movementId.value)
+
+    val combined: Seq[Bson] =
+      movementEORI
+        .map(
+          e => Seq(mSet("movementEORI", e.value))
+        )
+        .getOrElse(Seq.empty[Bson]) ++
+        mrn
+          .map(
+            e => Seq(mSet("movementReferenceNumber", e.value))
+          )
+          .getOrElse(Seq.empty[Bson])
+
+    // If we don't have to update anything, don't bother going to Mongo.
+    if (combined.isEmpty) EitherT.rightT(())
+    else executeUpdate(movementId, filter, combined ++ Seq(mSet("updated", received)))
+  }
+
+  private def executeUpdate(
+    movementId: MovementId,
+    filter: Bson,
+    updates: Seq[Bson],
+    updateOptions: UpdateOptions = new UpdateOptions()
+  ): EitherT[Future, MongoError, Unit] =
+    mongoRetry(Try(collection.updateOne(filter, mCombine(updates: _*), updateOptions)) match {
       case Success(obs) =>
         obs.toFuture().map {
           result =>
@@ -366,6 +409,4 @@ class MovementsRepositoryImpl @Inject() (
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
-  }
-
 }
