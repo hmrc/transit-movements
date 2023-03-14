@@ -19,7 +19,6 @@ package uk.gov.hmrc.transitmovements.repositories
 import org.mongodb.scala.model.Filters
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.OptionValues
-import org.scalatest.stats
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -36,7 +35,6 @@ import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
-import java.net.URI
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -661,6 +659,149 @@ class MovementsRepositorySpec
 
     result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
 
+  }
+
+  "updateMovement" should "return an error if there is no matching movement with the given ID" in forAll(
+    arbitrary[MovementId],
+    arbitrary[EORINumber],
+    arbitrary[MovementReferenceNumber]
+  ) {
+    (movementId, eori, mrn) =>
+      val message =
+        arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(movementId.value)))
+
+      val result = await(
+        repository.updateMovement(movementId, Some(eori), Some(mrn), instant).value
+      )
+
+      result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
+  }
+
+  it should "update the EORI if it is provided" in {
+    val departureMovement =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(),
+          movementType = MovementType.Departure,
+          movementEORINumber = None,
+          movementReferenceNumber = None
+        )
+
+    await(
+      repository.insert(departureMovement).value
+    )
+
+    val result = await(
+      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, receivedInstant).value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
+    }
+
+    movement.updated shouldEqual receivedInstant
+    movement.movementEORINumber shouldEqual Some(movement.enrollmentEORINumber)
+    movement.movementReferenceNumber shouldEqual None
+  }
+
+  it should "update the MRN if they are both supplied" in {
+    val departureMovement =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(),
+          movementEORINumber = None,
+          movementReferenceNumber = None
+        )
+
+    val mrn = arbitrary[MovementReferenceNumber].sample.get
+
+    await(
+      repository.insert(departureMovement).value
+    )
+
+    val result = await(
+      repository.updateMovement(departureMovement._id, None, Some(mrn), receivedInstant).value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
+    }
+
+    movement.updated shouldEqual receivedInstant
+    movement.movementEORINumber shouldEqual None
+    movement.movementReferenceNumber shouldEqual Some(mrn)
+  }
+
+  it should "update the EORI and MRN if they are both supplied" in {
+    val departureMovement =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(),
+          movementType = MovementType.Arrival,
+          movementEORINumber = None,
+          movementReferenceNumber = None
+        )
+
+    val mrn = arbitrary[MovementReferenceNumber].sample.get
+
+    await(
+      repository.insert(departureMovement).value
+    )
+
+    val result = await(
+      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), Some(mrn), receivedInstant).value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
+    }
+
+    movement.updated shouldEqual receivedInstant
+    movement.movementEORINumber shouldEqual Some(movement.enrollmentEORINumber)
+    movement.movementReferenceNumber shouldEqual Some(mrn)
+  }
+
+  it should "not update anything if the EORI and MRN are not supplied" in {
+    val departureMovement =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(),
+          movementType = MovementType.Arrival,
+          movementEORINumber = None,
+          movementReferenceNumber = None
+        )
+
+    await(
+      repository.insert(departureMovement).value
+    )
+
+    val result = await(
+      repository.updateMovement(departureMovement._id, None, None, receivedInstant).value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
+    }
+
+    movement.updated shouldEqual instant
+    movement.movementEORINumber shouldEqual None
+    movement.movementReferenceNumber shouldEqual None
   }
 
 }

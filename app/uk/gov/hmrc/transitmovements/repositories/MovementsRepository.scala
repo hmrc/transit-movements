@@ -375,7 +375,7 @@ class MovementsRepositoryImpl @Inject() (
     val combined: Seq[Bson] =
       movementEORI
         .map(
-          e => Seq(mSet("movementEORI", e.value))
+          e => Seq(mSet("movementEORINumber", e.value))
         )
         .getOrElse(Seq.empty[Bson]) ++
         mrn
