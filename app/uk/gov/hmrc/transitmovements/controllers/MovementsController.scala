@@ -24,6 +24,7 @@ import play.api.Logging
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
+import play.api.libs.json.Reads
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
@@ -137,11 +138,12 @@ class MovementsController @Inject() (
       case None    => updateMovementLargeMessage(movementId, triggerId)
     }
 
+  // PATCH method for updating a specific message
   def updateMessage(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
     Action.async(parse.json) {
       implicit request =>
         (for {
-          updateMessageMetadata <- mapRequest(request.body)
+          updateMessageMetadata <- require[UpdateMessageMetadata](request.body)
           maybeMovementToUpdate <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
           movementToUpdate      <- ensureMovement(maybeMovementToUpdate, movementId)
           _                     <- updateMetadataIfRequired(movementId, movementType, movementToUpdate, updateMessageMetadata.objectStoreURI)
@@ -281,12 +283,12 @@ class MovementsController @Inject() (
       case _ => EitherT.rightT((): Unit)
     }
 
-  private def mapRequest(responseBody: JsValue): EitherT[Future, PresentationError, UpdateMessageMetadata] =
+  private def require[T: Reads](responseBody: JsValue): EitherT[Future, PresentationError, T] =
     EitherT {
       responseBody
-        .validate[UpdateMessageMetadata]
+        .validate[T]
         .map(
-          updateMessageMetadata => Future.successful(Right(updateMessageMetadata))
+          t => Future.successful(Right(t))
         )
         .getOrElse {
           logger.error("Unable to parse unexpected request")
