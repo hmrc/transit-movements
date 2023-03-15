@@ -710,7 +710,7 @@ class MovementsRepositorySpec
     movement.movementReferenceNumber shouldEqual None
   }
 
-  it should "update the MRN if they are both supplied" in {
+  it should "update the MRN if only the MRN was supplied" in {
     val departureMovement =
       arbitrary[Movement].sample.value
         .copy(
