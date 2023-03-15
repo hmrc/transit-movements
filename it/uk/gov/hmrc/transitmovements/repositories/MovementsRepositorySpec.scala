@@ -125,8 +125,43 @@ class MovementsRepositorySpec
     result.toOption.get.isEmpty should be(true)
   }
 
-  "getSingleMessage" should "return message response if it exists" in {
-    val departure = arbitrary[Movement].sample.value
+  "getSingleMessage" should "return message response with uri if it exists" in {
+
+    val message1 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None, status = Some(MessageStatus.Pending))
+
+    val departure =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(message1)
+        )
+
+    await(repository.insert(departure).value)
+
+    val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id, departure.movementType).value)
+    result.toOption.get.get should be(MessageResponse.fromMessageWithoutBody(departure.messages.head))
+  }
+
+  "getSingleMessage" should "return message response with Body if it exists" in {
+
+    val message1 =
+      arbitrary[Message].sample.value.copy(
+        body = Some("body"),
+        messageType = MessageType.DeclarationData,
+        triggerId = None,
+        status = Some(MessageStatus.Pending),
+        uri = None
+      )
+
+    val departure =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(message1)
+        )
 
     await(repository.insert(departure).value)
 
@@ -145,7 +180,11 @@ class MovementsRepositorySpec
 
   "getMessages" should "return message responses if there are messages" in {
     val messages =
-      Vector(arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value, arbitraryMessage.arbitrary.sample.value)
+      Vector(
+        arbitraryMessage.arbitrary.sample.value.copy(uri = None),
+        arbitraryMessage.arbitrary.sample.value.copy(uri = None),
+        arbitraryMessage.arbitrary.sample.value.copy(uri = None)
+      )
         .sortBy(_.received)
         .reverse
 
@@ -166,9 +205,9 @@ class MovementsRepositorySpec
 
     val messages =
       Vector(
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1)),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1))
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None)
       )
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
@@ -571,7 +610,7 @@ class MovementsRepositorySpec
     movement.updated shouldEqual receivedInstant
     movement.messages.length should be(1)
     movement.messages.head.status shouldBe Some(message2.status)
-    movement.messages.head.url.value.toString shouldBe message2.objectStoreURI.get.value
+    movement.messages.head.uri.value.toString shouldBe message2.objectStoreURI.get.value
 
   }
 

@@ -118,7 +118,14 @@ class MovementsControllerSpec
 
   val now: OffsetDateTime = OffsetDateTime.now
 
-  lazy val message: Message = arbitraryMessage.arbitrary.sample.get.copy(id = messageId, generated = Some(now), received = now, triggerId = Some(triggerId))
+  lazy val message: Message =
+    arbitraryMessage.arbitrary.sample.get.copy(
+      id = messageId,
+      generated = Some(now),
+      received = now,
+      triggerId = Some(triggerId),
+      uri = Some(new URI("http://www.google.com"))
+    )
 
   lazy val messageFactoryEither: EitherT[Future, StreamError, Message] =
     EitherT.rightT(message)
@@ -680,6 +687,18 @@ class MovementsControllerSpec
           contentAsJson(result) mustBe Json.toJson(messageResponse)
         }
 
+        "must return OK along with uri if message found in the correct format" in {
+          val messageResponse = MessageResponse.fromMessageWithoutBody(movement.messages.head)
+
+          when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
+            .thenReturn(EitherT.rightT(Some(messageResponse)))
+
+          val result = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
+
+          status(result) mustBe OK
+          contentAsJson(result) mustBe Json.toJson(messageResponse)
+        }
+
         "must return NOT_FOUND if no message found" in {
           when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
             .thenReturn(EitherT.rightT(None))
@@ -1036,7 +1055,7 @@ class MovementsControllerSpec
       EitherT.rightT(messageData)
 
     lazy val messageFactory =
-      arbitraryMessage.arbitrary.sample.get.copy(id = messageId, generated = Some(now), received = now, triggerId = Some(triggerId), url = Some(objectStoreURI))
+      arbitraryMessage.arbitrary.sample.get.copy(id = messageId, generated = Some(now), received = now, triggerId = Some(triggerId), uri = Some(objectStoreURI))
 
     "must return OK if XML data extraction is successful" in {
 
@@ -1175,7 +1194,7 @@ class MovementsControllerSpec
         generated = Some(now),
         received = now,
         triggerId = None,
-        url = Some(objectStoreURI),
+        uri = Some(objectStoreURI),
         body = None,
         status = Some(MessageStatus.Success)
       )
