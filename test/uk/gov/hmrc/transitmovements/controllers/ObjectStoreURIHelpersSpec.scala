@@ -27,20 +27,20 @@ import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
 
-class ObjectStoreURIHeaderExtractorSpec extends SpecBase with ModelGenerators {
+class ObjectStoreURIHelpersSpec extends SpecBase with ModelGenerators {
 
-  class ObjectStoreURIHeaderExtractorImpl extends ObjectStoreURIHeaderExtractor with BaseController {
+  class ObjectStoreURIHelpersImpl extends ObjectStoreURIHelpers with BaseController {
     override protected def controllerComponents: ControllerComponents = stubControllerComponents()
   }
 
-  val objectStoreURIExtractor = new ObjectStoreURIHeaderExtractorImpl
+  val objectStoreURIExtractor = new ObjectStoreURIHelpersImpl
 
   "extractObjectStoreURI" - {
 
     "if object store uri header is not supplied, return BadRequestError" in {
       val noObjectStoreURIHeader = Headers("X-Message-Type" -> "IE015")
 
-      val result = objectStoreURIExtractor.extractObjectStoreURI(noObjectStoreURIHeader)
+      val result = objectStoreURIExtractor.extractObjectStoreResourceLocationFromHeader(noObjectStoreURIHeader)
 
       whenReady(result.value) {
         _ mustBe Left(PresentationError.badRequestError("Missing X-Object-Store-Uri header value"))
@@ -50,7 +50,7 @@ class ObjectStoreURIHeaderExtractorSpec extends SpecBase with ModelGenerators {
     "if object store uri header supplied is invalid, return BadRequestError" in {
       val invalidObjectStoreURIHeader = Headers(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Object-Store-Uri" -> "invalid")
 
-      val result = objectStoreURIExtractor.extractObjectStoreURI(invalidObjectStoreURIHeader)
+      val result = objectStoreURIExtractor.extractObjectStoreResourceLocationFromHeader(invalidObjectStoreURIHeader)
 
       whenReady(result.value) {
         _ mustBe Left(
@@ -64,7 +64,7 @@ class ObjectStoreURIHeaderExtractorSpec extends SpecBase with ModelGenerators {
       val objectStoreURI            = ObjectStoreResourceLocation(filePath).value
       val validObjectStoreURIHeader = Headers("X-Object-Store-Uri" -> objectStoreURI)
 
-      val result = objectStoreURIExtractor.extractObjectStoreURI(validObjectStoreURIHeader)
+      val result = objectStoreURIExtractor.extractObjectStoreResourceLocationFromHeader(validObjectStoreURIHeader)
 
       whenReady(result.value) {
         _ mustBe Right(ObjectStoreResourceLocation("movements/movementId/abc.xml"))

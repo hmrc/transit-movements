@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.models.requests
 
 import play.api.libs.json.Json
+import uk.gov.hmrc.transitmovements.models.MessageStatus
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 
 object UpdateMessageMetadata {
   implicit val updateMessageMetadata = Json.format[UpdateMessageMetadata]
 }
 
-final case class UpdateMessageMetadata(objectStoreURI: Option[ObjectStoreResourceLocation] = None, status: MessageStatus)
+final case class UpdateMessageMetadata(objectStoreURI: Option[ObjectStoreURI] = None, status: MessageStatus)

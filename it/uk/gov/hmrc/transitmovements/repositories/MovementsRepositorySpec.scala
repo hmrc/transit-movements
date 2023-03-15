@@ -32,6 +32,8 @@ import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
+import uk.gov.hmrc.transitmovements.models.requests
+import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
@@ -593,7 +595,7 @@ class MovementsRepositorySpec
       repository.insert(departureMovement).value
     )
 
-    val message2 = UpdateMessageMetadata(Some(ObjectStoreResourceLocation("some-url")), MessageStatus.Success)
+    val message2 = UpdateMessageMetadata(Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")), MessageStatus.Success)
 
     val result = await(
       repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
@@ -628,7 +630,7 @@ class MovementsRepositorySpec
       repository.insert(departureMovement).value
     )
 
-    val message2 = UpdateMessageMetadata(None, MessageStatus.Failed)
+    val message2 = requests.UpdateMessageMetadata(None, MessageStatus.Failed)
 
     val result = await(
       repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value

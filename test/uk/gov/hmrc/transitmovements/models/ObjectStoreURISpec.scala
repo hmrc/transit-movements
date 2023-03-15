@@ -16,4 +16,19 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-case class ObjectStoreResourceLocation(value: String) extends AnyVal
+import org.scalatest.matchers.must.Matchers
+import uk.gov.hmrc.transitmovements.base.SpecBase
+
+class ObjectStoreURISpec extends SpecBase with Matchers {
+
+  "asResourceLocation" - {
+    "with an expected owner" in {
+      ObjectStoreURI("common-transit-convention-traders/abc.xml").asResourceLocation mustBe Some(ObjectStoreResourceLocation("abc.xml"))
+    }
+
+    "with an unexpected owner" in {
+      ObjectStoreURI("something/abc.xml").asResourceLocation mustBe None
+    }
+  }
+
+}

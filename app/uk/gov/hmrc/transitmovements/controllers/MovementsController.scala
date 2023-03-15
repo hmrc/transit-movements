@@ -35,9 +35,9 @@ import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovements.models.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
+import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
@@ -70,7 +70,7 @@ class MovementsController @Inject() (
     with MessageTypeHeaderExtractor
     with PresentationFormats
     with ContentTypeRouting
-    with ObjectStoreURIHeaderExtractor {
+    with ObjectStoreURIHelpers {
 
   def createMovement(eori: EORINumber, movementType: MovementType) =
     contentTypeRoute {
@@ -158,7 +158,7 @@ class MovementsController @Inject() (
     implicit request =>
       (for {
         messageType                 <- extract(request.headers).asPresentation
-        objectStoreResourceLocation <- extractObjectStoreURI(request.headers)
+        objectStoreResourceLocation <- extractObjectStoreResourceLocationFromHeader(request.headers)
         sourceFile                  <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
         messageData                 <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
@@ -269,13 +269,14 @@ class MovementsController @Inject() (
     movementId: MovementId,
     movementType: MovementType,
     movementToUpdate: MovementWithoutMessages,
-    objectStoreResourceLocation: Option[ObjectStoreResourceLocation]
+    objectStoreURI: Option[ObjectStoreURI]
   )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Unit] =
-    (movementToUpdate.movementEORINumber, objectStoreResourceLocation) match {
+    (movementToUpdate.movementEORINumber, objectStoreURI) match {
       case (None, Some(location)) =>
         for {
-          source        <- objectStoreService.getObjectStoreFile(location).asPresentation
-          extractedData <- movementsXmlParsingService.extractData(movementType, source).asPresentation
+          resourceLocation <- extractResourceLocation(location)
+          source           <- objectStoreService.getObjectStoreFile(resourceLocation).asPresentation
+          extractedData    <- movementsXmlParsingService.extractData(movementType, source).asPresentation
           _ <- repo
             .updateMovement(movementId, Some(extractedData.movementEoriNumber), extractedData.movementReferenceNumber, extractedData.generationDate)
             .asPresentation
