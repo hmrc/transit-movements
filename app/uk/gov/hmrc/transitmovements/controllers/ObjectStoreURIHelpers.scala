@@ -29,24 +29,12 @@ import scala.concurrent.Future
 trait ObjectStoreURIHelpers {
   self: BaseController =>
 
-  def extractObjectStoreResourceLocationFromHeader(headers: Headers): EitherT[Future, PresentationError, ObjectStoreResourceLocation] =
-    EitherT(
+  def extractObjectStoreURI(headers: Headers): EitherT[Future, PresentationError, ObjectStoreURI] =
+    EitherT {
       Future.successful(
-        for {
-          headerValue                 <- getHeader(headers.get(Constants.ObjectStoreURI))
-          objectStoreResourceLocation <- getObjectStoreResourceLocation(headerValue)
-        } yield objectStoreResourceLocation
+        headers.get(Constants.ObjectStoreURI).map(ObjectStoreURI.apply).toRight(PresentationError.badRequestError("Missing X-Object-Store-Uri header value"))
       )
-    )
-
-  private def getHeader(objectStoreURI: Option[String]): Either[PresentationError, ObjectStoreURI] =
-    objectStoreURI.map(ObjectStoreURI.apply).toRight(PresentationError.badRequestError("Missing X-Object-Store-Uri header value"))
-
-  private def getObjectStoreResourceLocation(objectStoreURI: ObjectStoreURI): Either[PresentationError, ObjectStoreResourceLocation] =
-    objectStoreURI.asResourceLocation
-      .toRight(
-        PresentationError.badRequestError(s"X-Object-Store-Uri header value does not start with ${ObjectStoreURI.expectedOwner}/ (got ${objectStoreURI.value})")
-      )
+    }
 
   def extractResourceLocation(objectStoreURI: ObjectStoreURI): EitherT[Future, PresentationError, ObjectStoreResourceLocation] =
     EitherT {

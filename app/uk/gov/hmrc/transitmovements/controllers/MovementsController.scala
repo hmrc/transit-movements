@@ -158,7 +158,8 @@ class MovementsController @Inject() (
     implicit request =>
       (for {
         messageType                 <- extract(request.headers).asPresentation
-        objectStoreResourceLocation <- extractObjectStoreResourceLocationFromHeader(request.headers)
+        objectStoreURI              <- extractObjectStoreURI(request.headers)
+        objectStoreResourceLocation <- extractResourceLocation(objectStoreURI)
         sourceFile                  <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
         messageData                 <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
@@ -168,7 +169,7 @@ class MovementsController @Inject() (
             messageData.generationDate,
             received,
             triggerId,
-            ObjectStoreResourceLocation(request.headers.get(Constants.ObjectStoreURI).get)
+            objectStoreURI
           )
         _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
       } yield message.id).fold[Result](

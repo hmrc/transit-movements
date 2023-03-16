@@ -18,7 +18,6 @@ package uk.gov.hmrc.transitmovements.models
 
 import play.api.libs.json.Format
 import play.api.libs.json.Json
-import play.api.libs.json.OFormat
 
 import scala.util.matching.Regex
 
