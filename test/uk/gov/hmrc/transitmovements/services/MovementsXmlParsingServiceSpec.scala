@@ -28,6 +28,7 @@ import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -147,6 +148,30 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
 
   val mismatchedTags: String =
     "<CC015C><messageSender>GB1234</messageReceiver></CC015C>"
+
+  "When calling extract" - {
+    val service = new MovementsXmlParsingServiceImpl
+
+    "indicating we have a departure will return a Declaration Data" in {
+      val source = createStream(validDeclarationDataXml)
+
+      val result = service.extractData(MovementType.Departure, source)
+
+      whenReady(result.value) {
+        _ mustBe Right(DeclarationData(EORINumber("GB1234"), testDate))
+      }
+    }
+
+    "indicating we have an arrival will return a Arrival Data" in {
+      val source = createStream(validArrivalDataXml)
+
+      val result = service.extractData(MovementType.Arrival, source)
+
+      whenReady(result.value) {
+        _ mustBe Right(ArrivalData(EORINumber("GB1234"), testDate, MovementReferenceNumber("token")))
+      }
+    }
+  }
 
   "When handed an Declaration Data XML stream" - {
     val service = new MovementsXmlParsingServiceImpl

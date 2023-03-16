@@ -29,14 +29,17 @@ import akka.stream.scaladsl.Source
 import akka.stream.scaladsl.ZipWith
 import akka.util.ByteString
 import cats.data.EitherT
+import cats.implicits._
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import com.google.inject.Singleton
 import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.ExtractedData
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -47,6 +50,8 @@ import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[MovementsXmlParsingServiceImpl])
 trait MovementsXmlParsingService {
+
+  def extractData(movementType: MovementType, source: Source[ByteString, _]): EitherT[Future, ParseError, ExtractedData]
 
   def extractDeclarationData(source: Source[ByteString, _]): EitherT[Future, ParseError, DeclarationData]
 
@@ -143,4 +148,9 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
         .runWith(Sink.head[Either[ParseError, ArrivalData]])
     )
 
+  override def extractData(movementType: MovementType, source: Source[ByteString, _]): EitherT[Future, ParseError, ExtractedData] =
+    movementType match {
+      case MovementType.Departure => extractDeclarationData(source).widen[ExtractedData]
+      case MovementType.Arrival   => extractArrivalData(source).widen[ExtractedData]
+    }
 }

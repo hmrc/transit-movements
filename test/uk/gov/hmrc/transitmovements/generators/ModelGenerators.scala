@@ -120,4 +120,9 @@ trait ModelGenerators extends BaseGenerators {
         status         <- Gen.oneOf(MessageStatus.statusValues)
       } yield MessageResponse(id, offsetDateTime, messageType, None, Some(status))
     }
+
+  implicit lazy val arbitraryMessageStatus: Arbitrary[MessageStatus] =
+    Arbitrary {
+      Gen.oneOf(MessageStatus.statusValues)
+    }
 }

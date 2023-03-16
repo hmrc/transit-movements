@@ -24,10 +24,10 @@ import play.api.Logging
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
+import play.api.libs.json.Reads
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
-import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -35,9 +35,9 @@ import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovements.models.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
+import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
@@ -70,7 +70,7 @@ class MovementsController @Inject() (
     with MessageTypeHeaderExtractor
     with PresentationFormats
     with ContentTypeRouting
-    with ObjectStoreURIHeaderExtractor {
+    with ObjectStoreURIHelpers {
 
   def createMovement(eori: EORINumber, movementType: MovementType) =
     contentTypeRoute {
@@ -138,36 +138,28 @@ class MovementsController @Inject() (
       case None    => updateMovementLargeMessage(movementId, triggerId)
     }
 
-  def updateMessage(movementId: MovementId, messageId: MessageId) =
+  // PATCH method for updating a specific message
+  def updateMessage(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
     Action.async(parse.json) {
       implicit request =>
         (for {
-          updateMessageMetadata <- mapRequest(request.body)
-          update                <- repo.updateMessage(movementId, messageId, updateMessageMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
-        } yield update).fold[Result](
-          presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-          _ => Ok
-        )
-    }
-
-  private def mapRequest(responseBody: JsValue): EitherT[Future, PresentationError, UpdateMessageMetadata] =
-    EitherT {
-      responseBody
-        .validate[UpdateMessageMetadata]
-        .map(
-          updateMessageMetadata => Future.successful(Right(updateMessageMetadata))
-        )
-        .getOrElse {
-          logger.error("Unable to parse unexpected request")
-          Future.successful(Left(PresentationError.badRequestError("Could not parse the request")))
-        }
+          updateMessageMetadata <- require[UpdateMessageMetadata](request.body)
+          maybeMovementToUpdate <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
+          movementToUpdate      <- ensureMovement(maybeMovementToUpdate, movementId)
+          _                     <- updateMetadataIfRequired(movementId, movementType, movementToUpdate, updateMessageMetadata.objectStoreURI)
+          _                     <- repo.updateMessage(movementId, messageId, updateMessageMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
+        } yield Ok)
+          .valueOr[Result](
+            presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError))
+          )
     }
 
   def updateMovementLargeMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[AnyContent] = Action.async(parse.anyContent) {
     implicit request =>
       (for {
         messageType                 <- extract(request.headers).asPresentation
-        objectStoreResourceLocation <- extractObjectStoreURI(request.headers)
+        objectStoreURI              <- extractObjectStoreURI(request.headers)
+        objectStoreResourceLocation <- extractResourceLocation(objectStoreURI)
         sourceFile                  <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
         messageData                 <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
@@ -177,7 +169,7 @@ class MovementsController @Inject() (
             messageData.generationDate,
             received,
             triggerId,
-            ObjectStoreResourceLocation(request.headers.get(Constants.ObjectStoreURI).get)
+            objectStoreURI
           )
         _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
       } yield message.id).fold[Result](
@@ -266,6 +258,44 @@ class MovementsController @Inject() (
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
           messages => if (messages.isEmpty) NotFound else Ok(Json.toJson(messages))
         )
+    }
+
+  private def ensureMovement(movement: Option[MovementWithoutMessages], movementId: MovementId): EitherT[Future, PresentationError, MovementWithoutMessages] =
+    EitherT(
+      Future.successful(movement.map(Right.apply).getOrElse(Left(PresentationError.notFoundError(s"Movement with ID ${movementId.value} was not found"))))
+    )
+
+  // Large Messages: Only perform this step if we haven't updated the movement EORI and we have an Object Store reference
+  private def updateMetadataIfRequired(
+    movementId: MovementId,
+    movementType: MovementType,
+    movementToUpdate: MovementWithoutMessages,
+    objectStoreURI: Option[ObjectStoreURI]
+  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Unit] =
+    (movementToUpdate.movementEORINumber, objectStoreURI) match {
+      case (None, Some(location)) =>
+        for {
+          resourceLocation <- extractResourceLocation(location)
+          source           <- objectStoreService.getObjectStoreFile(resourceLocation).asPresentation
+          extractedData    <- movementsXmlParsingService.extractData(movementType, source).asPresentation
+          _ <- repo
+            .updateMovement(movementId, Some(extractedData.movementEoriNumber), extractedData.movementReferenceNumber, extractedData.generationDate)
+            .asPresentation
+        } yield ()
+      case _ => EitherT.rightT((): Unit)
+    }
+
+  private def require[T: Reads](responseBody: JsValue): EitherT[Future, PresentationError, T] =
+    EitherT {
+      responseBody
+        .validate[T]
+        .map(
+          t => Future.successful(Right(t))
+        )
+        .getOrElse {
+          logger.error("Unable to parse unexpected request")
+          Future.successful(Left(PresentationError.badRequestError("Could not parse the request")))
+        }
     }
 
 }

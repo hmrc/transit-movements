@@ -16,10 +16,4 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import play.api.libs.json.Json
-
-object ObjectStoreResourceLocation {
-  implicit val objectStoreResourceLocationFormat = Json.valueFormat[ObjectStoreResourceLocation]
-}
-
 case class ObjectStoreResourceLocation(value: String) extends AnyVal
