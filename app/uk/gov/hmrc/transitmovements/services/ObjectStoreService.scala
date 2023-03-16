@@ -17,6 +17,7 @@
 package uk.gov.hmrc.transitmovements.services
 
 import akka.NotUsed
+import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
@@ -25,11 +26,19 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClient
 import uk.gov.hmrc.objectstore.client.play.Implicits._
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
+import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
 
+import java.time.Clock
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import javax.inject._
 import scala.concurrent._
+import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[ObjectStoreServiceImpl])
@@ -39,10 +48,15 @@ trait ObjectStoreService {
     objectStoreResourceLocation: ObjectStoreResourceLocation
   )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]]
 
+  def addMessage(movementId: MovementId, messageId: MessageId, source: Source[ByteString, _])(implicit
+    ec: ExecutionContext,
+    hc: HeaderCarrier
+  ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
+
 }
 
 @Singleton
-class ObjectStoreServiceImpl @Inject() (client: PlayObjectStoreClient) extends ObjectStoreService {
+class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clock: Clock, client: PlayObjectStoreClient) extends ObjectStoreService {
 
   override def getObjectStoreFile(
     objectStoreResourceLocation: ObjectStoreResourceLocation
@@ -61,4 +75,30 @@ class ObjectStoreServiceImpl @Inject() (client: PlayObjectStoreClient) extends O
           case NonFatal(ex) => Left(ObjectStoreError.UnexpectedError(Some(ex)))
         }
     )
+
+  private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
+
+  override def addMessage(
+    movementId: MovementId,
+    messageId: MessageId,
+    source: Source[ByteString, _]
+  )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
+    EitherT {
+      val formattedDateTime = dateTimeFormatter.format(OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
+      (for {
+        response <- client.putObject(
+          path = Path.Directory(s"movements/${movementId.value}").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
+          content = source,
+          owner = "common-transit-conversion-traders"
+        )
+      } yield response)
+        .map {
+          objectSummary =>
+            Right(objectSummary)
+        }
+        .recover {
+          case NonFatal(thr) =>
+            Left(ObjectStoreError.UnexpectedError(Some(thr)))
+        }
+    }
 }
