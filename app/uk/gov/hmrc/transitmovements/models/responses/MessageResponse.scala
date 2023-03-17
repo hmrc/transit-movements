@@ -23,6 +23,7 @@ import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 
+import java.net.URI
 import java.time.OffsetDateTime
 
 case class MessageResponse(
@@ -30,7 +31,8 @@ case class MessageResponse(
   received: OffsetDateTime,
   messageType: MessageType,
   body: Option[String],
-  status: Option[MessageStatus]
+  status: Option[MessageStatus],
+  uri: Option[URI] = None
 )
 
 object MessageResponse {
@@ -49,7 +51,8 @@ object MessageResponse {
       message.received,
       message.messageType,
       message.body,
-      message.status
+      message.status,
+      None
     )
 
   def fromMessageWithoutBody(message: Message) =
@@ -58,6 +61,7 @@ object MessageResponse {
       message.received,
       message.messageType,
       None,
-      message.status
+      message.status,
+      message.uri
     )
 }

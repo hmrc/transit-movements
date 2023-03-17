@@ -112,7 +112,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
         Some(instant),
         MessageType.DestinationOfficeRejection,
         result.triggerId,
-        result.url,
+        result.uri,
         None,
         Some(Received)
       )

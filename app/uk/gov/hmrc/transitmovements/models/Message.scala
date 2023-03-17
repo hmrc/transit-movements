@@ -25,7 +25,7 @@ case class Message(
   generated: Option[OffsetDateTime],
   messageType: MessageType,
   triggerId: Option[MessageId],
-  url: Option[URI],
+  uri: Option[URI],
   body: Option[String],
   status: Option[MessageStatus]
 )

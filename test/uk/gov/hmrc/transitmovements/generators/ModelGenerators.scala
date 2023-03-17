@@ -31,7 +31,7 @@ import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
-import uk.gov.hmrc.transitmovements.models.UpdateMessageMetadata
+import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
 import java.net.URI
@@ -148,4 +148,9 @@ trait ModelGenerators extends BaseGenerators {
       lastModified
     )
   }
+
+  implicit lazy val arbitraryMessageStatus: Arbitrary[MessageStatus] =
+    Arbitrary {
+      Gen.oneOf(MessageStatus.statusValues)
+    }
 }

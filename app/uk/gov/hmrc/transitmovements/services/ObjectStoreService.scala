@@ -31,6 +31,7 @@ import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -65,7 +66,7 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
       client
         .getObject[Source[ByteString, NotUsed]](
           Path.File(objectStoreResourceLocation.value),
-          "common-transit-conversion-traders"
+          ObjectStoreURI.expectedOwner
         )
         .flatMap {
           case Some(source) => Future.successful(Right(source.content))
@@ -85,6 +86,7 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
   )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
     EitherT {
       val formattedDateTime = dateTimeFormatter.format(OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
+
       (for {
         response <- client.putObject(
           path = Path.Directory(s"movements/${movementId.value}").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),

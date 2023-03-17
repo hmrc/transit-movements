@@ -36,7 +36,11 @@ object MessageStatus {
 
   final case object Failed extends MessageStatus
 
-  val statusValues = Seq(Received, Pending, Processing, Success, Failed)
+  val statusValues: Seq[MessageStatus] = Seq(Received, Pending, Processing, Success, Failed)
+
+  def find(value: String): Option[MessageStatus] = statusValues.find(
+    status => value == status.toString
+  )
 
   implicit val messageStatusWrites = new Writes[MessageStatus] {
 
@@ -44,12 +48,12 @@ object MessageStatus {
   }
 
   implicit val statusReads: Reads[MessageStatus] = Reads {
-    case JsString("Received")   => JsSuccess(Received)
-    case JsString("Pending")    => JsSuccess(Pending)
-    case JsString("Processing") => JsSuccess(Processing)
-    case JsString("Success")    => JsSuccess(Success)
-    case JsString("Failed")     => JsSuccess(Failed)
-    case _                      => JsError("Invalid message status")
-
+    case JsString(proposedStatus) =>
+      find(proposedStatus)
+        .map(
+          x => JsSuccess(x)
+        )
+        .getOrElse(JsError("Invalid message status"))
+    case _ => JsError("Invalid message status")
   }
 }

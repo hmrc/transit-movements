@@ -16,8 +16,6 @@
 
 package uk.gov.hmrc.transitmovements.controllers
 
-import play.api.http.HeaderNames
-import play.api.http.MimeTypes
 import play.api.mvc.BaseController
 import play.api.mvc.ControllerComponents
 import play.api.mvc.Headers
@@ -26,14 +24,15 @@ import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 
-class ObjectStoreURIHeaderExtractorSpec extends SpecBase with ModelGenerators {
+class ObjectStoreURIHelpersSpec extends SpecBase with ModelGenerators {
 
-  class ObjectStoreURIHeaderExtractorImpl extends ObjectStoreURIHeaderExtractor with BaseController {
+  class ObjectStoreURIHelpersImpl extends ObjectStoreURIHelpers with BaseController {
     override protected def controllerComponents: ControllerComponents = stubControllerComponents()
   }
 
-  val objectStoreURIExtractor = new ObjectStoreURIHeaderExtractorImpl
+  val objectStoreURIExtractor = new ObjectStoreURIHelpersImpl
 
   "extractObjectStoreURI" - {
 
@@ -47,24 +46,32 @@ class ObjectStoreURIHeaderExtractorSpec extends SpecBase with ModelGenerators {
       }
     }
 
-    "if object store uri header supplied is invalid, return BadRequestError" in {
-      val invalidObjectStoreURIHeader = Headers(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Object-Store-Uri" -> "invalid")
+    "if object store uri header is supplied, return Right" in {
+      val noObjectStoreURIHeader = Headers("X-Message-Type" -> "IE015")
 
-      val result = objectStoreURIExtractor.extractObjectStoreURI(invalidObjectStoreURIHeader)
+      val result = objectStoreURIExtractor.extractObjectStoreURI(noObjectStoreURIHeader)
+
+      whenReady(result.value) {
+        _ mustBe Left(PresentationError.badRequestError("Missing X-Object-Store-Uri header value"))
+      }
+    }
+  }
+
+  "extractResourceLocation" - {
+    "if supplied object store uri is invalid, return BadRequestError" in {
+      val result = objectStoreURIExtractor.extractResourceLocation(ObjectStoreURI("invalid"))
 
       whenReady(result.value) {
         _ mustBe Left(
-          PresentationError.badRequestError(s"X-Object-Store-Uri header value does not start with common-transit-convention-traders/ (got invalid)")
+          PresentationError.badRequestError(s"Provided Object Store URI is not owned by common-transit-convention-traders")
         )
       }
     }
 
-    "if object store uri header supplied is valid, return Right" in {
-      val filePath                  = "common-transit-convention-traders/movements/movementId/abc.xml"
-      val objectStoreURI            = ObjectStoreResourceLocation(filePath).value
-      val validObjectStoreURIHeader = Headers("X-Object-Store-Uri" -> objectStoreURI)
+    "if supplied object store uri is valid, return Right" in {
+      val filePath = "common-transit-convention-traders/movements/movementId/abc.xml"
 
-      val result = objectStoreURIExtractor.extractObjectStoreURI(validObjectStoreURIHeader)
+      val result = objectStoreURIExtractor.extractResourceLocation(ObjectStoreURI(filePath))
 
       whenReady(result.value) {
         _ mustBe Right(ObjectStoreResourceLocation("movements/movementId/abc.xml"))

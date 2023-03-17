@@ -16,10 +16,19 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import play.api.libs.json.Json
+import org.scalatest.matchers.must.Matchers
+import uk.gov.hmrc.transitmovements.base.SpecBase
 
-object UpdateMessageMetadata {
-  implicit val updateMessageMetadata = Json.format[UpdateMessageMetadata]
+class ObjectStoreURISpec extends SpecBase with Matchers {
+
+  "asResourceLocation" - {
+    "with an expected owner" in {
+      ObjectStoreURI("common-transit-convention-traders/abc.xml").asResourceLocation mustBe Some(ObjectStoreResourceLocation("abc.xml"))
+    }
+
+    "with an unexpected owner" in {
+      ObjectStoreURI("something/abc.xml").asResourceLocation mustBe None
+    }
+  }
+
 }
-
-final case class UpdateMessageMetadata(objectStoreURI: Option[ObjectStoreResourceLocation] = None, status: MessageStatus)

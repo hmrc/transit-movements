@@ -21,6 +21,7 @@ import akka.stream.scaladsl.FileIO
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.{eq => eqTo}
 import org.mockito.Mockito.reset
 import org.mockito.MockitoSugar.when
 import org.scalatest.BeforeAndAfterEach
@@ -38,6 +39,7 @@ import uk.gov.hmrc.objectstore.client.Object
 import uk.gov.hmrc.objectstore.client.ObjectMetadata
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.objectstore.client.Path.File
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClient
 import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
@@ -67,8 +69,8 @@ class ObjectStoreServiceSpec
   implicit val hc: HeaderCarrier                           = HeaderCarrier()
   private val mockObjectStoreClient: PlayObjectStoreClient = mock[PlayObjectStoreClient]
 
-  override def beforeEach: Unit =
-    reset(mockObjectStoreClient)
+//  override def beforeEach: Unit =
+//    reset(mockObjectStoreClient)
 
   "Object Store service" - {
 
@@ -78,7 +80,9 @@ class ObjectStoreServiceSpec
       val metadata    = ObjectMetadata("", 0, Md5Hash(""), Instant.now(), Map.empty[String, String])
       val content     = "content"
       val fileContent = Option[Object[Source[ByteString, NotUsed]]](Object.apply(File(filePath), Source.single(ByteString(content)), metadata))
-      when(mockObjectStoreClient.getObject[Source[ByteString, NotUsed]](any[File](), any())(any(), any())).thenReturn(Future.successful(fileContent))
+
+      when(mockObjectStoreClient.getObject[Source[ByteString, NotUsed]](eqTo(Path.File(filePath)), eqTo("common-transit-convention-traders"))(any(), any()))
+        .thenReturn(Future.successful(fileContent))
       val service = new ObjectStoreServiceImpl()(materializer, Clock.systemUTC(), mockObjectStoreClient)
       val result  = service.getObjectStoreFile(ObjectStoreResourceLocation(filePath))
       whenReady(result.value) {
@@ -90,9 +94,10 @@ class ObjectStoreServiceSpec
     }
 
     "should return an error when the file is not found on path" in {
-      when(mockObjectStoreClient.getObject(any[File](), any())(any(), any())).thenReturn(Future.successful(None))
+      when(mockObjectStoreClient.getObject(any[File](), eqTo("common-transit-convention-traders"))(any(), any())).thenReturn(Future.successful(None))
       val service = new ObjectStoreServiceImpl()(materializer, Clock.systemUTC(), mockObjectStoreClient)
-      val result  = service.getObjectStoreFile(ObjectStoreResourceLocation("abc/movement/abc.xml"))
+
+      val result = service.getObjectStoreFile(ObjectStoreResourceLocation("abc/movement/abc.xml"))
       whenReady(result.value) {
         case Left(_: ObjectStoreError.FileNotFound) => succeed
         case x =>
@@ -103,7 +108,8 @@ class ObjectStoreServiceSpec
 
     "on a failed submission, should return a Left with an UnexpectedError" in {
       val error = UpstreamErrorResponse("error", INTERNAL_SERVER_ERROR)
-      when(mockObjectStoreClient.getObject(any[File](), any())(any(), any())).thenReturn(Future.failed(error))
+
+      when(mockObjectStoreClient.getObject(any[File](), eqTo("common-transit-convention-traders"))(any(), any())).thenReturn(Future.failed(error))
       val service = new ObjectStoreServiceImpl()(materializer, Clock.systemUTC(), mockObjectStoreClient)
       val result  = service.getObjectStoreFile(ObjectStoreResourceLocation("abc/movement/abc.xml"))
       whenReady(result.value) {
@@ -113,41 +119,64 @@ class ObjectStoreServiceSpec
       }
     }
 
-  }
+    "should add the content to a file" in {
+      val objectSummary: ObjectSummaryWithMd5 = arbitraryObjectSummaryWithMd5.arbitrary.sample.get
 
-  "should add the content to a file" in {
-    val objectSummary: ObjectSummaryWithMd5 = arbitraryObjectSummaryWithMd5.arbitrary.sample.get
+      val filePath =
+        Path.Directory(s"movements/${arbitraryMovementId.arbitrary.sample.get}").file(randomUUID.toString).asUri
 
-    val file                          = new java.io.File("test/uk/gov/hmrc/transitmovements/data/valid.xml")
-    val path: java.nio.file.Path      = file.toPath
-    val source: Source[ByteString, _] = FileIO.fromPath(path)
+      val file                          = new java.io.File("test/uk/gov/hmrc/transitmovements/data/valid.xml")
+      val path: java.nio.file.Path      = file.toPath
+      val source: Source[ByteString, _] = Source.single(ByteString("this is test content")) //FileIO.fromPath(path)
 
-    when(mockObjectStoreClient.putObject(any[File](), any(), any(), any(), any(), any())(any(), any())).thenReturn(Future.successful(objectSummary))
-    val service = new ObjectStoreServiceImpl()(materializer, Clock.systemUTC(), mockObjectStoreClient)
+      when(
+        mockObjectStoreClient.putObject(
+          any[File],
+          any[Source[ByteString, _]],
+          any[RetentionPeriod],
+          any[Option[String]],
+          any[Option[Md5Hash]],
+          owner = eqTo("common-transit-conversion-traders")
+        )(any(), any())
+      )
+        .thenReturn(Future.successful(objectSummary))
+      val service = new ObjectStoreServiceImpl()(materializer, Clock.systemUTC(), mockObjectStoreClient)
 
-    val result = service.addMessage(MovementId("123"), MessageId("123"), source)
-    whenReady(result.value) {
-      r =>
-        r.isRight mustBe true
-        r.toOption.get mustBe objectSummary
+      val result = service.addMessage(MovementId("123"), MessageId("123"), source)
+      whenReady(result.value) {
+        r =>
+          r.isRight mustBe true
+          r.toOption.get mustBe objectSummary
+      }
     }
-  }
 
-  "on a failed submission of content in Object store, should return a left" in {
-    val file                          = new java.io.File("test/uk/gov/hmrc/transitmovements/data/valid.xml")
-    val path: java.nio.file.Path      = file.toPath
-    val source: Source[ByteString, _] = FileIO.fromPath(path)
+    "on a failed submission of content in Object store, should return a left" in {
+      val file                          = new java.io.File("test/uk/gov/hmrc/transitmovements/data/valid.xml")
+      val path: java.nio.file.Path      = file.toPath
+      val source: Source[ByteString, _] = FileIO.fromPath(path)
 
-    val error = ObjectStoreError.UnexpectedError(Some(new Throwable("test")))
-    when(mockObjectStoreClient.putObject(any[File](), any(), any(), any(), any(), any())(any(), any())).thenReturn(Future.failed(error))
-    val service = new ObjectStoreServiceImpl()(materializer, Clock.systemUTC(), mockObjectStoreClient)
-    val result  = service.addMessage(MovementId("123"), MessageId("123"), source)
+      val error = ObjectStoreError.UnexpectedError(Some(new Throwable("test")))
+      when(
+        mockObjectStoreClient.putObject(
+          any[File],
+          any[Source[ByteString, _]],
+          any[RetentionPeriod],
+          any[Option[String]],
+          any[Option[Md5Hash]],
+          owner = eqTo("common-transit-conversion-traders")
+        )(any(), any())
+      )
+        .thenReturn(Future.failed(error))
+      val service = new ObjectStoreServiceImpl()(materializer, Clock.systemUTC(), mockObjectStoreClient)
+      val result  = service.addMessage(MovementId("123"), MessageId("123"), source)
 
-    whenReady(result.value) {
-      case Left(_: ObjectStoreError.UnexpectedError) => succeed
-      case x =>
-        fail(s"Expected Left(ObjectStoreError.UnexpectedError), instead got $x")
+      whenReady(result.value) {
+        case Left(_: ObjectStoreError.UnexpectedError) => succeed
+        case x =>
+          fail(s"Expected Left(ObjectStoreError.UnexpectedError), instead got $x")
+      }
     }
+
   }
 
 }
