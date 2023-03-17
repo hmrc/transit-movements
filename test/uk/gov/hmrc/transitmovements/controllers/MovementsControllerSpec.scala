@@ -72,7 +72,6 @@ import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
-import uk.gov.hmrc.transitmovements.utils.SmallMessageLimit
 
 import java.net.URI
 import java.security.SecureRandom
@@ -153,7 +152,7 @@ class MovementsControllerSpec
   val mockObjectStoreService: ObjectStoreService              = mock[ObjectStoreService]
   implicit val mockTemporaryFileCreator: TemporaryFileCreator = mock[TemporaryFileCreator]
   val mockRandom: SecureRandom                                = mock[SecureRandom]
-  val mockSmallMessageLimit: SmallMessageLimit                = mock[SmallMessageLimit]
+  val mockSmallMessageLimit: SmallMessageLimitService         = mock[SmallMessageLimitService]
   val mockAppConfig: AppConfig                                = mock[AppConfig]
 
   override def afterEach() {

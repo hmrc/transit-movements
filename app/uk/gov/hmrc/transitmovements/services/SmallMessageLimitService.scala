@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.utils
+package uk.gov.hmrc.transitmovements.services
 
 import uk.gov.hmrc.transitmovements.config.AppConfig
 
@@ -22,12 +22,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class SmallMessageLimit @Inject() (config: AppConfig) {
+class SmallMessageLimitService @Inject() (config: AppConfig) {
   private lazy val limit = config.smallMessageSizeLimit
 
-  def checkContentSize(size: Long): Boolean = size match {
-    case (x) if x > limit => true
-    case (_)              => false
-  }
+  def checkContentSize(size: Long): Boolean = size > limit
 
 }

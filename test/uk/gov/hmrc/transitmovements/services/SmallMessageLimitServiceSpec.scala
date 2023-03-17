@@ -14,31 +14,31 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.utils
+package uk.gov.hmrc.transitmovements.services
 
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers.convertToAnyMustWrapper
 import org.scalatestplus.mockito.MockitoSugar
 import uk.gov.hmrc.transitmovements.config.AppConfig
 
-class SmallMessageLimitSpec extends AnyFreeSpec with MockitoSugar {
+class SmallMessageLimitServiceSpec extends AnyFreeSpec with MockitoSugar {
 
   private val config: AppConfig = mock[AppConfig]
 
   "Small message limit " - {
 
     "should return false when below the limit" in {
-      val service = new SmallMessageLimit(config)
+      val service = new SmallMessageLimitService(config)
       service.checkContentSize(config.smallMessageSizeLimit - 1) mustBe false
     }
 
     "should return true when above the limit" in {
-      val service = new SmallMessageLimit(config)
+      val service = new SmallMessageLimitService(config)
       service.checkContentSize(config.smallMessageSizeLimit + 1) mustBe true
     }
 
     "should return false when equal the limit" in {
-      val service = new SmallMessageLimit(config)
+      val service = new SmallMessageLimitService(config)
       service.checkContentSize(config.smallMessageSizeLimit) mustBe false
     }
   }

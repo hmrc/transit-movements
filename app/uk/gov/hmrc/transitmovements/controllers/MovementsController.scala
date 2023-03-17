@@ -31,6 +31,7 @@ import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
+import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
@@ -42,8 +43,6 @@ import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
-import uk.gov.hmrc.transitmovements.utils.StreamWithFile
-import uk.gov.hmrc.transitmovements.utils.SmallMessageLimit
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 
 import java.security.SecureRandom
@@ -64,7 +63,7 @@ class MovementsController @Inject() (
   messagesXmlParsingService: MessagesXmlParsingService,
   objectStoreService: ObjectStoreService,
   random: SecureRandom,
-  smallMessageLimit: SmallMessageLimit
+  smallMessageLimitService: SmallMessageLimitService
 )(implicit
   val materializer: Materializer,
   clock: Clock,
@@ -76,8 +75,7 @@ class MovementsController @Inject() (
     with MessageTypeHeaderExtractor
     with PresentationFormats
     with ContentTypeRouting
-    with ObjectStoreURIHeaderExtractor
-    with StreamWithFile {
+    with ObjectStoreURIHeaderExtractor {
 
   def createMovement(eori: EORINumber, movementType: MovementType) =
     contentTypeRoute {
@@ -89,29 +87,30 @@ class MovementsController @Inject() (
       case None => createEmptyMovement(eori, movementType)
     }
 
-  private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = Action.stream {
-    implicit request =>
-      withReusableSourceAndSize(request.body) {
-        (source, size) =>
-          if (smallMessageLimit.checkContentSize(size)) createArrivalWithObjectStore(eori)
-          else {
-            for {
-              arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
-              received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-              movementId = MovementId(ShortUUID.next(clock, random))
-              message <- messageFactory
-                .create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body, MessageStatus.Processing)
-                .asPresentation
-              movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
-              _ <- repo.insert(movement).asPresentation
-            } yield MovementResponse(movement._id, Some(movement.messages.head.id))
-          }
+  private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithSize {
+    (request: Request[Source[ByteString, _]], size: Long) =>
+      {
+        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+        if (smallMessageLimitService.checkContentSize(size)) createArrivalWithObjectStore(eori, request)
+        else {
+          for {
+            arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
+            received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+            movementId = MovementId(ShortUUID.next(clock, random))
+            message <- messageFactory
+              .create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body, MessageStatus.Processing)
+              .asPresentation
+            movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
+            _ <- repo.insert(movement).asPresentation
+          } yield MovementResponse(movement._id, Some(movement.messages.head.id))
+        }
       }.fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), response => Ok(Json.toJson(response)))
   }
 
   private def createArrivalWithObjectStore(
-    eori: EORINumber
-  )(implicit hc: HeaderCarrier, request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, MovementResponse] =
+    eori: EORINumber,
+    request: Request[Source[ByteString, _]]
+  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, MovementResponse] =
     for {
       arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
       received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
@@ -132,23 +131,23 @@ class MovementsController @Inject() (
       _ <- repo.insert(movement).asPresentation
     } yield MovementResponse(movement._id, Some(movement.messages.head.id))
 
-  private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.stream {
-    implicit request =>
-      withReusableSourceAndSize(request.body) {
-        (source, size) =>
-          if (smallMessageLimit.checkContentSize(size)) createDepartureWithObjectStore(eori)
-          else {
-            for {
-              declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
-              received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-              movementId = MovementId(ShortUUID.next(clock, random))
-              message <- messageFactory
-                .create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body, MessageStatus.Processing)
-                .asPresentation
-              movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
-              _ <- repo.insert(movement).asPresentation
-            } yield MovementResponse(movement._id, Some(movement.messages.head.id))
-          }
+  private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithSize {
+    (request: Request[Source[ByteString, _]], size: Long) =>
+      {
+        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+        if (smallMessageLimitService.checkContentSize(size)) createDepartureWithObjectStore(eori, request)
+        else {
+          for {
+            declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
+            received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+            movementId = MovementId(ShortUUID.next(clock, random))
+            message <- messageFactory
+              .create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body, MessageStatus.Processing)
+              .asPresentation
+            movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
+            _ <- repo.insert(movement).asPresentation
+          } yield MovementResponse(movement._id, Some(movement.messages.head.id))
+        }
       } fold [Result] (
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         response => Ok(Json.toJson(response))
@@ -156,8 +155,9 @@ class MovementsController @Inject() (
   }
 
   private def createDepartureWithObjectStore(
-    eori: EORINumber
-  )(implicit hc: HeaderCarrier, request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, MovementResponse] =
+    eori: EORINumber,
+    request: Request[Source[ByteString, _]]
+  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, MovementResponse] =
     for {
       declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
       received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
@@ -251,29 +251,30 @@ class MovementsController @Inject() (
   }
 
   private def updateMovementSmallMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
-    Action.stream {
-      implicit request =>
-        withReusableSourceAndSize(request.body) {
-          (source, size) =>
-            if (smallMessageLimit.checkContentSize(size)) updateSmallMessageWithObjectStore(movementId, triggerId)
-            else
-              for {
-                messageType <- extract(request.headers).asPresentation
-                messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
-                received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-                status   = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
-                message <- messageFactory
-                  .create(
-                    messageType,
-                    messageData.generationDate,
-                    received,
-                    triggerId,
-                    request.body,
-                    status
-                  )
-                  .asPresentation
-                _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
-              } yield message.id
+    Action.streamWithSize {
+      (request: Request[Source[ByteString, _]], size: Long) =>
+        {
+          implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+
+          if (smallMessageLimitService.checkContentSize(size)) updateSmallMessageWithObjectStore(movementId, triggerId, request)
+          else
+            for {
+              messageType <- extract(request.headers).asPresentation
+              messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
+              received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+              status   = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
+              message <- messageFactory
+                .create(
+                  messageType,
+                  messageData.generationDate,
+                  received,
+                  triggerId,
+                  request.body,
+                  status
+                )
+                .asPresentation
+              _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
+            } yield message.id
         }.fold[Result](
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
           id => Ok(Json.toJson(UpdateMovementResponse(id)))
@@ -282,8 +283,9 @@ class MovementsController @Inject() (
 
   private def updateSmallMessageWithObjectStore(
     movementId: MovementId,
-    triggerId: Option[MessageId] = None
-  )(implicit hc: HeaderCarrier, request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, MessageId] =
+    triggerId: Option[MessageId] = None,
+    request: Request[Source[ByteString, _]]
+  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, MessageId] =
     for {
       messageType <- extract(request.headers).asPresentation
       messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation //request.body
