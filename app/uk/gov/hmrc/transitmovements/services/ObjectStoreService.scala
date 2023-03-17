@@ -51,7 +51,7 @@ class ObjectStoreServiceImpl @Inject() (client: PlayObjectStoreClient) extends O
       client
         .getObject[Source[ByteString, NotUsed]](
           Path.File(objectStoreResourceLocation.value),
-          "common-transit-conversion-traders"
+          "common-transit-convention-traders"
         )
         .flatMap {
           case Some(source) => Future.successful(Right(source.content))
