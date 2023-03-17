@@ -20,6 +20,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.{eq => eqTo}
 import org.mockito.Mockito.reset
 import org.mockito.MockitoSugar.when
 import org.scalatest.BeforeAndAfterEach
@@ -73,7 +74,8 @@ class ObjectStoreServiceSpec
       val metadata    = ObjectMetadata("", 0, Md5Hash(""), Instant.now(), Map.empty[String, String])
       val content     = "content"
       val fileContent = Option[Object[Source[ByteString, NotUsed]]](Object.apply(File(filePath), Source.single(ByteString(content)), metadata))
-      when(mockObjectStoreClient.getObject[Source[ByteString, NotUsed]](any[File](), any())(any(), any())).thenReturn(Future.successful(fileContent))
+      when(mockObjectStoreClient.getObject[Source[ByteString, NotUsed]](eqTo(Path.File(filePath)), eqTo("common-transit-convention-traders"))(any(), any()))
+        .thenReturn(Future.successful(fileContent))
       val service = new ObjectStoreServiceImpl(mockObjectStoreClient)
       val result  = service.getObjectStoreFile(ObjectStoreResourceLocation(filePath))
       whenReady(result.value) {
@@ -85,7 +87,7 @@ class ObjectStoreServiceSpec
     }
 
     "should return an error when the file is not found on path" in {
-      when(mockObjectStoreClient.getObject(any[File](), any())(any(), any())).thenReturn(Future.successful(None))
+      when(mockObjectStoreClient.getObject(any[File](), eqTo("common-transit-convention-traders"))(any(), any())).thenReturn(Future.successful(None))
       val service = new ObjectStoreServiceImpl(mockObjectStoreClient)
       val result  = service.getObjectStoreFile(ObjectStoreResourceLocation("abc/movement/abc.xml"))
       whenReady(result.value) {
@@ -98,7 +100,7 @@ class ObjectStoreServiceSpec
 
     "on a failed submission, should return a Left with an UnexpectedError" in {
       val error = UpstreamErrorResponse("error", INTERNAL_SERVER_ERROR)
-      when(mockObjectStoreClient.getObject(any[File](), any())(any(), any())).thenReturn(Future.failed(error))
+      when(mockObjectStoreClient.getObject(any[File](), eqTo("common-transit-convention-traders"))(any(), any())).thenReturn(Future.failed(error))
       val service = new ObjectStoreServiceImpl(mockObjectStoreClient)
       val result  = service.getObjectStoreFile(ObjectStoreResourceLocation("abc/movement/abc.xml"))
       whenReady(result.value) {
