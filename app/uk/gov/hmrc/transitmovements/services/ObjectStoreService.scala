@@ -27,6 +27,7 @@ import uk.gov.hmrc.objectstore.client.play.Implicits._
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 
 import javax.inject._
 import scala.concurrent._
@@ -51,7 +52,7 @@ class ObjectStoreServiceImpl @Inject() (client: PlayObjectStoreClient) extends O
       client
         .getObject[Source[ByteString, NotUsed]](
           Path.File(objectStoreResourceLocation.value),
-          "common-transit-conversion-traders"
+          ObjectStoreURI.expectedOwner
         )
         .flatMap {
           case Some(source) => Future.successful(Right(source.content))
