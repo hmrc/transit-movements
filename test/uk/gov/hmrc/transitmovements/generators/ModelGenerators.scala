@@ -19,6 +19,9 @@ package uk.gov.hmrc.transitmovements.generators
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
+import uk.gov.hmrc.objectstore.client.Md5Hash
+import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
+import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -28,12 +31,14 @@ import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
 import java.net.URI
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 trait ModelGenerators extends BaseGenerators {
 
@@ -120,6 +125,29 @@ trait ModelGenerators extends BaseGenerators {
         status         <- Gen.oneOf(MessageStatus.statusValues)
       } yield MessageResponse(id, offsetDateTime, messageType, None, Some(status))
     }
+
+  implicit lazy val arbitraryUpdateMessageMetadata: Arbitrary[UpdateMessageMetadata] =
+    Arbitrary {
+      for {
+        status <- Gen.oneOf(MessageStatus.statusValues)
+      } yield UpdateMessageMetadata(None, status)
+    }
+
+  implicit lazy val arbitraryObjectSummaryWithMd5: Arbitrary[ObjectSummaryWithMd5] = Arbitrary {
+    for {
+      movementId <- arbitrary[MovementId]
+      messageId  <- arbitrary[MessageId]
+      lastModified      = Instant.now()
+      formattedDateTime = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC).format(lastModified)
+      contentLen <- Gen.long
+      hash       <- Gen.alphaNumStr.map(Md5Hash)
+    } yield ObjectSummaryWithMd5(
+      Path.Directory("xxxxx").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
+      contentLen,
+      hash,
+      lastModified
+    )
+  }
 
   implicit lazy val arbitraryMessageStatus: Arbitrary[MessageStatus] =
     Arbitrary {

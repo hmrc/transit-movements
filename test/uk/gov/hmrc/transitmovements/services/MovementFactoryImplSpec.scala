@@ -24,10 +24,12 @@ import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.BaseGenerators
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
+import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 
@@ -48,6 +50,7 @@ class MovementFactoryImplSpec
   val instant: OffsetDateTime = OffsetDateTime.of(2022, 5, 27, 11, 0, 0, 0, ZoneOffset.UTC)
   val clock: Clock            = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
   val random                  = new SecureRandom
+  val movementId: MovementId  = MovementId(ShortUUID.next(clock, random))
 
   "createDeparture" - {
     val sut = new MovementFactoryImpl(clock, random)
@@ -55,7 +58,7 @@ class MovementFactoryImplSpec
     "will create a departure with a message" in forAll(arbitrary[EORINumber], arbitrary[EORINumber], arbitrary[Message]) {
       (enrollmentEori, movementEori, message) =>
         val departure =
-          sut.createDeparture(enrollmentEori, MovementType.Departure, DeclarationData(movementEori, instant), message, instant, instant)
+          sut.createDeparture(movementId, enrollmentEori, MovementType.Departure, DeclarationData(movementEori, instant), message, instant, instant)
 
         departure.messages.length mustBe 1
         departure.movementReferenceNumber mustBe None
@@ -71,7 +74,7 @@ class MovementFactoryImplSpec
     "will create a arrival with a message" in forAll(arbitrary[MovementReferenceNumber], arbitrary[EORINumber], arbitrary[EORINumber], arbitrary[Message]) {
       (mrn, enrollmentEori, movementEori, message) =>
         val arrival =
-          sut.createArrival(enrollmentEori, MovementType.Arrival, ArrivalData(movementEori, instant, mrn), message, instant, instant)
+          sut.createArrival(movementId, enrollmentEori, MovementType.Arrival, ArrivalData(movementEori, instant, mrn), message, instant, instant)
 
         arrival.messages.length mustBe 1
         arrival.movementReferenceNumber mustBe Some(mrn)

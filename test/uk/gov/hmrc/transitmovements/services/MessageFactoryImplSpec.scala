@@ -27,9 +27,10 @@ import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import java.io.File
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
 import uk.gov.hmrc.transitmovements.models.MessageStatus.Received
 import uk.gov.hmrc.transitmovements.models.MessageStatus.Pending
-import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
 import java.security.SecureRandom
@@ -90,5 +91,31 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
 
     }
 
+  }
+
+  "createSmallMessage" - {
+    val instant: OffsetDateTime = OffsetDateTime.of(2022, 8, 26, 9, 0, 0, 0, ZoneOffset.UTC)
+    val clock: Clock            = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
+    val random                  = new SecureRandom
+
+    val sut = new MessageFactoryImpl(clock, random)(materializer, materializer.executionContext)
+
+    "will create a message when given an object store uri" in {
+      val objectStoreURI = new ObjectStoreResourceLocation(value = "test")
+      val triggerId      = Some(MessageId("123"))
+
+      val result = sut.createSmallMessage(MessageId("123"), MessageType.DestinationOfficeRejection, instant, instant, triggerId, objectStoreURI, Received)
+
+      result mustBe Message(
+        result.id,
+        result.received,
+        Some(instant),
+        MessageType.DestinationOfficeRejection,
+        result.triggerId,
+        result.uri,
+        None,
+        Some(Received)
+      )
+    }
   }
 }

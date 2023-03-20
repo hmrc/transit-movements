@@ -26,6 +26,7 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
@@ -63,6 +64,16 @@ trait MessageFactory {
     triggerId: Option[MessageId],
     objectStoreURI: ObjectStoreURI
   ): Message
+
+  def createSmallMessage(
+    messageId: MessageId,
+    messageType: MessageType,
+    generationDate: OffsetDateTime,
+    received: OffsetDateTime,
+    triggerId: Option[MessageId],
+    objectStoreURI: ObjectStoreResourceLocation,
+    status: MessageStatus
+  ): Message
 }
 
 class MessageFactoryImpl @Inject() (
@@ -94,6 +105,26 @@ class MessageFactoryImpl @Inject() (
           status = Some(status)
         )
     }
+
+  def createSmallMessage(
+    messageId: MessageId,
+    messageType: MessageType,
+    generationDate: OffsetDateTime,
+    received: OffsetDateTime,
+    triggerId: Option[MessageId],
+    objectStoreURI: ObjectStoreResourceLocation,
+    status: MessageStatus
+  ): Message =
+    Message(
+      id = messageId,
+      received = received,
+      generated = Some(generationDate),
+      messageType = messageType,
+      triggerId = triggerId,
+      uri = Some(new URI(objectStoreURI.value)),
+      body = None,
+      status = Some(status)
+    )
 
   def createLargeMessage(
     messageType: MessageType,

@@ -36,6 +36,7 @@ import javax.inject.Inject
 trait MovementFactory {
 
   def createDeparture(
+    movementId: MovementId,
     eori: EORINumber,
     movementType: MovementType,
     declarationData: DeclarationData,
@@ -45,6 +46,7 @@ trait MovementFactory {
   ): Movement
 
   def createArrival(
+    movementId: MovementId,
     eori: EORINumber,
     movementType: MovementType,
     arrivalData: ArrivalData,
@@ -65,6 +67,7 @@ class MovementFactoryImpl @Inject() (
 ) extends MovementFactory {
 
   def createDeparture(
+    movementId: MovementId,
     eori: EORINumber,
     movementType: MovementType,
     declarationData: DeclarationData,
@@ -73,7 +76,7 @@ class MovementFactoryImpl @Inject() (
     updated: OffsetDateTime
   ): Movement =
     Movement(
-      _id = MovementId(ShortUUID.next(clock, random)),
+      _id = movementId,
       enrollmentEORINumber = eori,
       movementType = movementType,
       movementEORINumber = Some(declarationData.movementEoriNumber),
@@ -84,6 +87,7 @@ class MovementFactoryImpl @Inject() (
     )
 
   def createArrival(
+    movementId: MovementId,
     eori: EORINumber,
     movementType: MovementType,
     arrivalData: ArrivalData,
@@ -92,7 +96,7 @@ class MovementFactoryImpl @Inject() (
     updated: OffsetDateTime
   ): Movement =
     Movement(
-      _id = MovementId(ShortUUID.next(clock, random)),
+      _id = movementId,
       enrollmentEORINumber = eori,
       movementType = movementType,
       movementEORINumber = Some(arrivalData.movementEoriNumber),
