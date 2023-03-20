@@ -123,7 +123,7 @@ class MessageFactoryImpl @Inject() (
       triggerId = triggerId,
       uri = Some(new URI(objectStoreURI.value)),
       body = None,
-      status = Some(MessageStatus.Received)
+      status = Some(status)
     )
 
   def createLargeMessage(

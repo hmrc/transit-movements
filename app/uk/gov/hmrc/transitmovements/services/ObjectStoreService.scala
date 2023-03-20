@@ -91,7 +91,7 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
         response <- client.putObject(
           path = Path.Directory(s"movements/${movementId.value}").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
           content = source,
-          owner = "common-transit-conversion-traders"
+          owner = ObjectStoreURI.expectedOwner
         )
       } yield response)
         .map {

@@ -136,7 +136,7 @@ class ObjectStoreServiceSpec
           retentionPeriod = any[RetentionPeriod],
           contentType = any[Option[String]],
           contentMd5 = any[Option[Md5Hash]],
-          owner = eqTo("common-transit-conversion-traders")
+          owner = eqTo("common-transit-convention-traders")
         )(any(), any())
       )
         .thenReturn(Future.successful(objectSummary))
@@ -163,7 +163,7 @@ class ObjectStoreServiceSpec
           retentionPeriod = any[RetentionPeriod],
           contentType = any[Option[String]],
           contentMd5 = any[Option[Md5Hash]],
-          owner = eqTo("common-transit-conversion-traders")
+          owner = eqTo("common-transit-convention-traders")
         )(any(), any())
       )
         .thenReturn(Future.failed(error))
