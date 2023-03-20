@@ -16,30 +16,33 @@
 
 package uk.gov.hmrc.transitmovements.services
 
+import org.mockito.Mockito.when
+import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers.convertToAnyMustWrapper
 import org.scalatestplus.mockito.MockitoSugar
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.transitmovements.config.AppConfig
 
-class SmallMessageLimitServiceSpec extends AnyFreeSpec with MockitoSugar {
+class SmallMessageLimitServiceSpec extends AnyFreeSpec with MockitoSugar with ScalaCheckDrivenPropertyChecks {
 
   private val config: AppConfig = mock[AppConfig]
 
+  val limit = 500000
+
   "Small message limit " - {
+    val service = new SmallMessageLimitService(config)
+    when(config.smallMessageSizeLimit).thenReturn(limit)
 
-    "should return false when below the limit" in {
-      val service = new SmallMessageLimitService(config)
-      service.checkContentSize(config.smallMessageSizeLimit - 1) mustBe false
+    "should return false when below the limit" in forAll(Gen.choose(1, limit)) {
+      size =>
+        service.checkContentSize(size) mustBe false
     }
 
-    "should return true when above the limit" in {
-      val service = new SmallMessageLimitService(config)
-      service.checkContentSize(config.smallMessageSizeLimit + 1) mustBe true
+    "should return true when below the limit" in forAll(Gen.choose(limit + 1, 5000000)) {
+      size =>
+        service.checkContentSize(size) mustBe true
     }
 
-    "should return false when equal the limit" in {
-      val service = new SmallMessageLimitService(config)
-      service.checkContentSize(config.smallMessageSizeLimit) mustBe false
-    }
   }
 }

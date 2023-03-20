@@ -69,8 +69,8 @@ class ObjectStoreServiceSpec
   implicit val hc: HeaderCarrier                           = HeaderCarrier()
   private val mockObjectStoreClient: PlayObjectStoreClient = mock[PlayObjectStoreClient]
 
-//  override def beforeEach: Unit =
-//    reset(mockObjectStoreClient)
+  override def beforeEach: Unit =
+    reset(mockObjectStoreClient)
 
   "Object Store service" - {
 
@@ -127,15 +127,15 @@ class ObjectStoreServiceSpec
 
       val file                          = new java.io.File("test/uk/gov/hmrc/transitmovements/data/valid.xml")
       val path: java.nio.file.Path      = file.toPath
-      val source: Source[ByteString, _] = Source.single(ByteString("this is test content")) //FileIO.fromPath(path)
+      val source: Source[ByteString, _] = FileIO.fromPath(path)
 
       when(
         mockObjectStoreClient.putObject(
-          any[File],
-          any[Source[ByteString, _]],
-          any[RetentionPeriod],
-          any[Option[String]],
-          any[Option[Md5Hash]],
+          path = any[File],
+          content = eqTo(source),
+          retentionPeriod = any[RetentionPeriod],
+          contentType = any[Option[String]],
+          contentMd5 = any[Option[Md5Hash]],
           owner = eqTo("common-transit-conversion-traders")
         )(any(), any())
       )
@@ -158,11 +158,11 @@ class ObjectStoreServiceSpec
       val error = ObjectStoreError.UnexpectedError(Some(new Throwable("test")))
       when(
         mockObjectStoreClient.putObject(
-          any[File],
-          any[Source[ByteString, _]],
-          any[RetentionPeriod],
-          any[Option[String]],
-          any[Option[Md5Hash]],
+          path = any[File],
+          content = eqTo(source),
+          retentionPeriod = any[RetentionPeriod],
+          contentType = any[Option[String]],
+          contentMd5 = any[Option[Md5Hash]],
           owner = eqTo("common-transit-conversion-traders")
         )(any(), any())
       )
