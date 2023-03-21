@@ -21,6 +21,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import play.api.Logging
+import play.api.http.MimeTypes
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
@@ -36,6 +37,7 @@ import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
@@ -379,19 +381,6 @@ class MovementsController @Inject() (
       case _ => EitherT.rightT((): Unit)
     }
 
-  private def require[T: Reads](responseBody: JsValue): EitherT[Future, PresentationError, T] =
-    EitherT {
-      responseBody
-        .validate[T]
-        .map(
-          t => Future.successful(Right(t))
-        )
-        .getOrElse {
-          logger.error("Unable to parse unexpected request")
-          Future.successful(Left(PresentationError.badRequestError("Could not parse the request")))
-        }
-    }
-
   def getMessageBody(
     eoriNumber: EORINumber,
     movementType: MovementType,
@@ -403,7 +392,7 @@ class MovementsController @Inject() (
         (for {
           messageData <- repo.getSingleMessage(eoriNumber, movementId, messageId, movementType).asPresentation
           body        <- getBody(messageData)
-        } yield Ok.chunked(body)).valueOr[Result](
+        } yield Ok.chunked(body, Some(MimeTypes.XML))).valueOr[Result](
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError))
         )
     }
@@ -435,13 +424,26 @@ class MovementsController @Inject() (
 
   private def getBody(messageResponse: Option[MessageResponse])(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Source[ByteString, _]] =
     messageResponse match {
-      case None                                                => EitherT.leftT(PresentationError.notFoundError("Message not found"))
+      case None => EitherT.leftT(PresentationError.notFoundError("Message not found"))
       case Some(MessageResponse(_, _, _, Some(body), _, None)) => EitherT.rightT(Source.single(ByteString(body)))
       case Some(MessageResponse(_, _, _, None, _, Some(uri))) =>
         for {
           resourceLocation <- extractResourceLocation(ObjectStoreURI(uri.toString))
-          stream           <- objectStoreService.getObjectStoreFile(resourceLocation).asPresentation
+          stream <- objectStoreService.getObjectStoreFile(resourceLocation).asPresentation
         } yield stream
+    }
+
+  private def require[T: Reads](responseBody: JsValue): EitherT[Future, PresentationError, T] =
+    EitherT {
+      responseBody
+        .validate[T]
+        .map(
+          t => Future.successful(Right(t))
+        )
+        .getOrElse {
+          logger.error("Unable to parse unexpected request")
+          Future.successful(Left(PresentationError.badRequestError("Could not parse the request")))
+        }
     }
 
 }

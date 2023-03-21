@@ -27,7 +27,6 @@ import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClient
 import uk.gov.hmrc.objectstore.client.play.Implicits._
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
-import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MovementId
@@ -59,7 +58,6 @@ trait ObjectStoreService {
 @Singleton
 class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clock: Clock, client: PlayObjectStoreClient) extends ObjectStoreService {
 
-  private val owner             = "transit-movements"
   private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
 
   override def getObjectStoreFile(
