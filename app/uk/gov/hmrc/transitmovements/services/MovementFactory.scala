@@ -35,6 +35,8 @@ import javax.inject.Inject
 @ImplementedBy(classOf[MovementFactoryImpl])
 trait MovementFactory {
 
+  def generateId(): MovementId
+
   def createDeparture(
     movementId: MovementId,
     eori: EORINumber,
@@ -65,6 +67,8 @@ class MovementFactoryImpl @Inject() (
 )(implicit
   val materializer: Materializer
 ) extends MovementFactory {
+
+  def generateId(): MovementId = MovementId(ShortUUID.next(clock, random))
 
   def createDeparture(
     movementId: MovementId,
@@ -108,7 +112,7 @@ class MovementFactoryImpl @Inject() (
 
   def createEmptyMovement(eori: EORINumber, movementType: MovementType, message: Message, created: OffsetDateTime, updated: OffsetDateTime): Movement =
     Movement(
-      _id = MovementId(ShortUUID.next(clock, random)),
+      _id = generateId(),
       enrollmentEORINumber = eori,
       movementType = movementType,
       movementEORINumber = None,
@@ -117,4 +121,5 @@ class MovementFactoryImpl @Inject() (
       updated = updated,
       messages = Vector(message)
     )
+
 }

@@ -23,16 +23,15 @@ import play.api.libs.Files.SingletonTemporaryFileCreator
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
-
-import java.io.File
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
-import uk.gov.hmrc.transitmovements.models.MessageStatus.Received
 import uk.gov.hmrc.transitmovements.models.MessageStatus.Pending
+import uk.gov.hmrc.transitmovements.models.MessageStatus.Received
+import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
+import java.io.File
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -69,9 +68,8 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
       val result = sut.create(MessageType.RequestOfRelease, instant, instant, triggerId, stream, Received)
 
       whenReady(result.value) {
-        r =>
-          r.isLeft mustBe true
-          r.left.get.isInstanceOf[StreamError] mustBe true
+        case Left(_: StreamError) => succeed
+        case x                    => fail(s"Expected a Left(StreamError), got $x")
       }
 
     }
@@ -101,7 +99,7 @@ class MessageFactoryImplSpec extends SpecBase with ScalaFutures with Matchers wi
     val sut = new MessageFactoryImpl(clock, random)(materializer, materializer.executionContext)
 
     "will create a message when given an object store uri" in {
-      val objectStoreURI = new ObjectStoreResourceLocation(value = "test")
+      val objectStoreURI = ObjectStoreURI(value = "test")
       val triggerId      = Some(MessageId("123"))
 
       val result = sut.createSmallMessage(MessageId("123"), MessageType.DestinationOfficeRejection, instant, instant, triggerId, objectStoreURI, Received)

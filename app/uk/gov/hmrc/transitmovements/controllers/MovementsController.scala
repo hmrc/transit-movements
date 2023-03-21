@@ -33,7 +33,6 @@ import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
-import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
@@ -44,7 +43,6 @@ import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
-import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 
 import java.security.SecureRandom
 import java.time.Clock
@@ -63,7 +61,6 @@ class MovementsController @Inject() (
   movementsXmlParsingService: MovementsXmlParsingService,
   messagesXmlParsingService: MessagesXmlParsingService,
   objectStoreService: ObjectStoreService,
-  random: SecureRandom,
   smallMessageLimitService: SmallMessageLimitService
 )(implicit
   val materializer: Materializer,
@@ -97,7 +94,7 @@ class MovementsController @Inject() (
           for {
             arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
             received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-            movementId = MovementId(ShortUUID.next(clock, random))
+            movementId = movementFactory.generateId()
             message <- messageFactory
               .create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body, MessageStatus.Processing)
               .asPresentation
@@ -115,8 +112,8 @@ class MovementsController @Inject() (
     for {
       arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
       received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-      movementId = MovementId(ShortUUID.next(clock, random))
-      messageId  = MessageId(ShortUUID.next(clock, random))
+      movementId = movementFactory.generateId()
+      messageId  = messageFactory.generateId()
       objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
       message = messageFactory
         .createSmallMessage(
@@ -125,7 +122,7 @@ class MovementsController @Inject() (
           arrivalData.generationDate,
           received,
           None,
-          ObjectStoreResourceLocation(objectSummary.location.asUri),
+          ObjectStoreURI(objectSummary.location.asUri),
           MessageStatus.Processing
         )
       movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
@@ -141,7 +138,7 @@ class MovementsController @Inject() (
           for {
             declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
             received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-            movementId = MovementId(ShortUUID.next(clock, random))
+            movementId = movementFactory.generateId()
             message <- messageFactory
               .create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body, MessageStatus.Processing)
               .asPresentation
@@ -162,8 +159,8 @@ class MovementsController @Inject() (
     for {
       declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
       received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-      movementId = MovementId(ShortUUID.next(clock, random))
-      messageId  = MessageId(ShortUUID.next(clock, random))
+      movementId = movementFactory.generateId()
+      messageId  = messageFactory.generateId()
       objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
       message = messageFactory
         .createSmallMessage(
@@ -172,7 +169,7 @@ class MovementsController @Inject() (
           declarationData.generationDate,
           received,
           None,
-          ObjectStoreResourceLocation(objectSummary.location.asUri),
+          ObjectStoreURI(objectSummary.location.asUri),
           MessageStatus.Processing
         )
       movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
@@ -283,10 +280,9 @@ class MovementsController @Inject() (
       messageType <- extract(request.headers).asPresentation
       messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation //request.body
       received  = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-      messageId = MessageId(ShortUUID.next(clock, random))
+      messageId = messageFactory.generateId()
       objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
-      status    = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
-      messageId = MessageId(ShortUUID.next(clock, random))
+      status = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
       message = messageFactory
         .createSmallMessage(
           messageId,
@@ -294,7 +290,7 @@ class MovementsController @Inject() (
           messageData.generationDate,
           received,
           triggerId,
-          ObjectStoreResourceLocation(objectSummary.location.asUri),
+          ObjectStoreURI(objectSummary.location.asUri),
           status
         )
       _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
