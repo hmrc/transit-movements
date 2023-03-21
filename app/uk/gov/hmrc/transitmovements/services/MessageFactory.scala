@@ -26,7 +26,6 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
@@ -42,6 +41,8 @@ import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[MessageFactoryImpl])
 trait MessageFactory {
+
+  def generateId(): MessageId
 
   def create(
     messageType: MessageType,
@@ -71,7 +72,7 @@ trait MessageFactory {
     generationDate: OffsetDateTime,
     received: OffsetDateTime,
     triggerId: Option[MessageId],
-    objectStoreURI: ObjectStoreResourceLocation,
+    objectStoreURI: ObjectStoreURI,
     status: MessageStatus
   ): Message
 }
@@ -84,6 +85,8 @@ class MessageFactoryImpl @Inject() (
   ec: ExecutionContext
 ) extends MessageFactory {
 
+  def generateId(): MessageId = MessageId(ShortUUID.next(clock, random))
+
   def create(
     messageType: MessageType,
     generationDate: OffsetDateTime,
@@ -95,7 +98,7 @@ class MessageFactoryImpl @Inject() (
     getMessageBody(source).map {
       message =>
         Message(
-          id = MessageId(ShortUUID.next(clock, random)),
+          id = generateId(),
           received = received,
           generated = Some(generationDate),
           messageType = messageType,
@@ -112,7 +115,7 @@ class MessageFactoryImpl @Inject() (
     generationDate: OffsetDateTime,
     received: OffsetDateTime,
     triggerId: Option[MessageId],
-    objectStoreURI: ObjectStoreResourceLocation,
+    objectStoreURI: ObjectStoreURI,
     status: MessageStatus
   ): Message =
     Message(
@@ -134,7 +137,7 @@ class MessageFactoryImpl @Inject() (
     objectStoreURI: ObjectStoreURI
   ): Message =
     Message(
-      id = MessageId(ShortUUID.next(clock, random)),
+      id = generateId(),
       received = received,
       generated = Some(generationDate),
       messageType = messageType,
@@ -149,7 +152,7 @@ class MessageFactoryImpl @Inject() (
     received: OffsetDateTime
   ): Message =
     Message(
-      id = MessageId(ShortUUID.next(clock, random)),
+      id = generateId(),
       received = received,
       generated = None,
       messageType = messageType,
