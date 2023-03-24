@@ -501,7 +501,7 @@ class MovementsRepositorySpec
       )
 
     val result = await(
-      repository.updateMessages(departureID, message2, None, receivedInstant).value
+      repository.addMessage(departureID, message2, None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -546,7 +546,7 @@ class MovementsRepositorySpec
 
     val mrn = arbitrary[MovementReferenceNumber].sample.value
     val result = await(
-      repository.updateMessages(departureId, message2, Some(mrn), receivedInstant).value
+      repository.addMessage(departureId, message2, Some(mrn), receivedInstant).value
     )
 
     result should be(Right(()))
@@ -571,7 +571,7 @@ class MovementsRepositorySpec
       arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(movementId.value)))
 
     val result = await(
-      repository.updateMessages(movementId, message, Some(arbitrary[MovementReferenceNumber].sample.get), instant).value
+      repository.addMessage(movementId, message, Some(arbitrary[MovementReferenceNumber].sample.get), instant).value
     )
 
     result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
@@ -673,7 +673,7 @@ class MovementsRepositorySpec
         arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(movementId.value)))
 
       val result = await(
-        repository.updateMovement(movementId, Some(eori), Some(mrn), instant).value
+        repository.updateMovementMetadata(movementId, Some(eori), Some(mrn), instant).value
       )
 
       result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
@@ -696,7 +696,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, receivedInstant).value
+      repository.updateMovementMetadata(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -728,7 +728,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, None, Some(mrn), receivedInstant).value
+      repository.updateMovementMetadata(departureMovement._id, None, Some(mrn), receivedInstant).value
     )
 
     result should be(Right(()))
@@ -761,7 +761,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), Some(mrn), receivedInstant).value
+      repository.updateMovementMetadata(departureMovement._id, Some(departureMovement.enrollmentEORINumber), Some(mrn), receivedInstant).value
     )
 
     result should be(Right(()))
@@ -792,7 +792,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, None, None, receivedInstant).value
+      repository.updateMovementMetadata(departureMovement._id, None, None, receivedInstant).value
     )
 
     result should be(Right(()))

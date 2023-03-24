@@ -16,6 +16,7 @@ lazy val microservice = Project(appName, file("."))
     // Import models by default in route files
     RoutesKeys.routesImport ++= Seq(
       "uk.gov.hmrc.transitmovements.models._",
+      "uk.gov.hmrc.transitmovements.models.requests._",
       "uk.gov.hmrc.transitmovements.models.Bindings._",
       "java.time.OffsetDateTime"
     )

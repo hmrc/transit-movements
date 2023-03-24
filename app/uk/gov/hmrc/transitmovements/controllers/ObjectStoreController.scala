@@ -21,6 +21,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.google.inject.Inject
 import play.api.Logging
+import play.api.http.MimeTypes
 import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
@@ -51,8 +52,10 @@ class ObjectStoreController @Inject() (cc: ControllerComponents, objectStoreServ
     implicit request =>
       (for {
         resourceLocation <- extractResourceLocation(uri)
-        objectStream     <- objectStoreService.getObjectStoreFile(resourceLocation).asPresentation
-      } yield Ok.chunked(objectStream))
+        objectStream <- objectStoreService
+          .getObjectStoreFile(resourceLocation)
+          .asPresentation(objectStoreErrorWithNotFoundConverter, implicitly[ExecutionContext])
+      } yield Ok.chunked(objectStream, Some(MimeTypes.XML)))
         .valueOrF(
           error => Future.successful(Status(error.code.statusCode)(Json.toJson(error)))
         )

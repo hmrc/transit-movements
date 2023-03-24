@@ -14,18 +14,10 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.services.errors
 
-import java.net.URI
-import java.time.OffsetDateTime
+sealed abstract class MessageError
 
-case class Message(
-  id: MessageId,
-  received: OffsetDateTime,
-  generated: Option[OffsetDateTime],
-  messageType: Option[MessageType],
-  triggerId: Option[MessageId],
-  uri: Option[URI],
-  body: Option[String],
-  status: Option[MessageStatus]
-)
+object MessageError {
+  case class UnexpectedError(caughtException: Option[Throwable] = None) extends MessageError
+}

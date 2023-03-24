@@ -17,13 +17,13 @@
 package uk.gov.hmrc.transitmovements.models
 
 import play.api.libs.json.Json
-import play.api.libs.json.OWrites
+import play.api.libs.json.OFormat
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 
 import java.time.Instant
 
 object ObjectStoreSummaryResponse {
-  implicit lazy val writes: OWrites[ObjectStoreSummaryResponse] = Json.writes[ObjectStoreSummaryResponse]
+  implicit lazy val format: OFormat[ObjectStoreSummaryResponse] = Json.format[ObjectStoreSummaryResponse]
 
   def apply(objectStoreSummary: ObjectSummaryWithMd5): ObjectStoreSummaryResponse =
     ObjectStoreSummaryResponse(

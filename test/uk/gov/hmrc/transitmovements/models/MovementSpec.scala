@@ -42,7 +42,7 @@ class MovementSpec extends AnyFlatSpec with Matchers with PresentationFormats {
           id = MessageId("999"),
           received = OffsetDateTime.now(),
           generated = Some(OffsetDateTime.now()),
-          messageType = MessageType.ReleaseForTransit,
+          messageType = Some(MessageType.ReleaseForTransit),
           triggerId = Some(MessageId("888")),
           uri = Some(URI.create("xyz")),
           body = Some("body"),

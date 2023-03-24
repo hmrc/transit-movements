@@ -93,11 +93,11 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
   }
 
   "Stream error" - {
-    import uk.gov.hmrc.transitmovements.services.errors.StreamError
-    import uk.gov.hmrc.transitmovements.services.errors.StreamError._
+    import uk.gov.hmrc.transitmovements.services.errors.MessageError
+    import uk.gov.hmrc.transitmovements.services.errors.MessageError._
 
     "for a success" in {
-      val input = Right[StreamError, Unit](()).toEitherT[Future]
+      val input = Right[MessageError, Unit](()).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Right(())
       }
@@ -105,7 +105,7 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
 
     "for a failure" in {
       val exception = new Exception("stream failure")
-      val input     = Left[StreamError, Unit](UnexpectedError(Some(exception))).toEitherT[Future]
+      val input     = Left[MessageError, Unit](UnexpectedError(Some(exception))).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
       }

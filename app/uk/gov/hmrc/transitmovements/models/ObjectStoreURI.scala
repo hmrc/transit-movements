@@ -22,7 +22,7 @@ import play.api.libs.json.Json
 import scala.util.matching.Regex
 
 object ObjectStoreURI {
-  val expectedOwner = "common-transit-convention-traders"
+  val expectedOwner = "transit-movements"
 
   // The URI consists of the service name in the first part of the path, followed
   // by the location of the object in the context of that service. As this service
@@ -33,6 +33,11 @@ object ObjectStoreURI {
   implicit val objectStoreURIformat: Format[ObjectStoreURI] = Json.valueFormat[ObjectStoreURI]
 }
 
+/** The ObjectStoreURI represents the full location, including owner. For the variant without
+  * the owner, see [[ObjectStoreResourceLocation]]
+  *
+  * @param value The stringified URI
+  */
 case class ObjectStoreURI(value: String) extends AnyVal {
 
   def asResourceLocation: Option[ObjectStoreResourceLocation] =

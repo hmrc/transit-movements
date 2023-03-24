@@ -19,8 +19,9 @@ package uk.gov.hmrc.transitmovements.controllers.errors
 import cats.data.EitherT
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
+import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError.FileNotFound
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
-import uk.gov.hmrc.transitmovements.services.errors.StreamError
+import uk.gov.hmrc.transitmovements.services.errors.MessageError
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -60,11 +61,20 @@ trait ConvertError {
     }
   }
 
-  implicit val streamErrorConverter = new Converter[StreamError] {
-    import uk.gov.hmrc.transitmovements.services.errors.StreamError._
+  implicit val streamErrorConverter = new Converter[MessageError] {
+    import uk.gov.hmrc.transitmovements.services.errors.MessageError._
 
-    def convert(streamError: StreamError): PresentationError = streamError match {
+    def convert(streamError: MessageError): PresentationError = streamError match {
       case UnexpectedError(ex) => PresentationError.internalServiceError(cause = ex)
+    }
+  }
+
+  // Needed for the object store controller (pass by URL instead of header).
+  val objectStoreErrorWithNotFoundConverter = new Converter[ObjectStoreError] {
+
+    override def convert(input: ObjectStoreError): PresentationError = input match {
+      case FileNotFound(fileLocation) => PresentationError.notFoundError(s"file not found at location: $fileLocation")
+      case x                          => objectStoreErrorConverter.convert(x)
     }
   }
 

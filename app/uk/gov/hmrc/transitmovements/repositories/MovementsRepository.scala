@@ -44,7 +44,7 @@ import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
+import uk.gov.hmrc.transitmovements.models.mongo.UpdateMessageModel
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
@@ -95,14 +95,14 @@ trait MovementsRepository {
     movementEORI: Option[EORINumber]
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]]
 
-  def updateMovement(
+  def updateMovementMetadata(
     movementId: MovementId,
     movementEORI: Option[EORINumber],
     mrn: Option[MovementReferenceNumber],
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
-  def updateMessages(
+  def addMessage(
     movementId: MovementId,
     message: Message,
     mrn: Option[MovementReferenceNumber],
@@ -112,7 +112,7 @@ trait MovementsRepository {
   def updateMessage(
     movementId: MovementId,
     messageId: MessageId,
-    message: UpdateMessageMetadata,
+    message: UpdateMessageModel,
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
@@ -307,7 +307,7 @@ class MovementsRepositoryImpl @Inject() (
       case _                  => empty()
     }
 
-  def updateMessages(
+  def addMessage(
     movementId: MovementId,
     message: Message,
     mrn: Option[MovementReferenceNumber],
@@ -344,7 +344,7 @@ class MovementsRepositoryImpl @Inject() (
   def updateMessage(
     movementId: MovementId,
     messageId: MessageId,
-    message: UpdateMessageMetadata,
+    message: UpdateMessageModel,
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit] = {
 
@@ -355,16 +355,20 @@ class MovementsRepositoryImpl @Inject() (
 
     val arrayFilters = new UpdateOptions().arrayFilters(Collections.singletonList(Filters.in("element.id", messageId.value)))
 
-    val combined = Seq(setUpdated, setStatus) ++ message.objectStoreURI
+    val combined = Seq(setUpdated, setStatus) ++ message.uri
       .map(
         x => Seq(mSet("messages.$[element].uri", x.value))
+      )
+      .getOrElse(Seq()) ++ message.body
+      .map(
+        x => Seq(mSet("messages.$[element].body", x))
       )
       .getOrElse(Seq())
 
     executeUpdate(movementId, filter, combined, arrayFilters)
   }
 
-  override def updateMovement(
+  override def updateMovementMetadata(
     movementId: MovementId,
     movementEORI: Option[EORINumber],
     mrn: Option[MovementReferenceNumber],

@@ -16,4 +16,9 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+/** The ObjectStoreURI represents the location without the owner. For the variant with
+  * the owner, see [[ObjectStoreURI]]
+  *
+  * @param value The stringified UR without the owner
+  */
 case class ObjectStoreResourceLocation(value: String) extends AnyVal

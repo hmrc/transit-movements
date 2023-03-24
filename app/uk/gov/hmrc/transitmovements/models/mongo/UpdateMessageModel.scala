@@ -14,10 +14,17 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.services.errors
+package uk.gov.hmrc.transitmovements.models.mongo
 
-sealed abstract class StreamError
+import play.api.libs.json.Json
+import play.api.libs.json.OFormat
+import uk.gov.hmrc.transitmovements.models.MessageStatus
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 
-object StreamError {
-  case class UnexpectedError(caughtException: Option[Throwable] = None) extends StreamError
+import java.net.URI
+
+object UpdateMessageModel {
+  implicit val format: OFormat[UpdateMessageModel] = Json.format[UpdateMessageModel]
 }
+
+case class UpdateMessageModel(uri: Option[ObjectStoreURI], body: Option[String], status: MessageStatus)

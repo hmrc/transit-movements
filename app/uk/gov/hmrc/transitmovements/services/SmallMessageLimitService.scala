@@ -16,15 +16,21 @@
 
 package uk.gov.hmrc.transitmovements.services
 
+import com.google.inject.ImplementedBy
 import uk.gov.hmrc.transitmovements.config.AppConfig
 
 import javax.inject.Inject
 import javax.inject.Singleton
 
+@ImplementedBy(classOf[SmallMessageLimitServiceImpl])
+trait SmallMessageLimitService {
+  def isLarge(size: Long): Boolean
+}
+
 @Singleton
-class SmallMessageLimitService @Inject() (config: AppConfig) {
+class SmallMessageLimitServiceImpl @Inject() (config: AppConfig) extends SmallMessageLimitService {
   private lazy val limit = config.smallMessageSizeLimit
 
-  def checkContentSize(size: Long): Boolean = size > limit
+  def isLarge(size: Long): Boolean = size > limit
 
 }

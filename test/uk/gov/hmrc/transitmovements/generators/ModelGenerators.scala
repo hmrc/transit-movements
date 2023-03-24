@@ -22,6 +22,7 @@ import org.scalacheck.Gen
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -31,6 +32,7 @@ import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
@@ -100,10 +102,10 @@ trait ModelGenerators extends BaseGenerators {
         url         <- arbitrary[Option[URI]]
         body        <- arbitrary[Option[String]]
         status      <- Gen.oneOf(MessageStatus.statusValues)
-      } yield Message(id, received, generated, messageType, triggerId, url, body, Some(status))
+      } yield Message(id, received, generated, Some(messageType), triggerId, url, body, Some(status))
     }
 
-  implicit lazy val arbitraryMovement: Arbitrary[Movement] =
+  lazy val arbitraryEmptyMovement: Arbitrary[Movement] =
     Arbitrary {
       for {
         id                      <- arbitrary[MovementId]
@@ -112,8 +114,15 @@ trait ModelGenerators extends BaseGenerators {
         movementReferenceNumber <- arbitrary[Option[MovementReferenceNumber]]
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
-        messages                <- arbitrary[Vector[Message]]
-      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, created, updated, messages)
+      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, created, updated, Vector())
+    }
+
+  implicit lazy val arbitraryMovement: Arbitrary[Movement] =
+    Arbitrary {
+      for {
+        movement <- arbitraryEmptyMovement.arbitrary
+        messages <- arbitrary[Vector[Message]]
+      } yield movement.copy(messages = messages)
     }
 
   implicit lazy val arbitraryMessageResponse: Arbitrary[MessageResponse] =
@@ -123,7 +132,7 @@ trait ModelGenerators extends BaseGenerators {
         offsetDateTime <- arbitrary[OffsetDateTime]
         messageType    <- arbitrary[MessageType]
         status         <- Gen.oneOf(MessageStatus.statusValues)
-      } yield MessageResponse(id, offsetDateTime, messageType, None, Some(status))
+      } yield MessageResponse(id, offsetDateTime, Some(messageType), None, Some(status))
     }
 
   implicit lazy val arbitraryUpdateMessageMetadata: Arbitrary[UpdateMessageMetadata] =
@@ -153,4 +162,26 @@ trait ModelGenerators extends BaseGenerators {
     Arbitrary {
       Gen.oneOf(MessageStatus.statusValues)
     }
+
+  lazy val dateTimeFormat = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+
+  implicit lazy val arbitraryObjectStoreURI: Arbitrary[ObjectStoreURI] =
+    Arbitrary {
+      for {
+        movementId <- arbitrary[MovementId]
+        messageId  <- arbitrary[MessageId]
+        dateTime   <- arbitrary[OffsetDateTime]
+      } yield testObjectStoreURI(movementId, messageId, dateTime)
+    }
+
+  def testObjectStoreURI(movementId: MovementId, messageId: MessageId, dateTime: OffsetDateTime): ObjectStoreURI =
+    ObjectStoreURI(s"transit-movements/movements/${movementId.value}/${movementId.value}-${messageId.value}-${dateTimeFormat.format(dateTime)}.xml")
+
+  implicit lazy val arbitraryDepartureData: Arbitrary[DeclarationData] = Arbitrary {
+    for {
+      eori           <- arbitrary[EORINumber]
+      generationDate <- arbitrary[OffsetDateTime]
+    } yield DeclarationData(eori, generationDate)
+  }
+
 }
