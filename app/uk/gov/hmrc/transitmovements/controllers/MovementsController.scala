@@ -399,27 +399,19 @@ class MovementsController @Inject() (
     movementType: MovementType
   ): EitherT[Future, MessageTypeExtractError, Unit] =
     EitherT {
-      println("validateMessageType...")
       messageType match {
         case Some(messageType) =>
-          println("messageType..." + messageType)
-          println("movementType..." + movementType)
           movementType match {
             case MovementType.Arrival =>
-              println("Arrival..." + movementType)
               MessageType.checkArrivalMessageType(messageType.code) match {
                 case None    => Future.successful(Left(InvalidMessageType(s"Invalid messageType value: $messageType")))
                 case Some(_) => Future.successful(Right())
               }
             case MovementType.Departure =>
-              println("Departure..." + movementType)
-              println("messageType.code..." + messageType.code)
               MessageType.checkDepartureMessageType(messageType.code) match {
                 case None =>
-                  println("None - checkDepartureMessageType...")
                   Future.successful(Left(InvalidMessageType(s"Invalid messageType value: $messageType")))
                 case Some(_) =>
-                  println("Some - checkDepartureMessageType...")
                   Future.successful(Right())
               }
           }
