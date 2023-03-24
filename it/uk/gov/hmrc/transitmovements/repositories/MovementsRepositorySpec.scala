@@ -648,6 +648,81 @@ class MovementsRepositorySpec
 
   }
 
+  "updateMessage" should "update the existing message with both status and messageType" in {
+
+    val message1 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None, status = Some(MessageStatus.Pending))
+
+    val departureMovement =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(message1)
+        )
+
+    await(
+      repository.insert(departureMovement).value
+    )
+
+    val message2 = UpdateMessageMetadata(None, MessageStatus.Success, Some(MessageType.DeclarationAmendment))
+
+    val result = await(
+      repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
+    }
+
+    movement.updated shouldEqual receivedInstant
+    movement.messages.length should be(1)
+    movement.messages.head.status shouldBe Some(message2.status)
+    movement.messages.head.messageType.code shouldBe message2.messageType.get.code
+  }
+
+  "updateMessage" should "update the existing message with status, object store url, and messageType" in {
+
+    val message1 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None, status = Some(MessageStatus.Pending))
+
+    val departureMovement =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(message1)
+        )
+
+    await(
+      repository.insert(departureMovement).value
+    )
+
+    val message2 = UpdateMessageMetadata(
+      Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")),
+      MessageStatus.Success,
+      Some(MessageType.DeclarationAmendment)
+    )
+
+    val result = await(
+      repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
+    }
+
+    movement.updated shouldEqual receivedInstant
+    movement.messages.length should be(1)
+    movement.messages.head.status shouldBe Some(message2.status)
+    movement.messages.head.uri.value.toString shouldBe message2.objectStoreURI.get.value
+    movement.messages.head.messageType.code shouldBe message2.messageType.get.code
+  }
+
   "updateMessage" should "return error if there is no matching movement with the given id" in {
 
     val movementId = arbitrary[MovementId].sample.value

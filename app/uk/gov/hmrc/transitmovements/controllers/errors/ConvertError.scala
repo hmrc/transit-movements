@@ -78,10 +78,10 @@ trait ConvertError {
     }
   }
 
-  implicit val headerExtractErrorConverter = new Converter[HeaderExtractError] {
-    import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError._
+  implicit val messageTypeExtractErrorConverter = new Converter[MessageTypeExtractError] {
+    import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError._
 
-    def convert(headerExtractError: HeaderExtractError): PresentationError = headerExtractError match {
+    def convert(messageTypeExtractError: MessageTypeExtractError): PresentationError = messageTypeExtractError match {
       case NoHeaderFound(message)      => PresentationError.badRequestError(message)
       case InvalidMessageType(message) => PresentationError.badRequestError(message)
     }

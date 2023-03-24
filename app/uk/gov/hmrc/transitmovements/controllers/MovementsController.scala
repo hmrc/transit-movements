@@ -34,7 +34,9 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
+import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
+import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
@@ -206,6 +208,7 @@ class MovementsController @Inject() (
       implicit request =>
         (for {
           updateMessageMetadata <- require[UpdateMessageMetadata](request.body)
+          _                     <- validateMessageType(updateMessageMetadata.messageType, movementType).asPresentation
           maybeMovementToUpdate <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
           movementToUpdate      <- ensureMovement(maybeMovementToUpdate, movementId)
           _                     <- updateMetadataIfRequired(movementId, movementType, movementToUpdate, updateMessageMetadata.objectStoreURI)
@@ -389,6 +392,40 @@ class MovementsController @Inject() (
           logger.error("Unable to parse unexpected request")
           Future.successful(Left(PresentationError.badRequestError("Could not parse the request")))
         }
+    }
+
+  private def validateMessageType(
+    messageType: Option[MessageType],
+    movementType: MovementType
+  ): EitherT[Future, MessageTypeExtractError, Unit] =
+    EitherT {
+      println("validateMessageType...")
+      messageType match {
+        case Some(messageType) =>
+          println("messageType..." + messageType)
+          println("movementType..." + movementType)
+          movementType match {
+            case MovementType.Arrival =>
+              println("Arrival..." + movementType)
+              MessageType.checkArrivalMessageType(messageType.code) match {
+                case None    => Future.successful(Left(InvalidMessageType(s"Invalid messageType value: $messageType")))
+                case Some(_) => Future.successful(Right())
+              }
+            case MovementType.Departure =>
+              println("Departure..." + movementType)
+              println("messageType.code..." + messageType.code)
+              MessageType.checkDepartureMessageType(messageType.code) match {
+                case None =>
+                  println("None - checkDepartureMessageType...")
+                  Future.successful(Left(InvalidMessageType(s"Invalid messageType value: $messageType")))
+                case Some(_) =>
+                  println("Some - checkDepartureMessageType...")
+                  Future.successful(Right())
+              }
+          }
+
+        case None => Future.successful(Right())
+      }
     }
 
 }

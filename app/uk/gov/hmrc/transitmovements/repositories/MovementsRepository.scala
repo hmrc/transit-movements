@@ -359,6 +359,10 @@ class MovementsRepositoryImpl @Inject() (
       .map(
         x => Seq(mSet("messages.$[element].uri", x.value))
       )
+      .getOrElse(Seq()) ++ message.messageType
+      .map(
+        x => Seq(mSet("messages.$[element].messageType", x.code))
+      )
       .getOrElse(Seq())
 
     executeUpdate(movementId, filter, combined, arrayFilters)

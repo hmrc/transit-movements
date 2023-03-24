@@ -19,16 +19,16 @@ package uk.gov.hmrc.transitmovements.controllers
 import cats.data.EitherT
 import play.api.mvc.Headers
 import uk.gov.hmrc.transitmovements.config.Constants
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
+import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
+import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.NoHeaderFound
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError
+import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError
 
 import scala.concurrent.Future
 
 trait MessageTypeHeaderExtractor {
 
-  def extract(headers: Headers): EitherT[Future, HeaderExtractError, MessageType] =
+  def extract(headers: Headers): EitherT[Future, MessageTypeExtractError, MessageType] =
     EitherT {
       headers.get(Constants.MessageType) match {
         case None => Future.successful(Left(NoHeaderFound("Missing X-Message-Type header value")))

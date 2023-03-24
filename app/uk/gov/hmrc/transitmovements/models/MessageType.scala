@@ -213,4 +213,8 @@ object MessageType {
   val values = arrivalValues ++ departureValues ++ errorValues
 
   def fromHeaderValue(headerValue: String): Option[MessageType] = values.find(_.code == headerValue)
+
+  def checkDepartureMessageType(messageType: String): Option[MessageType] = departureRequestValues.find(_.code == messageType)
+
+  def checkArrivalMessageType(messageType: String): Option[MessageType] = arrivalRequestValues.find(_.code == messageType)
 }
