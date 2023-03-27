@@ -14,6 +14,10 @@ PATCH      /traders/:EORI/movements/:movementType/:movementId/messages/:messageI
 
 POST       /traders/movements/:movementId/messages                                 uk.gov.hmrc.transitmovements.controllers.MovementsController.updateMovement(movementId: MovementId, triggerId: Option[MessageId] ?= None)
 
+# -- Message Body
+
+GET        /traders/:EORI/movements/:movementType/:movementId/messages/:messageId/body uk.gov.hmrc.transitmovements.controllers.MessageBodyController.getBody(EORI: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId)
+
 # -- Object Store facade -- to be removed when proper refactoring is completed.
 
 GET        /object/*location                                                        uk.gov.hmrc.transitmovements.controllers.ObjectStoreController.getObject(location: ObjectStoreURI)
