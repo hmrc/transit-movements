@@ -28,10 +28,10 @@ import uk.gov.hmrc.objectstore.client.play.Implicits._
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
-import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -49,7 +49,7 @@ trait ObjectStoreService {
     objectStoreResourceLocation: ObjectStoreResourceLocation
   )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]]
 
-  def addMessage(movementId: MovementId, messageId: MessageId, source: Source[ByteString, _])(implicit
+  def putObjectStoreFile(movementId: MovementId, messageId: MessageId, source: Source[ByteString, _])(implicit
     ec: ExecutionContext,
     hc: HeaderCarrier
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
@@ -66,7 +66,7 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
       client
         .getObject[Source[ByteString, NotUsed]](
           Path.File(objectStoreResourceLocation.value),
-          ObjectStoreURI.expectedOwner
+          Constants.ObjectStoreOwner
         )
         .flatMap {
           case Some(source) => Future.successful(Right(source.content))
@@ -79,7 +79,7 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
 
   private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
 
-  override def addMessage(
+  override def putObjectStoreFile(
     movementId: MovementId,
     messageId: MessageId,
     source: Source[ByteString, _]
@@ -91,7 +91,7 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
         response <- client.putObject(
           path = Path.Directory(s"movements/${movementId.value}").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
           content = source,
-          owner = ObjectStoreURI.expectedOwner
+          owner = Constants.ObjectStoreOwner
         )
       } yield response)
         .map {

@@ -116,7 +116,7 @@ class MovementsController @Inject() (
       received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       movementId = movementFactory.generateId()
       messageId  = messageFactory.generateId()
-      objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
+      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
       message = messageFactory
         .createSmallMessage(
           messageId,
@@ -163,7 +163,7 @@ class MovementsController @Inject() (
       received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       movementId = movementFactory.generateId()
       messageId  = messageFactory.generateId()
-      objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
+      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
       message = messageFactory
         .createSmallMessage(
           messageId,
@@ -284,7 +284,7 @@ class MovementsController @Inject() (
       messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation //request.body
       received  = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       messageId = messageFactory.generateId()
-      objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
+      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
       status = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
       message = messageFactory
         .createSmallMessage(

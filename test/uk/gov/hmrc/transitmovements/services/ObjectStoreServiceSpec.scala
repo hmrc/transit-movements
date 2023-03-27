@@ -142,7 +142,7 @@ class ObjectStoreServiceSpec
         .thenReturn(Future.successful(objectSummary))
       val service = new ObjectStoreServiceImpl()(materializer, Clock.systemUTC(), mockObjectStoreClient)
 
-      val result = service.addMessage(MovementId("123"), MessageId("123"), source)
+      val result = service.putObjectStoreFile(MovementId("123"), MessageId("123"), source)
       whenReady(result.value) {
         r =>
           r.isRight mustBe true
@@ -168,7 +168,7 @@ class ObjectStoreServiceSpec
       )
         .thenReturn(Future.failed(error))
       val service = new ObjectStoreServiceImpl()(materializer, Clock.systemUTC(), mockObjectStoreClient)
-      val result  = service.addMessage(MovementId("123"), MessageId("123"), source)
+      val result  = service.putObjectStoreFile(MovementId("123"), MessageId("123"), source)
 
       whenReady(result.value) {
         case Left(_: ObjectStoreError.UnexpectedError) => succeed

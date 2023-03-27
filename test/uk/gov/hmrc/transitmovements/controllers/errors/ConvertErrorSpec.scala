@@ -29,6 +29,7 @@ import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.I
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.NoHeaderFound
 
 import java.time.format.DateTimeParseException
+import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -153,6 +154,34 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       val input = Left[ObjectStoreError, Unit](FileNotFound("test")).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _.left.toOption.get.code mustBe BadRequest
+      }
+    }
+  }
+
+  "objectStoreErrorWithNotFoundConverter" - {
+    import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
+    import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError._
+
+    "for a success" in {
+      val input = Right[ObjectStoreError, Unit](()).toEitherT[Future]
+      whenReady(input.asPresentation(objectStoreErrorWithNotFoundConverter, implicitly[ExecutionContext]).value) {
+        _ mustBe Right(())
+      }
+    }
+
+    "for a failure" in {
+      val exception = new Exception("unexpected failure")
+      val input     = Left[ObjectStoreError, Unit](UnexpectedError(Some(exception))).toEitherT[Future]
+      whenReady(input.asPresentation(objectStoreErrorWithNotFoundConverter, implicitly[ExecutionContext]).value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
+      }
+    }
+
+    "FileNotFound should result BadRequest status" in {
+      val input = Left[ObjectStoreError, Unit](FileNotFound("test")).toEitherT[Future]
+      whenReady(input.asPresentation(objectStoreErrorWithNotFoundConverter, implicitly[ExecutionContext]).value) {
+        case Left(StandardError("file not found at location: test", NotFound)) => succeed
+        case x                                                                 => fail(s"Expected Left(NotFound), got $x")
       }
     }
   }
