@@ -166,15 +166,16 @@ class MovementsControllerSpec
   override def beforeEach(): Unit = {
     // TODO: Move this to specific tests as required
     when(mockMessageService.generateId()).thenReturn(messageId)
-    when(mockMovementFactory.generateId()).thenReturn(movementId)
     super.beforeEach()
   }
 
   override def afterEach() = {
     reset(mockTemporaryFileCreator)
+    reset(mockMovementsXmlParsingService)
     reset(mockMessagesXmlParsingService)
     reset(mockMessageService)
     reset(mockObjectStoreService)
+    reset(mockRepository)
     super.afterEach()
   }
 
@@ -1307,7 +1308,7 @@ class MovementsControllerSpec
             eqTo(MessageStatus.Received)
           )
         )
-          .thenReturn(messageFactory)
+          .thenReturn(message)
 
         when(mockRepository.addMessage(MovementId(eqTo(movementId.value)), eqTo(message), eqTo(messageData.mrn), any[OffsetDateTime]))
           .thenReturn(EitherT.rightT(()))
