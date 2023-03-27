@@ -22,6 +22,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
+import play.api.http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClient
 import uk.gov.hmrc.objectstore.client.play.Implicits._
@@ -77,7 +78,7 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
         }
     )
 
-  private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
+  private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss.SSS").withZone(ZoneOffset.UTC)
 
   override def putObjectStoreFile(
     movementId: MovementId,
@@ -87,13 +88,13 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
     EitherT {
       val formattedDateTime = dateTimeFormatter.format(OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
 
-      (for {
-        response <- client.putObject(
+      client
+        .putObject(
           path = Path.Directory(s"movements/${movementId.value}").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
           content = source,
-          owner = Constants.ObjectStoreOwner
+          owner = Constants.ObjectStoreOwner,
+          contentType = Some(MimeTypes.XML)
         )
-      } yield response)
         .map {
           objectSummary =>
             Right(objectSummary)
