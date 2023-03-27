@@ -128,7 +128,7 @@ class MovementsRepositorySpec
   "getSingleMessage" should "return message response with uri if it exists" in {
 
     val message1 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None, status = Some(MessageStatus.Pending))
+      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
 
     val departure =
       arbitrary[Movement].sample.value
@@ -149,7 +149,7 @@ class MovementsRepositorySpec
     val message1 =
       arbitrary[Message].sample.value.copy(
         body = Some("body"),
-        messageType = MessageType.DeclarationData,
+        messageType = Some(MessageType.DeclarationData),
         triggerId = None,
         status = Some(MessageStatus.Pending),
         uri = None
@@ -476,7 +476,7 @@ class MovementsRepositorySpec
   }
 
   "updateMessages" should "if not MrnAllocated, add a message to the matching movement and set updated parameter to when the latest message was received" in {
-    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None)
+    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None)
 
     val departureID = arbitrary[MovementId].sample.value
     val departure =
@@ -495,13 +495,13 @@ class MovementsRepositorySpec
     val message2 =
       arbitrary[Message].sample.value.copy(
         body = None,
-        messageType = MessageType.DepartureOfficeRejection,
+        messageType = Some(MessageType.DepartureOfficeRejection),
         triggerId = Some(MessageId(departureID.value)),
         received = receivedInstant
       )
 
     val result = await(
-      repository.updateMessages(departureID, message2, None, receivedInstant).value
+      repository.attachMessage(departureID, message2, None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -519,7 +519,7 @@ class MovementsRepositorySpec
 
   "updateMessages" should "if MrnAllocated, update MRN field when message type is MRNAllocated, as well as messages and set updated parameter to when the latest message was received" in {
 
-    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.MrnAllocated, triggerId = None)
+    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.MrnAllocated), triggerId = None)
 
     val departureId = arbitrary[MovementId].sample.value
     val departure =
@@ -539,14 +539,14 @@ class MovementsRepositorySpec
     val message2 =
       arbitrary[Message].sample.value.copy(
         body = None,
-        messageType = MessageType.MrnAllocated,
+        messageType = Some(MessageType.MrnAllocated),
         triggerId = Some(MessageId(departureId.value)),
         received = receivedInstant
       )
 
     val mrn = arbitrary[MovementReferenceNumber].sample.value
     val result = await(
-      repository.updateMessages(departureId, message2, Some(mrn), receivedInstant).value
+      repository.attachMessage(departureId, message2, Some(mrn), receivedInstant).value
     )
 
     result should be(Right(()))
@@ -568,10 +568,10 @@ class MovementsRepositorySpec
     val movementId = arbitrary[MovementId].sample.value
 
     val message =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(movementId.value)))
+      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DepartureOfficeRejection), triggerId = Some(MessageId(movementId.value)))
 
     val result = await(
-      repository.updateMessages(movementId, message, Some(arbitrary[MovementReferenceNumber].sample.get), instant).value
+      repository.attachMessage(movementId, message, Some(arbitrary[MovementReferenceNumber].sample.get), instant).value
     )
 
     result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
@@ -581,7 +581,7 @@ class MovementsRepositorySpec
   "updateMessage" should "update the existing message with both status and object store url" in {
 
     val message1 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None, status = Some(MessageStatus.Pending))
+      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
 
     val departureMovement =
       arbitrary[Movement].sample.value
@@ -616,7 +616,7 @@ class MovementsRepositorySpec
 
   "updateMessage" should "update an existing message with status only" in {
     val message1 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None, status = Some(MessageStatus.Pending))
+      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
 
     val departureMovement =
       arbitrary[Movement].sample.value
@@ -653,7 +653,7 @@ class MovementsRepositorySpec
     val movementId = arbitrary[MovementId].sample.value
 
     val message =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(movementId.value)))
+      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DepartureOfficeRejection), triggerId = Some(MessageId(movementId.value)))
 
     val result = await(
       repository.updateMessage(movementId, message.id, UpdateMessageMetadata(None, MessageStatus.Failed), instant).value
@@ -670,7 +670,8 @@ class MovementsRepositorySpec
   ) {
     (movementId, eori, mrn) =>
       val message =
-        arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(movementId.value)))
+        arbitrary[Message].sample.value
+          .copy(body = None, messageType = Some(MessageType.DepartureOfficeRejection), triggerId = Some(MessageId(movementId.value)))
 
       val result = await(
         repository.updateMovement(movementId, Some(eori), Some(mrn), instant).value

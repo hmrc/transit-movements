@@ -29,13 +29,6 @@ import scala.concurrent.Future
 trait ObjectStoreURIHelpers {
   self: BaseController =>
 
-  def extractObjectStoreURI(headers: Headers): EitherT[Future, PresentationError, ObjectStoreURI] =
-    EitherT {
-      Future.successful(
-        headers.get(Constants.ObjectStoreURI).map(ObjectStoreURI.apply).toRight(PresentationError.badRequestError("Missing X-Object-Store-Uri header value"))
-      )
-    }
-
   def extractResourceLocation(objectStoreURI: ObjectStoreURI): EitherT[Future, PresentationError, ObjectStoreResourceLocation] =
     EitherT {
       Future.successful(

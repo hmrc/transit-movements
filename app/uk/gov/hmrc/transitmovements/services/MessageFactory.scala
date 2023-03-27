@@ -54,7 +54,7 @@ trait MessageFactory {
   ): EitherT[Future, StreamError, Message]
 
   def createEmptyMessage(
-    messageType: MessageType,
+    messageType: Option[MessageType],
     received: OffsetDateTime
   ): Message
 
@@ -101,7 +101,7 @@ class MessageFactoryImpl @Inject() (
           id = generateId(),
           received = received,
           generated = Some(generationDate),
-          messageType = messageType,
+          messageType = Some(messageType),
           triggerId = triggerId,
           uri = None,
           body = Some(message),
@@ -122,7 +122,7 @@ class MessageFactoryImpl @Inject() (
       id = messageId,
       received = received,
       generated = Some(generationDate),
-      messageType = messageType,
+      messageType = Some(messageType),
       triggerId = triggerId,
       uri = Some(new URI(objectStoreURI.value)),
       body = None,
@@ -140,7 +140,7 @@ class MessageFactoryImpl @Inject() (
       id = generateId(),
       received = received,
       generated = Some(generationDate),
-      messageType = messageType,
+      messageType = Some(messageType),
       triggerId = triggerId,
       uri = Some(new URI(objectStoreURI.value)),
       body = None,
@@ -148,7 +148,7 @@ class MessageFactoryImpl @Inject() (
     )
 
   def createEmptyMessage(
-    messageType: MessageType,
+    messageType: Option[MessageType],
     received: OffsetDateTime
   ): Message =
     Message(

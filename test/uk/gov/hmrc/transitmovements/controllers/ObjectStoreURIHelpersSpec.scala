@@ -34,29 +34,6 @@ class ObjectStoreURIHelpersSpec extends SpecBase with ModelGenerators {
 
   val objectStoreURIExtractor = new ObjectStoreURIHelpersImpl
 
-  "extractObjectStoreURI" - {
-
-    "if object store uri header is not supplied, return BadRequestError" in {
-      val noObjectStoreURIHeader = Headers("X-Message-Type" -> "IE015")
-
-      val result = objectStoreURIExtractor.extractObjectStoreURI(noObjectStoreURIHeader)
-
-      whenReady(result.value) {
-        _ mustBe Left(PresentationError.badRequestError("Missing X-Object-Store-Uri header value"))
-      }
-    }
-
-    "if object store uri header is supplied, return Right" in {
-      val noObjectStoreURIHeader = Headers("X-Message-Type" -> "IE015")
-
-      val result = objectStoreURIExtractor.extractObjectStoreURI(noObjectStoreURIHeader)
-
-      whenReady(result.value) {
-        _ mustBe Left(PresentationError.badRequestError("Missing X-Object-Store-Uri header value"))
-      }
-    }
-  }
-
   "extractResourceLocation" - {
     "if supplied object store uri is invalid, return BadRequestError" in {
       val result = objectStoreURIExtractor.extractResourceLocation(ObjectStoreURI("invalid"))

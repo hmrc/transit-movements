@@ -144,7 +144,7 @@ class MovementsControllerSpec
   ): Request[NodeSeq] =
     FakeRequest(
       method = method,
-      uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
+      uri = routes.MovementsController.attachMessage(movementId, Some(triggerId)).url,
       headers = if (messageType.isDefined) headers.add("X-Message-Type" -> messageType.get) else headers,
       body = body
     )
@@ -216,7 +216,16 @@ class MovementsControllerSpec
     lazy val uri = new URI("test")
 
     lazy val message =
-      Message(messageId, received, Some(received), MessageType.DeclarationData, Some(messageId), Some(uri), Some("content"), Some(MessageStatus.Processing))
+      Message(
+        messageId,
+        received,
+        Some(received),
+        Some(MessageType.DeclarationData),
+        Some(messageId),
+        Some(uri),
+        Some("content"),
+        Some(MessageStatus.Processing)
+      )
 
     "must return OK if XML data extraction is successful" in {
 
@@ -485,7 +494,16 @@ class MovementsControllerSpec
     lazy val uri = new URI("test")
 
     lazy val message =
-      Message(messageId, received, Some(received), MessageType.ArrivalNotification, Some(messageId), Some(uri), Some("content"), Some(MessageStatus.Processing))
+      Message(
+        messageId,
+        received,
+        Some(received),
+        Some(MessageType.ArrivalNotification),
+        Some(messageId),
+        Some(uri),
+        Some("content"),
+        Some(MessageStatus.Processing)
+      )
 
     "must return OK if XML data extraction is successful" in {
 
@@ -1018,13 +1036,13 @@ class MovementsControllerSpec
       )
         .thenReturn(messageFactoryEither)
 
-      when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+      when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.rightT(()))
 
       val request = fakeRequest(POST, validXml, Some(messageType.code))
 
       val result =
-        controller.updateMovement(movementId, Some(triggerId))(request)
+        controller.attachMessage(movementId, Some(triggerId))(request)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj("messageId" -> messageId.value)
@@ -1044,7 +1062,7 @@ class MovementsControllerSpec
             received = now,
             triggerId = Some(triggerId),
             uri = Some(new URI(objectSummary.location.asUri)),
-            messageType = messageType
+            messageType = Some(messageType)
           )
 
         when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
@@ -1075,13 +1093,13 @@ class MovementsControllerSpec
         )
           .thenReturn(message)
 
-        when(mockRepository.updateMessages(MovementId(eqTo(movementId.value)), eqTo(message), eqTo(None), any[OffsetDateTime]))
+        when(mockRepository.attachMessage(MovementId(eqTo(movementId.value)), eqTo(message), eqTo(None), any[OffsetDateTime]))
           .thenReturn(EitherT.rightT(()))
 
         val request = fakeRequest(POST, validXml, Some(messageType.code))
 
         val result =
-          controller.updateMovement(movementId, Some(triggerId))(request)
+          controller.attachMessage(movementId, Some(triggerId))(request)
 
         status(result) mustBe OK
         contentAsJson(result) mustBe Json.obj("messageId" -> messageId.value)
@@ -1120,13 +1138,13 @@ class MovementsControllerSpec
         )
           .thenReturn(messageFactoryEither)
 
-        when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+        when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
           .thenReturn(EitherT.rightT(()))
 
         val request = fakeRequest(POST, xml, Some(messageType.code))
 
         val result =
-          controller.updateMovement(movementId, Some(triggerId))(request)
+          controller.attachMessage(movementId, Some(triggerId))(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -1157,13 +1175,13 @@ class MovementsControllerSpec
         )
           .thenReturn(messageFactoryEither)
 
-        when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+        when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
           .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(s"No departure found with the given id: ${movementId.value}")))
 
         val request = fakeRequest(POST, validXml, Some(messageType.code))
 
         val result =
-          controller.updateMovement(movementId, Some(triggerId))(request)
+          controller.attachMessage(movementId, Some(triggerId))(request)
 
         status(result) mustBe NOT_FOUND
         contentAsJson(result) mustBe Json.obj(
@@ -1180,7 +1198,7 @@ class MovementsControllerSpec
         val request = fakeRequest(POST, validXml, None, FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)))
 
         val result =
-          controller.updateMovement(movementId, Some(triggerId))(request)
+          controller.attachMessage(movementId, Some(triggerId))(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -1197,7 +1215,7 @@ class MovementsControllerSpec
         val request = fakeRequest(POST, validXml, Some("invalid"), FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)))
 
         val result =
-          controller.updateMovement(movementId, Some(triggerId))(request)
+          controller.attachMessage(movementId, Some(triggerId))(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -1222,13 +1240,13 @@ class MovementsControllerSpec
 
         val request = FakeRequest(
           method = POST,
-          uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
+          uri = routes.MovementsController.attachMessage(movementId, Some(triggerId)).url,
           headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code)),
           body = unknownErrorXml
         )
 
         val result =
-          controller.updateMovement(movementId, Some(triggerId))(request)
+          controller.attachMessage(movementId, Some(triggerId))(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
@@ -1244,7 +1262,7 @@ class MovementsControllerSpec
         val request = fakeRequest(POST, validXml, Some(messageType.code))
 
         val result =
-          controller.updateMovement(movementId, Some(triggerId))(request)
+          controller.attachMessage(movementId, Some(triggerId))(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
@@ -1255,7 +1273,7 @@ class MovementsControllerSpec
     }
   }
 
-  "updateMovement for Large message" - {
+  "attachMessage for Large message stored in object store" - {
 
     val messageType = MessageType.DeclarationData
 
@@ -1286,40 +1304,21 @@ class MovementsControllerSpec
       )
         .thenReturn(messageFactory)
 
-      when(mockRepository.updateMessages(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+      when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.rightT(()))
 
       lazy val request = FakeRequest(
         method = "POST",
-        uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
+        uri = routes.MovementsController.attachMessage(movementId, Some(triggerId)).url,
         headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> ObjectStoreResourceLocation(filePath).value)),
         body = AnyContentAsEmpty
       )
 
       val result =
-        controller.updateMovement(movementId, Some(triggerId))(request)
+        controller.attachMessage(movementId, Some(triggerId))(request)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj("messageId" -> messageId.value)
-    }
-
-    "must return BAD_REQUEST when Object Store uri header not supplied" in {
-
-      lazy val request = FakeRequest(
-        method = "POST",
-        uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
-        headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code)),
-        body = AnyContentAsEmpty
-      )
-
-      val result =
-        controller.updateMovement(movementId, Some(triggerId))(request)
-
-      status(result) mustBe BAD_REQUEST
-      contentAsJson(result) mustBe Json.obj(
-        "code"    -> "BAD_REQUEST",
-        "message" -> "Missing X-Object-Store-Uri header value"
-      )
     }
 
     "must return BAD_REQUEST when file not found on object store resource location" in {
@@ -1328,13 +1327,13 @@ class MovementsControllerSpec
         .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound(filePath)))
       lazy val request = FakeRequest(
         method = "POST",
-        uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
+        uri = routes.MovementsController.attachMessage(movementId, Some(triggerId)).url,
         headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> filePath)),
         body = AnyContentAsEmpty
       )
 
       val result =
-        controller.updateMovement(movementId, Some(triggerId))(request)
+        controller.attachMessage(movementId, Some(triggerId))(request)
 
       status(result) mustBe BAD_REQUEST
       contentAsJson(result) mustBe Json.obj(
@@ -1353,13 +1352,13 @@ class MovementsControllerSpec
 
       lazy val request = FakeRequest(
         method = "POST",
-        uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
+        uri = routes.MovementsController.attachMessage(movementId, Some(triggerId)).url,
         headers = FakeHeaders(Seq("X-Message-Type" -> messageType.code, "X-Object-Store-Uri" -> filePath)),
         body = AnyContentAsEmpty
       )
 
       val result =
-        controller.updateMovement(movementId, Some(triggerId))(request)
+        controller.attachMessage(movementId, Some(triggerId))(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
       contentAsJson(result) mustBe Json.obj(
@@ -1367,6 +1366,75 @@ class MovementsControllerSpec
         "message" -> "Internal server error"
       )
     }
+  }
+
+  "attachMessage for an empty message" - {
+
+    lazy val message =
+      arbitraryMessage.arbitrary.sample.get.copy(
+        generated = None,
+        messageType = None,
+        triggerId = None,
+        uri = None,
+        body = None,
+        status = Some(MessageStatus.Pending)
+      )
+
+    lazy val request = FakeRequest(
+      method = "POST",
+      uri = routes.MovementsController.attachMessage(movementId, None).url,
+      headers = FakeHeaders(Seq.empty[(String, String)]),
+      body = AnyContentAsEmpty
+    )
+
+    "must return OK if successfully attaches an empty message to a movement" in {
+
+      when(
+        mockMessageFactory.createEmptyMessage(
+          any[Option[MessageType]],
+          any[OffsetDateTime]
+        )
+      )
+        .thenReturn(message)
+
+      when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+        .thenReturn(EitherT.rightT(()))
+
+      val result =
+        controller.attachMessage(movementId, None)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.obj("messageId" -> message.id.value)
+    }
+
+    "must return NOT_FOUND when movement cannot be found in DB" in {
+
+      when(
+        mockMessageFactory.createLargeMessage(
+          any[MessageType],
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          any[Option[MessageId]],
+          any[String].asInstanceOf[ObjectStoreURI]
+        )
+      )
+        .thenReturn(message)
+
+      val errorMessage = s"Movement with id ${movementId.value} not found"
+
+      when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+        .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(errorMessage)))
+
+      val result =
+        controller.attachMessage(movementId, None)(request)
+
+      status(result) mustBe NOT_FOUND
+      contentAsJson(result) mustBe Json.obj(
+        "code"    -> "NOT_FOUND",
+        "message" -> errorMessage
+      )
+    }
+
   }
 
   "updateMessage (for PATCH)" - {
