@@ -165,6 +165,8 @@ trait ModelGenerators extends BaseGenerators {
 
   lazy val dateTimeFormat = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
 
+  private val objectStoreOwner = "common-transit-convention-traders"
+
   implicit lazy val arbitraryObjectStoreURI: Arbitrary[ObjectStoreURI] =
     Arbitrary {
       for {
@@ -175,7 +177,7 @@ trait ModelGenerators extends BaseGenerators {
     }
 
   def testObjectStoreURI(movementId: MovementId, messageId: MessageId, dateTime: OffsetDateTime): ObjectStoreURI =
-    ObjectStoreURI(s"transit-movements/movements/${movementId.value}/${movementId.value}-${messageId.value}-${dateTimeFormat.format(dateTime)}.xml")
+    ObjectStoreURI(s"$objectStoreOwner/movements/${movementId.value}/${movementId.value}-${messageId.value}-${dateTimeFormat.format(dateTime)}.xml")
 
   implicit lazy val arbitraryDepartureData: Arbitrary[DeclarationData] = Arbitrary {
     for {

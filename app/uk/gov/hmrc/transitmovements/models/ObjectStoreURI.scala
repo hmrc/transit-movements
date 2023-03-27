@@ -22,7 +22,8 @@ import play.api.libs.json.Json
 import scala.util.matching.Regex
 
 object ObjectStoreURI {
-  val expectedOwner = "transit-movements"
+  // val expectedOwner = "transit-movements"
+  val expectedOwner = "common-transit-convention-traders"
 
   // The URI consists of the service name in the first part of the path, followed
   // by the location of the object in the context of that service. As this service

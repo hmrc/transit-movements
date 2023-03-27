@@ -71,33 +71,16 @@ trait StreamingParsers {
     def stream(
       block: (Request[Source[ByteString, _]]) => Future[Result]
     )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
-      actionBuilder.async(streamFromMemory) {
-        request =>
-          // This is outside the for comprehension because we need access to the file
-          // if the rest of the futures fail, which we wouldn't get if it was in there.
-          Future
-            .fromTry(Try(temporaryFileCreator.create()))
-            .flatMap {
-              file =>
-                (for {
-                  _      <- request.body.runWith(FileIO.toPath(file))
-                  result <- block(request.withBody(FileIO.fromPath(file)))
-                } yield result)
-                  .attemptTap {
-                    _ =>
-                      file.delete()
-                      Future.successful(())
-                  }
-            }
-            .recover {
-              case NonFatal(ex) =>
-                logger.error(s"Failed call: ${ex.getMessage}", ex)
-                Status(INTERNAL_SERVER_ERROR)(Json.toJson(PresentationError.internalServiceError(cause = Some(ex))))
-            }
-      }
+      createStream((request, _) => block(request), _ => Future.successful(0)) // we don't care about this size so don't calculate it
 
     def streamWithSize(
       block: (Request[Source[ByteString, _]], Long) => Future[Result]
+    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
+      createStream(block, file => Future.fromTry(Try(Files.size(file))))
+
+    private def createStream(
+      block: (Request[Source[ByteString, _]], Long) => Future[Result],
+      sizeGenerator: (play.api.libs.Files.TemporaryFile => Future[Long])
     )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
       actionBuilder.async(streamFromMemory) {
         request =>
@@ -109,7 +92,7 @@ trait StreamingParsers {
               file =>
                 (for {
                   _      <- request.body.runWith(FileIO.toPath(file))
-                  size   <- Future.fromTry(Try(Files.size(file)))
+                  size   <- sizeGenerator(file)
                   result <- block(request.withBody(FileIO.fromPath(file)), size)
                 } yield result)
                   .attemptTap {
@@ -125,5 +108,4 @@ trait StreamingParsers {
             }
       }
   }
-
 }

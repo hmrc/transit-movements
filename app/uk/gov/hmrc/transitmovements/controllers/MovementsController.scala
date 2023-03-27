@@ -58,7 +58,7 @@ import scala.concurrent.Future
 @Singleton
 class MovementsController @Inject() (
   cc: ControllerComponents,
-  messageFactory: MessageService,
+  messageService: MessageService,
   movementFactory: MovementFactory,
   repo: MovementsRepository,
   movementsXmlParsingService: MovementsXmlParsingService,
@@ -95,7 +95,7 @@ class MovementsController @Inject() (
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
         // TODO: Create empty movement then create message -- avoids creating IDs here.
         movementId = movementFactory.generateId()
-        message <- messageFactory
+        message <- messageService
           .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body, size, MessageStatus.Processing)
           .asPresentation
         movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
@@ -112,7 +112,7 @@ class MovementsController @Inject() (
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
         // TODO: Create empty movement then create message -- avoids creating IDs here.
         movementId = movementFactory.generateId()
-        message <- messageFactory
+        message <- messageService
           .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, request.body, size, MessageStatus.Processing)
           .asPresentation
         movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
@@ -130,7 +130,7 @@ class MovementsController @Inject() (
         case MovementType.Arrival   => MessageType.ArrivalNotification
         case MovementType.Departure => MessageType.DeclarationData
       }
-      val message  = messageFactory.createEmpty(Some(messageType), received)
+      val message  = messageService.createEmpty(Some(messageType), received)
       val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received)
       (for {
         _ <- repo.insert(movement).asPresentation
@@ -178,7 +178,7 @@ class MovementsController @Inject() (
         sourceFile                  <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
         messageData                 <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
         received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-        message = messageFactory.createWithURI(
+        message = messageService.createWithURI(
           messageType,
           messageData.generationDate,
           received,
@@ -203,7 +203,7 @@ class MovementsController @Inject() (
             messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
             received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
             status   = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
-            message <- messageFactory
+            message <- messageService
               .create(
                 movementId,
                 messageType,
@@ -333,7 +333,7 @@ class MovementsController @Inject() (
         (for {
           // check to see we have the message in the database before we do anything
           _      <- repo.getSingleMessage(eoriNumber, movementId, messageId, movementType).asPresentation
-          update <- messageFactory.update(movementId, messageId, request.body, size, MessageStatus.Processing).asPresentation
+          update <- messageService.update(movementId, messageId, request.body, size, MessageStatus.Processing).asPresentation
           _ <- repo
             .updateMessage(
               movementId,
