@@ -88,6 +88,15 @@ trait ConvertError {
     }
   }
 
+  // Needed for the message body controller
+  val objectStoreErrorWithInternalServiceErrorConverter = new Converter[ObjectStoreError] {
+
+    override def convert(input: ObjectStoreError): PresentationError = input match {
+      case FileNotFound(fileLocation) => PresentationError.internalServiceError(s"file not found at location: $fileLocation", cause = None)
+      case x => objectStoreErrorConverter.convert(x)
+    }
+  }
+
   implicit val messageTypeExtractErrorConverter = new Converter[MessageTypeExtractError] {
     import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError._
 
