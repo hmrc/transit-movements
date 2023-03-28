@@ -38,11 +38,13 @@ import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.ObjectStoreService
 
+import javax.inject.Inject
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
-class MessageBodyController(cc: ControllerComponents, repo: MovementsRepository, objectStoreService: ObjectStoreService)(implicit ec: ExecutionContext)
-    extends BackendController(cc)
+class MessageBodyController @Inject() (cc: ControllerComponents, repo: MovementsRepository, objectStoreService: ObjectStoreService)(implicit
+  ec: ExecutionContext
+) extends BackendController(cc)
     with Logging
     with ConvertError
     with ObjectStoreURIHelpers {

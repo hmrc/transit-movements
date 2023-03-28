@@ -87,15 +87,29 @@ class MessageBodyControllerSpec
       arbitrary[MovementType],
       arbitrary[MovementId],
       arbitrary[MessageId],
-      arbitrary[MessageType],
-      Gen
-        .stringOfN(15, Gen.alphaNumChar)
-        .map(
-          s => s"<test>$s</test>"
-        )
+      arbitrary[MessageType]
     ) {
-      (eori, movementType, movementId, messageId, messageType, xml) =>
+      (eori, movementType, movementId, messageId, messageType) =>
+        val xml = Gen
+          .stringOfN(15, Gen.alphaNumChar)
+          .map(
+            s => s"<test>$s</test>"
+          )
+          .sample
+          .get
         val mockMovementsRepo = mock[MovementsRepository]
+        val expectedResponse: EitherT[Future, MongoError, Option[MessageResponse]] = EitherT.rightT[Future, MongoError](
+          Some(
+            MessageResponse(
+              messageId,
+              now,
+              messageType,
+              Some(xml),
+              Some(MessageStatus.Success),
+              None
+            )
+          )
+        )
         when(
           mockMovementsRepo.getSingleMessage(
             EORINumber(eqTo(eori.value)),
@@ -104,24 +118,7 @@ class MessageBodyControllerSpec
             eqTo(movementType)
           )
         )
-          .thenReturn(
-            EitherT(
-              Future.successful[Either[MongoError, Option[MessageResponse]]](
-                Right(
-                  Some(
-                    MessageResponse(
-                      messageId,
-                      now,
-                      messageType,
-                      Some(xml),
-                      Some(MessageStatus.Success),
-                      None
-                    )
-                  )
-                )
-              )
-            )
-          )
+          .thenReturn(expectedResponse)
 
         val mockObjectStoreService = mock[ObjectStoreService]
 
@@ -129,7 +126,7 @@ class MessageBodyControllerSpec
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
 
         status(result) mustBe OK
-        contentAsString(result) mustBe s"<test>$xml</test>"
+        contentAsString(result) mustBe xml
 
         whenReady(result) {
           _ =>
@@ -145,16 +142,17 @@ class MessageBodyControllerSpec
       arbitrary[MovementType],
       arbitrary[MovementId],
       arbitrary[MessageId],
-      arbitrary[MessageType],
-      Gen
-        .stringOfN(15, Gen.alphaNumChar)
-        .map(
-          s => s"<test>$s</test>"
-        )
+      arbitrary[MessageType]
     ) {
-      (eori, movementType, movementId, messageId, messageType, xml) =>
+      (eori, movementType, movementId, messageId, messageType) =>
         val objectStoreUri = testObjectStoreURI(movementId, messageId, now)
-
+        val xml = Gen
+          .stringOfN(15, Gen.alphaNumChar)
+          .map(
+            s => s"<test>$s</test>"
+          )
+          .sample
+          .get
         val mockMovementsRepo = mock[MovementsRepository]
         when(
           mockMovementsRepo.getSingleMessage(
@@ -191,7 +189,7 @@ class MessageBodyControllerSpec
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
 
         status(result) mustBe OK
-        contentAsString(result) mustBe s"<test>$xml</test>"
+        contentAsString(result) mustBe xml
 
         whenReady(result) {
           _ =>

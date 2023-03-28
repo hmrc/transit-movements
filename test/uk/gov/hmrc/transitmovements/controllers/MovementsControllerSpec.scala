@@ -22,7 +22,6 @@ import akka.util.ByteString
 import akka.util.Timeout
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.Mockito.atLeastOnce
 import org.mockito.Mockito.times
@@ -81,12 +80,15 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
 import java.util.UUID.randomUUID
+import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.xml.NodeSeq
 
+// this warning is a false one due to how the mock matchers work
+@nowarn("msg=dead code following this construct")
 class MovementsControllerSpec
     extends SpecBase
     with TestActorSystem

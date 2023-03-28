@@ -461,8 +461,7 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    def setup() {
-
+    def setup() = {
       //populate db in non-time order
       await(repository.insert(departureXi2).value)
       await(repository.insert(departureGB2).value)
@@ -744,9 +743,6 @@ class MovementsRepositorySpec
     arbitrary[MovementReferenceNumber]
   ) {
     (movementId, eori, mrn) =>
-      val message =
-        arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(movementId.value)))
-
       val result = await(
         repository.updateMovement(movementId, Some(eori), Some(mrn), instant).value
       )
