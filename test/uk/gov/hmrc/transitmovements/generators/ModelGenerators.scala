@@ -130,7 +130,7 @@ trait ModelGenerators extends BaseGenerators {
     Arbitrary {
       for {
         status <- Gen.oneOf(MessageStatus.statusValues)
-      } yield UpdateMessageMetadata(None, status)
+      } yield UpdateMessageMetadata(None, status, None)
     }
 
   implicit lazy val arbitraryObjectSummaryWithMd5: Arbitrary[ObjectSummaryWithMd5] = Arbitrary {
