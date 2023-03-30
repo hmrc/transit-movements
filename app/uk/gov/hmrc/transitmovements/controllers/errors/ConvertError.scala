@@ -93,7 +93,7 @@ trait ConvertError {
 
     override def convert(input: ObjectStoreError): PresentationError = input match {
       case FileNotFound(fileLocation) => PresentationError.internalServiceError(s"file not found at location: $fileLocation", cause = None)
-      case x                          => objectStoreErrorConverter.convert(x)
+      case err                        => objectStoreErrorConverter.convert(err)
     }
   }
 
