@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovements.controllers.errors
 import cats.data.EitherT
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
+import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError.FileNotFound
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -75,6 +76,24 @@ trait ConvertError {
     def convert(objectStoreError: ObjectStoreError): PresentationError = objectStoreError match {
       case FileNotFound(fileLocation) => PresentationError.badRequestError(s"file not found at location: $fileLocation")
       case UnexpectedError(ex)        => PresentationError.internalServiceError(cause = ex)
+    }
+  }
+
+  // Needed for the object store controller (pass by URL instead of header).
+  val objectStoreErrorWithNotFoundConverter = new Converter[ObjectStoreError] {
+
+    override def convert(input: ObjectStoreError): PresentationError = input match {
+      case FileNotFound(fileLocation) => PresentationError.notFoundError(s"file not found at location: $fileLocation")
+      case x                          => objectStoreErrorConverter.convert(x)
+    }
+  }
+
+  // Needed for the message body controller
+  val objectStoreErrorWithInternalServiceErrorConverter = new Converter[ObjectStoreError] {
+
+    override def convert(input: ObjectStoreError): PresentationError = input match {
+      case FileNotFound(fileLocation) => PresentationError.internalServiceError(s"file not found at location: $fileLocation", cause = None)
+      case err                        => objectStoreErrorConverter.convert(err)
     }
   }
 

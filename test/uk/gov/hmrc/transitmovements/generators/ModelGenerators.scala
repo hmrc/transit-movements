@@ -31,6 +31,7 @@ import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
@@ -152,5 +153,21 @@ trait ModelGenerators extends BaseGenerators {
   implicit lazy val arbitraryMessageStatus: Arbitrary[MessageStatus] =
     Arbitrary {
       Gen.oneOf(MessageStatus.statusValues)
+    }
+
+  lazy val dateTimeFormat = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+
+  private val objectStoreOwner = "common-transit-convention-traders"
+
+  def testObjectStoreURI(movementId: MovementId, messageId: MessageId, dateTime: OffsetDateTime): ObjectStoreURI =
+    ObjectStoreURI(s"$objectStoreOwner/movements/${movementId.value}/${movementId.value}-${messageId.value}-${dateTimeFormat.format(dateTime)}.xml")
+
+  implicit lazy val arbitraryObjectStoreURI: Arbitrary[ObjectStoreURI] =
+    Arbitrary {
+      for {
+        movementId <- arbitrary[MovementId]
+        messageId  <- arbitrary[MessageId]
+        dateTime   <- arbitrary[OffsetDateTime]
+      } yield testObjectStoreURI(movementId, messageId, dateTime)
     }
 }

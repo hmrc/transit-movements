@@ -40,7 +40,7 @@ trait ObjectStoreURIHelpers {
     EitherT {
       Future.successful(
         objectStoreURI.asResourceLocation
-          .toRight(PresentationError.badRequestError(s"Provided Object Store URI is not owned by ${ObjectStoreURI.expectedOwner}"))
+          .toRight(PresentationError.badRequestError(s"Provided Object Store URI is not owned by ${Constants.ObjectStoreOwner}"))
       )
     }
 }

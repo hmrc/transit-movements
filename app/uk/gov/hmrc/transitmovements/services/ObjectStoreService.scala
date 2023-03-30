@@ -22,16 +22,17 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
+import play.api.http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClient
 import uk.gov.hmrc.objectstore.client.play.Implicits._
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
-import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -49,7 +50,7 @@ trait ObjectStoreService {
     objectStoreResourceLocation: ObjectStoreResourceLocation
   )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]]
 
-  def addMessage(movementId: MovementId, messageId: MessageId, source: Source[ByteString, _])(implicit
+  def putObjectStoreFile(movementId: MovementId, messageId: MessageId, source: Source[ByteString, _])(implicit
     ec: ExecutionContext,
     hc: HeaderCarrier
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
@@ -66,7 +67,7 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
       client
         .getObject[Source[ByteString, NotUsed]](
           Path.File(objectStoreResourceLocation.value),
-          ObjectStoreURI.expectedOwner
+          Constants.ObjectStoreOwner
         )
         .flatMap {
           case Some(source) => Future.successful(Right(source.content))
@@ -77,9 +78,9 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
         }
     )
 
-  private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
+  private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss.SSS").withZone(ZoneOffset.UTC)
 
-  override def addMessage(
+  override def putObjectStoreFile(
     movementId: MovementId,
     messageId: MessageId,
     source: Source[ByteString, _]
@@ -87,13 +88,13 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
     EitherT {
       val formattedDateTime = dateTimeFormatter.format(OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
 
-      (for {
-        response <- client.putObject(
+      client
+        .putObject(
           path = Path.Directory(s"movements/${movementId.value}").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
           content = source,
-          owner = ObjectStoreURI.expectedOwner
+          owner = Constants.ObjectStoreOwner,
+          contentType = Some(MimeTypes.XML)
         )
-      } yield response)
         .map {
           objectSummary =>
             Right(objectSummary)

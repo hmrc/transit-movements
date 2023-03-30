@@ -46,7 +46,6 @@ import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
 
-import java.security.SecureRandom
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -116,7 +115,7 @@ class MovementsController @Inject() (
       received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       movementId = movementFactory.generateId()
       messageId  = messageFactory.generateId()
-      objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
+      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
       message = messageFactory
         .createSmallMessage(
           messageId,
@@ -148,7 +147,7 @@ class MovementsController @Inject() (
             _ <- repo.insert(movement).asPresentation
           } yield MovementResponse(movement._id, Some(movement.messages.head.id))
         }
-      } fold [Result] (
+      }.fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         response => Ok(Json.toJson(response))
       )
@@ -163,7 +162,7 @@ class MovementsController @Inject() (
       received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       movementId = movementFactory.generateId()
       messageId  = messageFactory.generateId()
-      objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
+      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
       message = messageFactory
         .createSmallMessage(
           messageId,
@@ -179,7 +178,7 @@ class MovementsController @Inject() (
     } yield MovementResponse(movement._id, Some(movement.messages.head.id))
 
   private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = Action.async(parse.anyContent) {
-    implicit request =>
+    _ =>
       val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       val messageType = movementType match {
         case MovementType.Arrival   => MessageType.ArrivalNotification
@@ -243,7 +242,7 @@ class MovementsController @Inject() (
       )
   }
 
-  private def updateMovementSmallMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
+  private def updateMovementSmallMessage(movementId: MovementId, triggerId: Option[MessageId]): Action[Source[ByteString, _]] =
     Action.streamWithSize {
       (request: Request[Source[ByteString, _]], size: Long) =>
         {
@@ -276,7 +275,7 @@ class MovementsController @Inject() (
 
   private def updateSmallMessageWithObjectStore(
     movementId: MovementId,
-    triggerId: Option[MessageId] = None,
+    triggerId: Option[MessageId],
     request: Request[Source[ByteString, _]]
   )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, MessageId] =
     for {
@@ -284,7 +283,7 @@ class MovementsController @Inject() (
       messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation //request.body
       received  = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       messageId = messageFactory.generateId()
-      objectSummary <- objectStoreService.addMessage(movementId, messageId, request.body).asPresentation
+      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
       status = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
       message = messageFactory
         .createSmallMessage(
