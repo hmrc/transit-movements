@@ -46,6 +46,7 @@ import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.AnyContentAsEmpty
 import play.api.mvc.Request
+import play.api.mvc.Result
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
@@ -140,10 +141,10 @@ class MovementsControllerSpec
 
   def fakeRequest[A](
     method: String,
-    body: NodeSeq,
+    body: A,
     messageType: Option[String],
     headers: FakeHeaders = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
-  ): Request[NodeSeq] =
+  ): Request[A] =
     FakeRequest(
       method = method,
       uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
@@ -154,7 +155,7 @@ class MovementsControllerSpec
   val mockMessagesXmlParsingService: MessagesXmlParsingService   = mock[MessagesXmlParsingService]
   val mockMovementsXmlParsingService: MovementsXmlParsingService = mock[MovementsXmlParsingService]
   val mockRepository: MovementsRepository                        = mock[MovementsRepository]
-  val mockMessageFactory: MessageFactory                         = mock[MessageFactory]
+  val mockMessageFactory: MessageService                         = mock[MessageService]
   val mockMovementFactory: MovementFactory                       = mock[MovementFactory]
 
   val mockObjectStoreService: ObjectStoreService              = mock[ObjectStoreService]
@@ -189,8 +190,7 @@ class MovementsControllerSpec
       mockRepository,
       mockMovementsXmlParsingService,
       mockMessagesXmlParsingService,
-      mockObjectStoreService,
-      mockSmallMessageLimit
+      mockObjectStoreService
     )
 
   "createMovement - Departure" - {
@@ -200,6 +200,8 @@ class MovementsControllerSpec
         <messageSender>ABC123</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
       </CC015C>
+
+    val validXmlStream: Source[ByteString, _] = Source.single(ByteString(validXml.mkString))
 
     lazy val declarationData = DeclarationData(eoriNumber, OffsetDateTime.now(ZoneId.of("UTC")))
 
@@ -217,8 +219,10 @@ class MovementsControllerSpec
 
     lazy val uri = new URI("test")
 
+    lazy val size = Gen.chooseNum[Long](1L, 25000L).sample.value
+
     lazy val message =
-      Message(messageId, received, Some(received), MessageType.DeclarationData, Some(messageId), Some(uri), Some("content"), Some(MessageStatus.Processing))
+      Message(messageId, received, Some(received), MessageType.DeclarationData, Some(messageId), Some(uri), Some("content"), Some(size), Some(MessageStatus.Processing))
 
     "must return OK if XML data extraction is successful" in {
 
@@ -226,7 +230,7 @@ class MovementsControllerSpec
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
       //checkSize
-      when(mockSmallMessageLimit.checkContentSize(any[Long])).thenReturn(false)
+      when(mockSmallMessageLimit.isLarge(any[Long])).thenReturn(false)
 
       when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
@@ -246,22 +250,24 @@ class MovementsControllerSpec
 
       when(
         mockMessageFactory.create(
-          any[MessageType],
+          MovementId(eqTo(movementId.value)),
+          eqTo(MessageType.DeclarationData),
           any[OffsetDateTime],
           any[OffsetDateTime],
           any[Option[MessageId]],
-          any[Source[ByteString, Future[IOResult]]],
-          any[MessageStatus]
-        )
+          eqTo(size),
+          eqTo(validXmlStream),
+          eqTo(MessageStatus.Processing)
+        )(any[HeaderCarrier])
       )
         .thenReturn(messageFactoryEither)
 
       when(mockRepository.insert(any()))
         .thenReturn(EitherT.rightT(Right(())))
 
-      val request = fakeRequest(POST, validXml, Some(MessageType.DeclarationData.code))
+      val request: Request[Source[ByteString, _]] = fakeRequest[Source[ByteString, _]](POST, validXmlStream, Some(MessageType.DeclarationData.code))
 
-      val result =
+      val result: Future[Result] =
         controller.createMovement(eoriNumber, MovementType.Departure)(request)
 
       status(result) mustBe OK
@@ -270,7 +276,7 @@ class MovementsControllerSpec
         "messageId"  -> messageId.value
       )
 
-      verify(mockMessageFactory, atLeastOnce()).create(eqTo(MessageType.DeclarationData), any(), any(), any(), any(), eqTo(MessageStatus.Processing))
+      verify(mockMessageFactory, times(1)).create(eqTo(movementId), eqTo(MessageType.DeclarationData), any[OffsetDateTime], any[OffsetDateTime], any[Option[MessageId]], eqTo(size), eqTo(validXmlStream), eqTo(MessageStatus.Processing))(any[HeaderCarrier])
     }
 
     "must return OK if XML data extraction is successful and is stored in object store" in {
@@ -279,7 +285,7 @@ class MovementsControllerSpec
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
       //checkSize
-      when(mockSmallMessageLimit.checkContentSize(any[Long])).thenReturn(true)
+      when(mockSmallMessageLimit.isLarge(any[Long])).thenReturn(true)
 
       when(mockMovementsXmlParsingService.extractDeclarationData(eqTo(source)))
         .thenReturn(departureDataEither)
@@ -305,8 +311,8 @@ class MovementsControllerSpec
         .thenReturn(movement)
 
       when(
-        mockMessageFactory.createSmallMessage(
-          MessageId(eqTo(messageId.value)),
+        mockMessageFactory.create(
+          MovementId(eqTo(movementId.value)),
           eqTo(MessageType.DeclarationData),
           any[OffsetDateTime],
           any[OffsetDateTime],
@@ -486,6 +492,8 @@ class MovementsControllerSpec
 
     lazy val uri = new URI("test")
 
+    lazy val size = Gen.chooseNum(1L, 25000L).sample.value
+
     lazy val message =
       Message(messageId, received, Some(received), MessageType.ArrivalNotification, Some(messageId), Some(uri), Some("content"), Some(MessageStatus.Processing))
 
@@ -495,7 +503,7 @@ class MovementsControllerSpec
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
       //checkSize
-      when(mockSmallMessageLimit.checkContentSize(any[Long])).thenReturn(false)
+      when(mockSmallMessageLimit.isLarge(any[Long])).thenReturn(false)
 
       when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
         .thenReturn(arrivalDataEither)
@@ -548,7 +556,7 @@ class MovementsControllerSpec
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
       //checkSize
-      when(mockSmallMessageLimit.checkContentSize(any[Long])).thenReturn(true)
+      when(mockSmallMessageLimit.isLarge(any[Long])).thenReturn(true)
 
       when(mockMovementsXmlParsingService.extractArrivalData(eqTo(source)))
         .thenReturn(arrivalDataEither)
@@ -1003,7 +1011,7 @@ class MovementsControllerSpec
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
       //checkSize
-      when(mockSmallMessageLimit.checkContentSize(any[Long])).thenReturn(false)
+      when(mockSmallMessageLimit.isLarge(any[Long])).thenReturn(false)
 
       when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
         .thenReturn(messageDataEither)
@@ -1052,7 +1060,7 @@ class MovementsControllerSpec
         when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
         //checkSize
-        when(mockSmallMessageLimit.checkContentSize(any[Long])).thenReturn(true)
+        when(mockSmallMessageLimit.isLarge(any[Long])).thenReturn(true)
 
         when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
           .thenReturn(EitherT.rightT(MessageData(now, None)))
@@ -1142,7 +1150,7 @@ class MovementsControllerSpec
         val tempFile = SingletonTemporaryFileCreator.create()
         when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
-        when(mockSmallMessageLimit.checkContentSize(any[Long])).thenReturn(false)
+        when(mockSmallMessageLimit.isLarge(any[Long])).thenReturn(false)
 
         when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], any[MessageType]))
           .thenReturn(messageDataEither)

@@ -22,12 +22,15 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
+import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
 import java.net.URI
@@ -35,106 +38,94 @@ import java.security.SecureRandom
 import java.time.Clock
 import java.time.OffsetDateTime
 import javax.inject.Inject
+import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
-@ImplementedBy(classOf[MessageFactoryImpl])
-trait MessageFactory {
+@ImplementedBy(classOf[MessageServiceImpl])
+trait MessageService {
 
   def generateId(): MessageId
 
   def create(
+    movementId: MovementId,
     messageType: MessageType,
     generationDate: OffsetDateTime,
     received: OffsetDateTime,
     triggerId: Option[MessageId],
-    tempFile: Source[ByteString, _],
+    size: Long,
+    source: Source[ByteString, _],
     status: MessageStatus
-  ): EitherT[Future, StreamError, Message]
+  )(implicit hc: HeaderCarrier): EitherT[Future, StreamError, Message]
+
+  @deprecated(message = "This should be phased out in favour of #create -> EitherT", since = "now")
+  def create(
+    movementId: MovementId,
+    messageType: MessageType,
+    generationDate: OffsetDateTime,
+    received: OffsetDateTime,
+    triggerId: Option[MessageId],
+    objectStoreURI: ObjectStoreURI,
+    status: MessageStatus
+  ): Message
 
   def createEmptyMessage(
     messageType: MessageType,
     received: OffsetDateTime
   ): Message
 
-  def createLargeMessage(
-    messageType: MessageType,
-    generationDate: OffsetDateTime,
-    received: OffsetDateTime,
-    triggerId: Option[MessageId],
-    objectStoreURI: ObjectStoreURI
-  ): Message
-
-  def createSmallMessage(
-    messageId: MessageId,
-    messageType: MessageType,
-    generationDate: OffsetDateTime,
-    received: OffsetDateTime,
-    triggerId: Option[MessageId],
-    objectStoreURI: ObjectStoreURI,
-    status: MessageStatus
-  ): Message
 }
 
-class MessageFactoryImpl @Inject() (
+class MessageServiceImpl @Inject() (
   clock: Clock,
-  random: SecureRandom
+  random: SecureRandom,
+  objectStoreService: ObjectStoreService,
+  smallMessageLimitService: SmallMessageLimitService
 )(implicit
   val materializer: Materializer,
   ec: ExecutionContext
-) extends MessageFactory {
+) extends MessageService {
 
-  def generateId(): MessageId = MessageId(ShortUUID.next(clock, random))
+  override def generateId(): MessageId = MessageId(ShortUUID.next(clock, random))
 
-  def create(
+  override def create(
+    movementId: MovementId,
     messageType: MessageType,
     generationDate: OffsetDateTime,
     received: OffsetDateTime,
     triggerId: Option[MessageId],
+    size: Long,
     source: Source[ByteString, _],
     status: MessageStatus
-  ): EitherT[Future, StreamError, Message] =
-    getMessageBody(source).map {
-      message =>
+  )(implicit hc: HeaderCarrier): EitherT[Future, StreamError, Message] = {
+    val messageId = generateId()
+    processBody(movementId, messageId, size, source).map {
+      either =>
         Message(
-          id = generateId(),
+          id = messageId,
           received = received,
           generated = Some(generationDate),
           messageType = messageType,
           triggerId = triggerId,
-          uri = None,
-          body = Some(message),
+          uri = either.swap.toOption.map(
+            x => new URI(x.value)
+          ),
+          body = either.toOption,
+          size = Some(size),
           status = Some(status)
         )
     }
+  }
 
-  def createSmallMessage(
-    messageId: MessageId,
+  override def create(
+    movementId: MovementId,
     messageType: MessageType,
     generationDate: OffsetDateTime,
     received: OffsetDateTime,
     triggerId: Option[MessageId],
     objectStoreURI: ObjectStoreURI,
     status: MessageStatus
-  ): Message =
-    Message(
-      id = messageId,
-      received = received,
-      generated = Some(generationDate),
-      messageType = messageType,
-      triggerId = triggerId,
-      uri = Some(new URI(objectStoreURI.value)),
-      body = None,
-      status = Some(status)
-    )
-
-  def createLargeMessage(
-    messageType: MessageType,
-    generationDate: OffsetDateTime,
-    received: OffsetDateTime,
-    triggerId: Option[MessageId],
-    objectStoreURI: ObjectStoreURI
   ): Message =
     Message(
       id = generateId(),
@@ -144,13 +135,11 @@ class MessageFactoryImpl @Inject() (
       triggerId = triggerId,
       uri = Some(new URI(objectStoreURI.value)),
       body = None,
-      status = Some(MessageStatus.Received)
+      size = None,
+      status = Some(status)
     )
 
-  def createEmptyMessage(
-    messageType: MessageType,
-    received: OffsetDateTime
-  ): Message =
+  override def createEmptyMessage(messageType: MessageType, received: OffsetDateTime): Message =
     Message(
       id = generateId(),
       received = received,
@@ -159,12 +148,32 @@ class MessageFactoryImpl @Inject() (
       triggerId = None,
       uri = None,
       body = None,
+      size = None,
       status = Some(MessageStatus.Pending)
     )
 
-  private def getMessageBody(tempFile: Source[ByteString, _]): EitherT[Future, StreamError, String] =
+  private def processBody(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, _])(implicit
+    hc: HeaderCarrier
+  ): EitherT[Future, StreamError, Either[ObjectStoreURI, String]] =
+    if (smallMessageLimitService.isLarge(size)) createObjectStoreObject(movementId, messageId, src).map(Left.apply)
+    else getMessageBody(src).map(Right.apply)
+
+  private def createObjectStoreObject(movementId: MovementId, messageId: MessageId, src: Source[ByteString, _])(implicit
+    hc: HeaderCarrier
+  ): EitherT[Future, StreamError, ObjectStoreURI] =
+    objectStoreService
+      .putObjectStoreFile(movementId, messageId, src)
+      .leftMap[StreamError] {
+        case ObjectStoreError.UnexpectedError(caughtException) => StreamError.UnexpectedError(caughtException)
+        case ObjectStoreError.FileNotFound(_)                  => StreamError.UnexpectedError(None)
+      }
+      .map(
+        summary => ObjectStoreURI(summary.location.asUri)
+      )
+
+  private def getMessageBody(src: Source[ByteString, _]): EitherT[Future, StreamError, String] =
     EitherT {
-      tempFile
+      src
         .fold("")(
           (curStr, newStr) => curStr + newStr.utf8String
         )
@@ -174,4 +183,5 @@ class MessageFactoryImpl @Inject() (
           case NonFatal(ex) => Left[StreamError, String](StreamError.UnexpectedError(Some(ex)))
         }
     }
+
 }

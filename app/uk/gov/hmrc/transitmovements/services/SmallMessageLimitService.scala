@@ -25,6 +25,6 @@ import javax.inject.Singleton
 class SmallMessageLimitService @Inject() (config: AppConfig) {
   private lazy val limit = config.smallMessageSizeLimit
 
-  def checkContentSize(size: Long): Boolean = size > limit
+  def isLarge(size: Long): Boolean = size > limit
 
 }

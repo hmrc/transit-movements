@@ -52,18 +52,18 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
+import scala.annotation.nowarn
 import scala.concurrent.Future
 
 @Singleton
 class MovementsController @Inject() (
   cc: ControllerComponents,
-  messageFactory: MessageFactory,
+  messageService: MessageService,
   movementFactory: MovementFactory,
   repo: MovementsRepository,
   movementsXmlParsingService: MovementsXmlParsingService,
   messagesXmlParsingService: MessagesXmlParsingService,
-  objectStoreService: ObjectStoreService,
-  smallMessageLimitService: SmallMessageLimitService
+  objectStoreService: ObjectStoreService
 )(implicit
   val materializer: Materializer,
   clock: Clock,
@@ -91,92 +91,38 @@ class MovementsController @Inject() (
     (request: Request[Source[ByteString, _]], size: Long) =>
       {
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-        if (smallMessageLimitService.checkContentSize(size)) createArrivalWithObjectStore(eori, request)
-        else {
-          for {
-            arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
-            received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-            movementId = movementFactory.generateId()
-            message <- messageFactory
-              .create(MessageType.ArrivalNotification, arrivalData.generationDate, received, None, request.body, MessageStatus.Processing)
-              .asPresentation
-            movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
-            _ <- repo.insert(movement).asPresentation
-          } yield MovementResponse(movement._id, Some(movement.messages.head.id))
-        }
+        for {
+          arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
+          received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+          movementId = movementFactory.generateId()
+          message <- messageService
+            .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, request.body, MessageStatus.Processing)
+            .asPresentation
+          movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
+          _ <- repo.insert(movement).asPresentation
+        } yield MovementResponse(movement._id, Some(movement.messages.head.id))
       }.fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), response => Ok(Json.toJson(response)))
   }
-
-  private def createArrivalWithObjectStore(
-    eori: EORINumber,
-    request: Request[Source[ByteString, _]]
-  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, MovementResponse] =
-    for {
-      arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
-      received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-      movementId = movementFactory.generateId()
-      messageId  = messageFactory.generateId()
-      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
-      message = messageFactory
-        .createSmallMessage(
-          messageId,
-          MessageType.ArrivalNotification,
-          arrivalData.generationDate,
-          received,
-          None,
-          ObjectStoreURI(objectSummary.location.asUri),
-          MessageStatus.Processing
-        )
-      movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
-      _ <- repo.insert(movement).asPresentation
-    } yield MovementResponse(movement._id, Some(movement.messages.head.id))
 
   private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithSize {
     (request: Request[Source[ByteString, _]], size: Long) =>
       {
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-        if (smallMessageLimitService.checkContentSize(size)) createDepartureWithObjectStore(eori, request)
-        else {
-          for {
-            declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
-            received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-            movementId = movementFactory.generateId()
-            message <- messageFactory
-              .create(MessageType.DeclarationData, declarationData.generationDate, received, None, request.body, MessageStatus.Processing)
-              .asPresentation
-            movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
-            _ <- repo.insert(movement).asPresentation
-          } yield MovementResponse(movement._id, Some(movement.messages.head.id))
-        }
+        for {
+          declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
+          received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+          movementId = movementFactory.generateId()
+          message <- messageService
+            .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, request.body, MessageStatus.Processing)
+            .asPresentation
+          movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
+          _ <- repo.insert(movement).asPresentation
+        } yield MovementResponse(movement._id, Some(movement.messages.head.id))
       }.fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         response => Ok(Json.toJson(response))
       )
   }
-
-  private def createDepartureWithObjectStore(
-    eori: EORINumber,
-    request: Request[Source[ByteString, _]]
-  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, MovementResponse] =
-    for {
-      declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
-      received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-      movementId = movementFactory.generateId()
-      messageId  = messageFactory.generateId()
-      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
-      message = messageFactory
-        .createSmallMessage(
-          messageId,
-          MessageType.DeclarationData,
-          declarationData.generationDate,
-          received,
-          None,
-          ObjectStoreURI(objectSummary.location.asUri),
-          MessageStatus.Processing
-        )
-      movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
-      _ <- repo.insert(movement).asPresentation
-    } yield MovementResponse(movement._id, Some(movement.messages.head.id))
 
   private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = Action.async(parse.anyContent) {
     _ =>
@@ -185,7 +131,7 @@ class MovementsController @Inject() (
         case MovementType.Arrival   => MessageType.ArrivalNotification
         case MovementType.Departure => MessageType.DeclarationData
       }
-      val message  = messageFactory.createEmptyMessage(messageType, received)
+      val message  = messageService.createEmptyMessage(messageType, received)
       val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received)
 
       (for {
@@ -196,10 +142,10 @@ class MovementsController @Inject() (
       )
   }
 
-  def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None) =
+  def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
     contentTypeRoute {
-      case Some(_) => updateMovementSmallMessage(movementId, triggerId)
-      case None    => updateMovementLargeMessage(movementId, triggerId)
+      case Some(_) => updateMovementWithStream(movementId, triggerId)
+      case None    => updateMovementWithObjectStoreURI(movementId, triggerId)
     }
 
   // PATCH methods for updating a specific message
@@ -234,85 +180,63 @@ class MovementsController @Inject() (
           )
     }
 
-  def updateMovementLargeMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[AnyContent] = Action.async(parse.anyContent) {
-    implicit request =>
-      (for {
-        messageType                 <- extract(request.headers).asPresentation
-        objectStoreURI              <- extractObjectStoreURI(request.headers)
-        objectStoreResourceLocation <- extractResourceLocation(objectStoreURI)
-        sourceFile                  <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
-        messageData                 <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
-        received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-        message = messageFactory
-          .createLargeMessage(
-            messageType,
-            messageData.generationDate,
-            received,
-            triggerId,
-            objectStoreURI
-          )
-        _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
-      } yield message.id).fold[Result](
-        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        id => Ok(Json.toJson(UpdateMovementResponse(id)))
-      )
-  }
-
-  private def updateMovementSmallMessage(movementId: MovementId, triggerId: Option[MessageId]): Action[Source[ByteString, _]] =
-    Action.streamWithSize {
-      (request: Request[Source[ByteString, _]], size: Long) =>
-        {
-          implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-
-          if (smallMessageLimitService.checkContentSize(size)) updateSmallMessageWithObjectStore(movementId, triggerId, request)
-          else
-            for {
-              messageType <- extract(request.headers).asPresentation
-              messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
-              received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-              status   = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
-              message <- messageFactory
-                .create(
-                  messageType,
-                  messageData.generationDate,
-                  received,
-                  triggerId,
-                  request.body,
-                  status
-                )
-                .asPresentation
-              _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
-            } yield message.id
-        }.fold[Result](
+  @nowarn // deprecation
+  private def updateMovementWithObjectStoreURI(movementId: MovementId, triggerId: Option[MessageId] = None): Action[AnyContent] =
+    Action.async(parse.anyContent) {
+      implicit request =>
+        (for {
+          messageType                 <- extract(request.headers).asPresentation
+          objectStoreURI              <- extractObjectStoreURI(request.headers)
+          objectStoreResourceLocation <- extractResourceLocation(objectStoreURI)
+          sourceFile                  <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
+          messageData                 <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
+          received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+          message = messageService
+            .create(
+              movementId,
+              messageType,
+              messageData.generationDate,
+              received,
+              triggerId,
+              objectStoreURI,
+              if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
+            )
+          _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
+        } yield message.id).fold[Result](
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
           id => Ok(Json.toJson(UpdateMovementResponse(id)))
         )
     }
 
-  private def updateSmallMessageWithObjectStore(
-    movementId: MovementId,
-    triggerId: Option[MessageId],
-    request: Request[Source[ByteString, _]]
-  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, MessageId] =
-    for {
-      messageType <- extract(request.headers).asPresentation
-      messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation //request.body
-      received  = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-      messageId = messageFactory.generateId()
-      objectSummary <- objectStoreService.putObjectStoreFile(movementId, messageId, request.body).asPresentation
-      status = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
-      message = messageFactory
-        .createSmallMessage(
-          messageId,
-          messageType,
-          messageData.generationDate,
-          received,
-          triggerId,
-          ObjectStoreURI(objectSummary.location.asUri),
-          status
+  private def updateMovementWithStream(movementId: MovementId, triggerId: Option[MessageId]): Action[Source[ByteString, _]] =
+    Action.streamWithSize {
+      (request: Request[Source[ByteString, _]], size: Long) =>
+        {
+          implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+          for {
+            messageType <- extract(request.headers).asPresentation
+            messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
+            received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+            status   = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
+            message <- messageService
+              .create(
+                movementId,
+                messageType,
+                messageData.generationDate,
+                received,
+                triggerId,
+                size,
+                request.body,
+                status
+              )
+              .asPresentation
+            _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
+          } yield message.id
+        }.fold[Result](
+          baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+          id => Ok(Json.toJson(UpdateMovementResponse(id)))
         )
-      _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
-    } yield message.id
+    }
 
   def getMovementsForEori(
     eoriNumber: EORINumber,
@@ -418,17 +342,17 @@ class MovementsController @Inject() (
         case (Some(messageType), MovementType.Arrival) =>
           MessageType.checkArrivalMessageType(messageType.code) match {
             case None    => Future.successful(Left(InvalidMessageType(s"Invalid messageType value: $messageType")))
-            case Some(_) => Future.successful(Right())
+            case Some(_) => Future.successful(Right((): Unit))
           }
         case (Some(messageType), MovementType.Departure) =>
           MessageType.checkDepartureMessageType(messageType.code) match {
             case None =>
               Future.successful(Left(InvalidMessageType(s"Invalid messageType value: $messageType")))
             case Some(_) =>
-              Future.successful(Right())
+              Future.successful(Right((): Unit))
           }
 
-        case (None, _) => Future.successful(Right())
+        case (None, _) => Future.successful(Right((): Unit))
       }
     }
 

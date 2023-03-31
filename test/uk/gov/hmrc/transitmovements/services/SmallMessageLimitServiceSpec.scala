@@ -36,12 +36,12 @@ class SmallMessageLimitServiceSpec extends AnyFreeSpec with MockitoSugar with Sc
 
     "should return false when below the limit" in forAll(Gen.choose(1, limit)) {
       size =>
-        service.checkContentSize(size) mustBe false
+        service.isLarge(size) mustBe false
     }
 
     "should return true when below the limit" in forAll(Gen.choose(limit + 1, 5000000)) {
       size =>
-        service.checkContentSize(size) mustBe true
+        service.isLarge(size) mustBe true
     }
 
   }
