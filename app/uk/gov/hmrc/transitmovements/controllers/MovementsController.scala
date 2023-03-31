@@ -41,6 +41,7 @@ import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
+import uk.gov.hmrc.transitmovements.models.requests.UpdateStatus
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
@@ -201,8 +202,23 @@ class MovementsController @Inject() (
       case None    => updateMovementLargeMessage(movementId, triggerId)
     }
 
-  // PATCH method for updating a specific message
-  def updateMessage(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
+  // PATCH methods for updating a specific message
+
+  // Initiated from SDES callback
+  def updateMessageStatus(movementId: MovementId, messageId: MessageId): Action[JsValue] =
+    Action.async(parse.json) {
+      implicit request =>
+        (for {
+          updateStatus <- require[UpdateStatus](request.body)
+          _            <- repo.updateMessage(movementId, messageId, updateStatus.asUpdateMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
+        } yield Ok)
+          .valueOr[Result](
+            presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError))
+          )
+    }
+
+  // Initiated from trader/Upscan
+  def updateMessage(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[JsValue] =
     Action.async(parse.json) {
       implicit request =>
         (for {
