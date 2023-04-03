@@ -20,15 +20,22 @@ sealed trait MessageType extends Product with Serializable {
   def code: String
   def rootNode: String
   def xsdPath: String
+
+  @transient
+  def statusOnAttach: MessageStatus
 }
 
 sealed trait ArrivalMessageType extends MessageType
 
 sealed trait DepartureMessageType extends MessageType
 
-sealed trait RequestMessageType extends MessageType
+sealed trait RequestMessageType extends MessageType {
+  override val statusOnAttach = MessageStatus.Processing
+}
 
-sealed trait ResponseMessageType extends MessageType
+sealed trait ResponseMessageType extends MessageType {
+  override val statusOnAttach = MessageStatus.Received
+}
 
 sealed abstract class DepartureRequestMessageType(
   val code: String,

@@ -21,6 +21,7 @@ import akka.util.ByteString
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.{eq => eqTo}
+import org.mockito.Mockito
 import org.mockito.Mockito.reset
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
@@ -82,7 +83,7 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
       (movementId, triggerId, messageType) =>
         beforeTest()
 
-        when(smallMessageLimitServiceMock.isLarge(eqTo(4))).thenReturn(false)
+        when(smallMessageLimitServiceMock.isLarge(eqTo(4L))).thenReturn(false)
         val stream = Source.single(ByteString("test"))
         val result = sut.create(movementId, messageType, instant, instant, triggerId, 4, stream, Received)(HeaderCarrier())
 
@@ -90,7 +91,7 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
           r =>
             r mustBe Right(Message(messageId, instant, Some(instant), messageType, triggerId, None, Some("test"), Some(4), Some(Received)))
 
-            verify(objectStoreServiceMock, times(0)).putObjectStoreFile(any(), any(), any())(any(), any()) // must not be called at all
+            verify(objectStoreServiceMock, times(0)).putObjectStoreFile(MovementId(any()), MessageId(any()), any())(any(), any()) // must not be called at all
         }
     }
 
@@ -102,21 +103,36 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
       (movementId, triggerId, messageType) =>
         beforeTest()
 
-        when(smallMessageLimitServiceMock.isLarge(eqTo(4))).thenReturn(true)
+        when(smallMessageLimitServiceMock.isLarge(eqTo(4L))).thenReturn(true)
         val os                   = testObjectStoreURI(movementId, messageId, instant)
         val objectSummaryWithMd5 = ObjectSummaryWithMd5(OSPath.File(os.value), 4, Md5Hash(""), instant.toInstant)
         val stream               = Source.single(ByteString("test"))
 
-        when(smallMessageLimitServiceMock.isLarge(eqTo(4))).thenReturn(true)
-        when(objectStoreServiceMock.putObjectStoreFile(eqTo(movementId), eqTo(messageId), eqTo(stream))(any(), any()))
+        when(objectStoreServiceMock.putObjectStoreFile(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(stream))(any(), any()))
           .thenReturn(EitherT.rightT(objectSummaryWithMd5))
         val result = sut.create(movementId, messageType, instant, instant, triggerId, 4, stream, Received)(HeaderCarrier())
 
         whenReady(result.value) {
           r =>
-            r mustBe Right(Message(messageId, instant, Some(instant), messageType, triggerId, None, None, Some(4), Some(Received)))
+            println(Mockito.mockingDetails(smallMessageLimitServiceMock).printInvocations())
+            r mustBe Right(
+              Message(
+                messageId,
+                instant,
+                Some(instant),
+                messageType,
+                triggerId,
+                Some(new URI(objectSummaryWithMd5.location.asUri)),
+                None,
+                Some(4),
+                Some(Received)
+              )
+            )
 
-            verify(objectStoreServiceMock, times(1)).putObjectStoreFile(eqTo(movementId), eqTo(messageId), eqTo(stream))(any(), any())
+            verify(objectStoreServiceMock, times(1)).putObjectStoreFile(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(stream))(
+              any(),
+              any()
+            )
         }
     }
 
@@ -128,7 +144,7 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
       (movementId, triggerId, messageType) =>
         beforeTest()
 
-        when(smallMessageLimitServiceMock.isLarge(eqTo(4))).thenReturn(false)
+        when(smallMessageLimitServiceMock.isLarge(eqTo(4L))).thenReturn(false)
 
         val error  = new IllegalStateException()
         val stream = Source.failed[ByteString](error)
@@ -137,7 +153,7 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
 
         whenReady(result.value) {
           case Left(_: StreamError) =>
-            verify(objectStoreServiceMock, times(0)).putObjectStoreFile(any(), any(), any())(any(), any()) // must not be called at all
+            verify(objectStoreServiceMock, times(0)).putObjectStoreFile(MovementId(any()), MessageId(any()), any())(any(), any()) // must not be called at all
           case x => fail(s"Expected a Left(StreamError), got $x")
         }
 
@@ -151,18 +167,21 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
       (movementId, triggerId, messageType) =>
         beforeTest()
 
-        when(smallMessageLimitServiceMock.isLarge(eqTo(4))).thenReturn(false)
+        when(smallMessageLimitServiceMock.isLarge(eqTo(4L))).thenReturn(true)
 
         val error  = new IllegalStateException()
         val stream = Source.empty[ByteString]
-        when(objectStoreServiceMock.putObjectStoreFile(eqTo(movementId), eqTo(messageId), eqTo(stream))(any(), any()))
+        when(objectStoreServiceMock.putObjectStoreFile(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(stream))(any(), any()))
           .thenReturn(EitherT.leftT(ObjectStoreError.UnexpectedError(Some(error))))
 
         val result = sut.create(movementId, messageType, instant, instant, triggerId, 4, stream, Received)(HeaderCarrier())
 
         whenReady(result.value) {
           case Left(StreamError.UnexpectedError(Some(`error`))) =>
-            verify(objectStoreServiceMock, times(1)).putObjectStoreFile(eqTo(movementId), eqTo(messageId), eqTo(stream))(any(), any())
+            verify(objectStoreServiceMock, times(1)).putObjectStoreFile(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(stream))(
+              any(),
+              any()
+            )
           case x => fail(s"Expected a Left(StreamError.UnexpectedError), got $x")
         }
 
@@ -178,9 +197,9 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
         beforeTest()
 
         val os     = testObjectStoreURI(movementId, messageId, instant)
-        val result = sut.create(movementId, messageType, instant, instant, triggerId, os, Received)(HeaderCarrier())
+        val result = sut.create(movementId, messageType, instant, instant, triggerId, os, messageStatus)
 
-        result mustBe Message(messageId, instant, None, messageType, None, Some(new URI(os.value)), None, None, Some(messageStatus))
+        result mustBe Message(messageId, instant, Some(instant), messageType, triggerId, Some(new URI(os.value)), None, None, Some(messageStatus))
 
     }
   }

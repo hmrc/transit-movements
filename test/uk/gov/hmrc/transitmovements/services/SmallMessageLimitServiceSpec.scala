@@ -28,18 +28,18 @@ class SmallMessageLimitServiceSpec extends AnyFreeSpec with MockitoSugar with Sc
 
   private val config: AppConfig = mock[AppConfig]
 
-  val limit = 500000
+  val limit = 500000L
 
   "Small message limit " - {
     val service = new SmallMessageLimitService(config)
     when(config.smallMessageSizeLimit).thenReturn(limit)
 
-    "should return false when below the limit" in forAll(Gen.choose(1, limit)) {
+    "should return false when below the limit" in forAll(Gen.choose[Long](1, limit)) {
       size =>
         service.isLarge(size) mustBe false
     }
 
-    "should return true when below the limit" in forAll(Gen.choose(limit + 1, 5000000)) {
+    "should return true when below the limit" in forAll(Gen.choose[Long](limit + 1, 5000000)) {
       size =>
         service.isLarge(size) mustBe true
     }

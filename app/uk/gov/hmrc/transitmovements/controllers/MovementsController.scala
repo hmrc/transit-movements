@@ -199,7 +199,7 @@ class MovementsController @Inject() (
               received,
               triggerId,
               objectStoreURI,
-              if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
+              messageType.statusOnAttach
             )
           _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
         } yield message.id).fold[Result](
@@ -217,7 +217,6 @@ class MovementsController @Inject() (
             messageType <- extract(request.headers).asPresentation
             messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
             received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-            status   = if (MessageType.responseValues.exists(_.code == messageType.code)) MessageStatus.Received else MessageStatus.Processing
             message <- messageService
               .create(
                 movementId,
@@ -227,7 +226,7 @@ class MovementsController @Inject() (
                 triggerId,
                 size,
                 request.body,
-                status
+                messageType.statusOnAttach
               )
               .asPresentation
             _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
