@@ -22,7 +22,6 @@ import akka.util.Timeout
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchersSugar.eqTo
-import org.mockito.Mockito
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.MockitoSugar.reset
@@ -62,7 +61,6 @@ import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
-import uk.gov.hmrc.transitmovements.models.requests
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
@@ -168,7 +166,7 @@ class MovementsControllerSpec
     super.beforeEach()
   }
 
-  override def afterEach() {
+  override def afterEach(): Unit = {
     reset(mockTemporaryFileCreator)
     reset(mockMessagesXmlParsingService)
     reset(mockMessageFactory)
@@ -208,11 +206,7 @@ class MovementsControllerSpec
     lazy val messageFactoryEither: EitherT[Future, StreamError, Message] =
       EitherT.rightT(message)
 
-    lazy val objectSummaryEither: EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] = EitherT.rightT(objectSummary)
-
     lazy val received = OffsetDateTime.now(ZoneId.of("UTC"))
-
-    lazy val source: Source[ByteString, _] = Source.single(ByteString("this is test content"))
 
     lazy val uri = new URI("test")
 
@@ -445,24 +439,9 @@ class MovementsControllerSpec
 
     lazy val received = OffsetDateTime.now(ZoneId.of("UTC"))
 
-    lazy val source: Source[ByteString, _] = Source.single(ByteString("this is test content"))
-
     lazy val uri = new URI("test")
 
     lazy val size = Gen.chooseNum(1L, 25000L).sample.value
-
-    lazy val message =
-      Message(
-        messageId,
-        received,
-        Some(received),
-        MessageType.ArrivalNotification,
-        Some(messageId),
-        Some(uri),
-        Some("content"),
-        Some(size),
-        Some(MessageStatus.Processing)
-      )
 
     "must return OK if XML data extraction is successful" in {
 

@@ -29,7 +29,7 @@ import java.time.OffsetDateTime
 case class MessageResponse(
   id: MessageId,
   received: OffsetDateTime,
-  messageType: MessageType,
+  messageType: Option[MessageType],
   body: Option[String],
   status: Option[MessageStatus],
   uri: Option[URI] = None
@@ -49,7 +49,7 @@ object MessageResponse {
     MessageResponse(
       message.id,
       message.received,
-      message.messageType,
+      Some(message.messageType),
       message.body,
       message.status,
       None
@@ -59,7 +59,7 @@ object MessageResponse {
     MessageResponse(
       message.id,
       message.received,
-      message.messageType,
+      Some(message.messageType),
       None,
       message.status,
       message.uri

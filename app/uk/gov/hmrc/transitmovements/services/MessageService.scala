@@ -39,7 +39,6 @@ import java.security.SecureRandom
 import java.time.Clock
 import java.time.OffsetDateTime
 import javax.inject.Inject
-import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.control.NonFatal

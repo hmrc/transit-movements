@@ -123,7 +123,7 @@ trait ModelGenerators extends BaseGenerators {
       for {
         id             <- arbitrary[MessageId]
         offsetDateTime <- arbitrary[OffsetDateTime]
-        messageType    <- arbitrary[MessageType]
+        messageType    <- Gen.option(arbitrary[MessageType])
         status         <- Gen.oneOf(MessageStatus.statusValues)
       } yield MessageResponse(id, offsetDateTime, messageType, None, Some(status))
     }

@@ -41,7 +41,6 @@ import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
-import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageService
@@ -153,7 +152,7 @@ class MessageBodyController @Inject() (
         movementId,
         extractedData.map(_.movementEoriNumber),
         extractedData.flatMap(_.movementReferenceNumber).orElse(messageData.mrn),
-        messageData.generationDate
+        received
       )
       .asPresentation
 }
