@@ -35,5 +35,5 @@ class AppConfig @Inject() (
   lazy val mongoRetryAttempts: Int = config.get[Int]("mongodb.retryAttempts")
   lazy val documentTtl: Long       = config.get[Long]("mongodb.timeToLiveInSeconds")
 
-  lazy val smallMessageSizeLimit: Int = config.get[Int]("smallMessageSizeLimit")
+  lazy val smallMessageSizeLimit: Long = config.get[Long]("smallMessageSizeLimit")
 }

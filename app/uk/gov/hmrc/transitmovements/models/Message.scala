@@ -27,5 +27,6 @@ case class Message(
   triggerId: Option[MessageId],
   uri: Option[URI],
   body: Option[String],
+  size: Option[Long],
   status: Option[MessageStatus]
 )
