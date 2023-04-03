@@ -96,7 +96,7 @@ class MessageBodyController @Inject() (
           messageType   <- extract(request.headers).asPresentation
           messageData   <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
           extractedData <- movementsXmlParsingService.extractData(messageType, request.body).asPresentation
-          bodyStorage   <- messageService.storeIfAppropriate(movementId, messageId, size, request.body).asPresentation
+          bodyStorage   <- messageService.storeIfLarge(movementId, messageId, size, request.body).asPresentation
           _ <- repo
             .updateMessage(
               movementId,

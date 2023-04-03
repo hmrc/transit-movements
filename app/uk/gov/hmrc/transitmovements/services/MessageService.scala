@@ -75,7 +75,7 @@ trait MessageService {
     received: OffsetDateTime
   ): Message
 
-  def storeIfAppropriate(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, _])(implicit
+  def storeIfLarge(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, _])(implicit
     hc: HeaderCarrier
   ): EitherT[Future, StreamError, BodyStorage]
 
@@ -104,7 +104,7 @@ class MessageServiceImpl @Inject() (
     status: MessageStatus
   )(implicit hc: HeaderCarrier): EitherT[Future, StreamError, Message] = {
     val messageId = generateId()
-    storeIfAppropriate(movementId, messageId, size, source).map {
+    storeIfLarge(movementId, messageId, size, source).map {
       bodyStorage =>
         Message(
           id = messageId,
@@ -156,7 +156,7 @@ class MessageServiceImpl @Inject() (
       status = Some(MessageStatus.Pending)
     )
 
-  override def storeIfAppropriate(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, _])(implicit
+  override def storeIfLarge(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, _])(implicit
     hc: HeaderCarrier
   ): EitherT[Future, StreamError, BodyStorage] =
     if (smallMessageLimitService.isLarge(size)) createObjectStoreObject(movementId, messageId, src).map(BodyStorage.objectStore)

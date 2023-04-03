@@ -308,7 +308,7 @@ class MovementsController @Inject() (
     movementType: MovementType,
     movementToUpdate: MovementWithoutMessages,
     objectStoreURI: Option[ObjectStoreURI],
-    receieved: OffsetDateTime
+    received: OffsetDateTime
   )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Unit] =
     (movementToUpdate.movementEORINumber, objectStoreURI) match {
       case (None, Some(location)) =>
@@ -317,7 +317,7 @@ class MovementsController @Inject() (
           source           <- objectStoreService.getObjectStoreFile(resourceLocation).asPresentation
           extractedData    <- movementsXmlParsingService.extractData(movementType, source).asPresentation
           _ <- repo
-            .updateMovement(movementId, Some(extractedData.movementEoriNumber), extractedData.movementReferenceNumber, receieved)
+            .updateMovement(movementId, Some(extractedData.movementEoriNumber), extractedData.movementReferenceNumber, received)
             .asPresentation
         } yield ()
       case _ => EitherT.rightT((): Unit)

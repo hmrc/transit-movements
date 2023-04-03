@@ -538,7 +538,7 @@ class MessageBodyControllerSpec
 
         when(
           messageService
-            .storeIfAppropriate(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
         ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
 
         when(
@@ -603,7 +603,7 @@ class MessageBodyControllerSpec
 
         when(
           messageService
-            .storeIfAppropriate(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
         ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
 
         when(
@@ -668,7 +668,7 @@ class MessageBodyControllerSpec
 
         when(
           messageService
-            .storeIfAppropriate(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
         ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
 
         when(
@@ -734,7 +734,7 @@ class MessageBodyControllerSpec
 
         when(
           messageService
-            .storeIfAppropriate(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
         ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
 
         when(
@@ -1081,7 +1081,7 @@ class MessageBodyControllerSpec
 
         when(
           messageService
-            .storeIfAppropriate(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
         ).thenReturn(EitherT.leftT(StreamError.UnexpectedError(None)))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
@@ -1135,7 +1135,7 @@ class MessageBodyControllerSpec
 
         when(
           messageService
-            .storeIfAppropriate(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
         ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
 
         when(
@@ -1198,7 +1198,7 @@ class MessageBodyControllerSpec
 
         when(
           messageService
-            .storeIfAppropriate(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
         ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
 
         when(
