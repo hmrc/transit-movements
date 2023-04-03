@@ -1257,7 +1257,7 @@ class MovementsControllerSpec
               mockRepository.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
-                any[UpdateMessageMetadata],
+                any[UpdateMessageData],
                 any[OffsetDateTime]
               )
             )
@@ -1287,7 +1287,7 @@ class MovementsControllerSpec
             verify(mockRepository, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
-              any[UpdateMessageMetadata],
+              any[UpdateMessageData],
               any[OffsetDateTime]
             )
             verify(mockRepository, times(1)).updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(None), any[OffsetDateTime])
@@ -1320,7 +1320,7 @@ class MovementsControllerSpec
               mockRepository.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
-                any[UpdateMessageMetadata],
+                any[UpdateMessageData],
                 any[OffsetDateTime]
               )
             )
@@ -1350,7 +1350,7 @@ class MovementsControllerSpec
             verify(mockRepository, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
-              any[UpdateMessageMetadata],
+              any[UpdateMessageData],
               any[OffsetDateTime]
             )
             verify(mockRepository, times(1)).updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(Some(mrn)), any[OffsetDateTime])
@@ -1374,7 +1374,7 @@ class MovementsControllerSpec
               mockRepository.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
-                any[UpdateMessageMetadata],
+                any[UpdateMessageData],
                 any[OffsetDateTime]
               )
             )
@@ -1404,7 +1404,7 @@ class MovementsControllerSpec
             verify(mockRepository, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
-              any[UpdateMessageMetadata],
+              any[UpdateMessageData],
               any[OffsetDateTime]
             )
             verify(mockRepository, times(0)).updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(None), any[OffsetDateTime])
@@ -1439,7 +1439,7 @@ class MovementsControllerSpec
               mockRepository.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
-                any[UpdateMessageMetadata],
+                any[UpdateMessageData],
                 any[OffsetDateTime]
               )
             )
@@ -1473,7 +1473,7 @@ class MovementsControllerSpec
             verify(mockRepository, times(0)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
-              any[UpdateMessageMetadata],
+              any[UpdateMessageData],
               any[OffsetDateTime]
             )
             verify(mockRepository, times(0)).updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(None), any[OffsetDateTime])
@@ -1487,7 +1487,7 @@ class MovementsControllerSpec
       ) {
         (eori, movementType, messageStatus) =>
           reset(mockRepository) // needed thanks to the generators running the test multiple times.
-          val expectedUpdateMessageMetadata = requests.UpdateMessageMetadata(None, messageStatus, None)
+          val expectedUpdateData = UpdateMessageData(status = messageStatus)
 
           when(
             mockRepository.getMovementWithoutMessages(eqTo(eori), MovementId(eqTo(movementId.value)), eqTo(movementType))
@@ -1500,7 +1500,7 @@ class MovementsControllerSpec
             mockRepository.updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
-              eqTo(expectedUpdateMessageMetadata),
+              eqTo(expectedUpdateData),
               any[OffsetDateTime]
             )
           )
@@ -1524,7 +1524,7 @@ class MovementsControllerSpec
           verify(mockRepository, times(1)).updateMessage(
             MovementId(eqTo(movementId.value)),
             MessageId(eqTo(messageId.value)),
-            any[UpdateMessageMetadata],
+            any[UpdateMessageData],
             any[OffsetDateTime]
           )
           verify(mockRepository, times(0)).updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(None), any[OffsetDateTime])
@@ -1562,7 +1562,7 @@ class MovementsControllerSpec
             mockRepository.updateMessage(
               any[String].asInstanceOf[MovementId],
               any[String].asInstanceOf[MessageId],
-              any[UpdateMessageMetadata],
+              any[UpdateMessageData],
               any[OffsetDateTime]
             )
           )
@@ -1602,7 +1602,7 @@ class MovementsControllerSpec
               mockRepository.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
-                any[UpdateMessageMetadata],
+                any[UpdateMessageData],
                 any[OffsetDateTime]
               )
             )
@@ -1627,7 +1627,7 @@ class MovementsControllerSpec
             verify(mockRepository, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
-              any[UpdateMessageMetadata],
+              any[UpdateMessageData],
               any[OffsetDateTime]
             )
             verify(mockRepository, times(0)).updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(None), any[OffsetDateTime])
@@ -1649,7 +1649,7 @@ class MovementsControllerSpec
               mockRepository.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
-                any[UpdateMessageMetadata],
+                any[UpdateMessageData],
                 any[OffsetDateTime]
               )
             )
@@ -1674,7 +1674,7 @@ class MovementsControllerSpec
             verify(mockRepository, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
-              any[UpdateMessageMetadata],
+              any[UpdateMessageData],
               any[OffsetDateTime]
             )
             verify(mockRepository, times(0)).updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(Some(mrn)), any[OffsetDateTime])
@@ -1710,7 +1710,7 @@ class MovementsControllerSpec
               mockRepository.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
-                any[UpdateMessageMetadata],
+                any[UpdateMessageData],
                 any[OffsetDateTime]
               )
             )
@@ -1741,7 +1741,7 @@ class MovementsControllerSpec
             verify(mockRepository, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
-              any[UpdateMessageMetadata],
+              any[UpdateMessageData],
               any[OffsetDateTime]
             )
             verify(mockRepository, times(1)).updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(None), any[OffsetDateTime])
@@ -1774,7 +1774,7 @@ class MovementsControllerSpec
               mockRepository.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
-                any[UpdateMessageMetadata],
+                any[UpdateMessageData],
                 any[OffsetDateTime]
               )
             )
@@ -1805,7 +1805,7 @@ class MovementsControllerSpec
             verify(mockRepository, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
-              any[UpdateMessageMetadata],
+              any[UpdateMessageData],
               any[OffsetDateTime]
             )
             verify(mockRepository, times(1)).updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(Some(mrn)), any[OffsetDateTime])
@@ -1870,7 +1870,7 @@ class MovementsControllerSpec
     ) {
       (movementId, messageId, messageStatus) =>
         reset(mockRepository) // needed thanks to the generators running the test multiple times.
-        val expectedUpdateMessageMetadata = requests.UpdateMessageMetadata(None, messageStatus, None)
+        val expectedUpdateMessageMetadata = UpdateMessageData(status = messageStatus)
 
         when(
           mockRepository.updateMessage(
@@ -1900,7 +1900,7 @@ class MovementsControllerSpec
         verify(mockRepository, times(1)).updateMessage(
           MovementId(eqTo(movementId.value)),
           MessageId(eqTo(messageId.value)),
-          any[UpdateMessageMetadata],
+          any[UpdateMessageData],
           any[OffsetDateTime]
         )
     }
@@ -1931,7 +1931,7 @@ class MovementsControllerSpec
     "must return NOT_FOUND when an incorrect message is specified" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[MessageStatus]) {
       (movementId, messageId, messageStatus) =>
         reset(mockRepository) // needed thanks to the generators running the test multiple times.
-        val expectedUpdateMessageMetadata = requests.UpdateMessageMetadata(None, messageStatus, None)
+        val expectedUpdateMessageMetadata = UpdateMessageData(status = messageStatus)
 
         when(
           mockRepository.updateMessage(

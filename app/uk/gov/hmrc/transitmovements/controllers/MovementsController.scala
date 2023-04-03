@@ -88,9 +88,8 @@ class MovementsController @Inject() (
     }
 
   private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithSize {
-    (request: Request[Source[ByteString, _]], size: Long) =>
+    implicit request => size =>
       {
-        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         for {
           arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
           received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
@@ -105,7 +104,7 @@ class MovementsController @Inject() (
   }
 
   private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithSize {
-    (request: Request[Source[ByteString, _]], size: Long) =>
+    implicit request => size =>
       {
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         for {
@@ -156,7 +155,9 @@ class MovementsController @Inject() (
       implicit request =>
         (for {
           updateStatus <- require[UpdateStatus](request.body)
-          _            <- repo.updateMessage(movementId, messageId, updateStatus.asUpdateMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
+          _ <- repo
+            .updateMessage(movementId, messageId, UpdateMessageData(updateStatus), OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
+            .asPresentation
         } yield Ok)
           .valueOr[Result](
             presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError))
@@ -173,7 +174,9 @@ class MovementsController @Inject() (
           maybeMovementToUpdate <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
           movementToUpdate      <- ensureMovement(maybeMovementToUpdate, movementId)
           _                     <- updateMetadataIfRequired(movementId, movementType, movementToUpdate, updateMessageMetadata.objectStoreURI)
-          _                     <- repo.updateMessage(movementId, messageId, updateMessageMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
+          _ <- repo
+            .updateMessage(movementId, messageId, UpdateMessageData(updateMessageMetadata), OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
+            .asPresentation
         } yield Ok)
           .valueOr[Result](
             presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError))
@@ -210,7 +213,7 @@ class MovementsController @Inject() (
 
   private def updateMovementWithStream(movementId: MovementId, triggerId: Option[MessageId]): Action[Source[ByteString, _]] =
     Action.streamWithSize {
-      (request: Request[Source[ByteString, _]], size: Long) =>
+      implicit request => size =>
         {
           implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
           for {

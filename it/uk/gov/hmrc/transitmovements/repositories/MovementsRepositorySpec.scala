@@ -32,8 +32,6 @@ import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
-import uk.gov.hmrc.transitmovements.models.requests
-import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
@@ -594,7 +592,7 @@ class MovementsRepositorySpec
       repository.insert(departureMovement).value
     )
 
-    val message2 = UpdateMessageMetadata(Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")), MessageStatus.Success)
+    val message2 = UpdateMessageData(objectStoreURI = Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")), status = MessageStatus.Success)
 
     val result = await(
       repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
@@ -629,7 +627,7 @@ class MovementsRepositorySpec
       repository.insert(departureMovement).value
     )
 
-    val message2 = requests.UpdateMessageMetadata(None, MessageStatus.Failed)
+    val message2 = UpdateMessageData(status = MessageStatus.Failed)
 
     val result = await(
       repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
@@ -664,7 +662,7 @@ class MovementsRepositorySpec
       repository.insert(departureMovement).value
     )
 
-    val message2 = UpdateMessageMetadata(None, MessageStatus.Success, Some(MessageType.DeclarationAmendment))
+    val message2 = UpdateMessageData(objectStoreURI = None, status = MessageStatus.Success, messageType = Some(MessageType.DeclarationAmendment))
 
     val result = await(
       repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
@@ -682,7 +680,7 @@ class MovementsRepositorySpec
     movement.messages.head.messageType.code shouldBe message2.messageType.get.code
   }
 
-  "updateMessage" should "update the existing message with status, object store url, and messageType" in {
+  "updateMessage" should "update the existing message with status, object store url, size, and messageType" in {
 
     val message1 =
       arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None, status = Some(MessageStatus.Pending))
@@ -699,10 +697,11 @@ class MovementsRepositorySpec
       repository.insert(departureMovement).value
     )
 
-    val message2 = UpdateMessageMetadata(
-      Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")),
-      MessageStatus.Success,
-      Some(MessageType.DeclarationAmendment)
+    val message2 = UpdateMessageData(
+      objectStoreURI = Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")),
+      status = MessageStatus.Success,
+      size = Option(4L),
+      messageType = Some(MessageType.DeclarationAmendment)
     )
 
     val result = await(
@@ -711,15 +710,19 @@ class MovementsRepositorySpec
 
     result should be(Right(()))
 
-    val movement = await {
+    whenReady(
       repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
-    }
+    ) {
+      movement =>
+        movement.updated shouldEqual receivedInstant
+        movement.messages.length should be(1)
 
-    movement.updated shouldEqual receivedInstant
-    movement.messages.length should be(1)
-    movement.messages.head.status shouldBe Some(message2.status)
-    movement.messages.head.uri.value.toString shouldBe message2.objectStoreURI.get.value
-    movement.messages.head.messageType.code shouldBe message2.messageType.get.code
+        val message = movement.messages.head
+        message.status shouldBe Some(message2.status)
+        message.uri.value.toString shouldBe message2.objectStoreURI.get.value
+        message.messageType.code shouldBe message2.messageType.get.code
+        message.size shouldBe Some(4L)
+    }
   }
 
   "updateMessage" should "return error if there is no matching movement with the given id" in {
@@ -730,7 +733,7 @@ class MovementsRepositorySpec
       arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DepartureOfficeRejection, triggerId = Some(MessageId(movementId.value)))
 
     val result = await(
-      repository.updateMessage(movementId, message.id, UpdateMessageMetadata(None, MessageStatus.Failed), instant).value
+      repository.updateMessage(movementId, message.id, UpdateMessageData(status = MessageStatus.Failed), instant).value
     )
 
     result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))

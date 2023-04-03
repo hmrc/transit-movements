@@ -42,6 +42,7 @@ import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
+import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
@@ -112,7 +113,7 @@ trait MovementsRepository {
   def updateMessage(
     movementId: MovementId,
     messageId: MessageId,
-    message: UpdateMessageMetadata,
+    message: UpdateMessageData,
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
@@ -344,7 +345,7 @@ class MovementsRepositoryImpl @Inject() (
   def updateMessage(
     movementId: MovementId,
     messageId: MessageId,
-    message: UpdateMessageMetadata,
+    message: UpdateMessageData,
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit] = {
 
@@ -355,18 +356,21 @@ class MovementsRepositoryImpl @Inject() (
 
     val arrayFilters = new UpdateOptions().arrayFilters(Collections.singletonList(Filters.in("element.id", messageId.value)))
 
-    val combined = Seq(setUpdated, setStatus) ++ message.objectStoreURI
-      .map(
-        x => Seq(mSet("messages.$[element].uri", x.value))
-      )
-      .getOrElse(Seq()) ++ message.messageType
-      .map(
-        x => Seq(mSet("messages.$[element].messageType", x.code))
-      )
-      .getOrElse(Seq())
+    val combined = Seq(setUpdated, setStatus) ++
+      createSet("messages.$[element].uri", message.objectStoreURI.map(_.value)) ++
+      createSet("messages.$[element].body", message.body) ++
+      createSet("messages.$[element].size", message.size) ++
+      createSet("messages.$[element].messageType", message.messageType.map(_.code))
 
     executeUpdate(movementId, filter, combined, arrayFilters)
   }
+
+  private def createSet[A](path: String, value: Option[A]): Seq[Bson] =
+    value
+      .map(
+        v => Seq(mSet(path, v))
+      )
+      .getOrElse(Seq.empty)
 
   override def updateMovement(
     movementId: MovementId,

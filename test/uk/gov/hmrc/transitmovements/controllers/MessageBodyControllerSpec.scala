@@ -35,6 +35,8 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
+import play.api.libs.Files.SingletonTemporaryFileCreator
+import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.Result
 import play.api.test.FakeRequest
@@ -56,11 +58,15 @@ import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
+import uk.gov.hmrc.transitmovements.services.MessageService
+import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
+import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 import uk.gov.hmrc.transitmovements.services.ObjectStoreService
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 
 import java.net.URI
+import java.time.Clock
 import java.time.OffsetDateTime
 import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -78,7 +84,8 @@ class MessageBodyControllerSpec
     with ModelGenerators
     with ScalaCheckDrivenPropertyChecks {
 
-  private val now = OffsetDateTime.now()
+  private val now   = OffsetDateTime.now()
+  private val clock = Clock.fixed(now.toInstant, now.getOffset)
 
   "getBody" - {
 
@@ -120,9 +127,22 @@ class MessageBodyControllerSpec
         )
           .thenReturn(expectedResponse)
 
-        val mockObjectStoreService = mock[ObjectStoreService]
+        val mockObjectStoreService         = mock[ObjectStoreService]
+        val mockMessagesXmlParsingSerivce  = mock[MessagesXmlParsingService]
+        val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
+        val mockMessageService             = mock[MessageService]
 
-        val sut                    = new MessageBodyController(stubControllerComponents(), mockMovementsRepo, mockObjectStoreService)
+        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
+
+        val sut = new MessageBodyController(
+          stubControllerComponents(),
+          mockMovementsRepo,
+          mockObjectStoreService,
+          mockMessagesXmlParsingSerivce,
+          mockMovementsXmlParsingSerivce,
+          mockMessageService,
+          clock
+        )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
 
         status(result) mustBe OK
@@ -185,7 +205,21 @@ class MessageBodyControllerSpec
         when(mockObjectStoreService.getObjectStoreFile(ObjectStoreResourceLocation(eqTo(objectStoreUri.asResourceLocation.get.value)))(any(), any()))
           .thenReturn(EitherT.rightT(Source.single(ByteString(xml))))
 
-        val sut                    = new MessageBodyController(stubControllerComponents(), mockMovementsRepo, mockObjectStoreService)
+        val mockMessagesXmlParsingSerivce  = mock[MessagesXmlParsingService]
+        val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
+        val mockMessageService             = mock[MessageService]
+
+        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
+
+        val sut = new MessageBodyController(
+          stubControllerComponents(),
+          mockMovementsRepo,
+          mockObjectStoreService,
+          mockMessagesXmlParsingSerivce,
+          mockMovementsXmlParsingSerivce,
+          mockMessageService,
+          clock
+        )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
 
         status(result) mustBe OK
@@ -234,7 +268,21 @@ class MessageBodyControllerSpec
 
         val mockObjectStoreService = mock[ObjectStoreService]
 
-        val sut                    = new MessageBodyController(stubControllerComponents(), mockMovementsRepo, mockObjectStoreService)
+        val mockMessagesXmlParsingSerivce  = mock[MessagesXmlParsingService]
+        val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
+        val mockMessageService             = mock[MessageService]
+
+        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
+
+        val sut = new MessageBodyController(
+          stubControllerComponents(),
+          mockMovementsRepo,
+          mockObjectStoreService,
+          mockMessagesXmlParsingSerivce,
+          mockMovementsXmlParsingSerivce,
+          mockMessageService,
+          clock
+        )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
 
         status(result) mustBe NOT_FOUND
@@ -272,7 +320,21 @@ class MessageBodyControllerSpec
 
         val mockObjectStoreService = mock[ObjectStoreService]
 
-        val sut                    = new MessageBodyController(stubControllerComponents(), mockMovementsRepo, mockObjectStoreService)
+        val mockMessagesXmlParsingSerivce  = mock[MessagesXmlParsingService]
+        val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
+        val mockMessageService             = mock[MessageService]
+
+        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
+
+        val sut = new MessageBodyController(
+          stubControllerComponents(),
+          mockMovementsRepo,
+          mockObjectStoreService,
+          mockMessagesXmlParsingSerivce,
+          mockMovementsXmlParsingSerivce,
+          mockMessageService,
+          clock
+        )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
 
         status(result) mustBe NOT_FOUND
@@ -311,7 +373,21 @@ class MessageBodyControllerSpec
 
         val mockObjectStoreService = mock[ObjectStoreService]
 
-        val sut                    = new MessageBodyController(stubControllerComponents(), mockMovementsRepo, mockObjectStoreService)
+        val mockMessagesXmlParsingSerivce  = mock[MessagesXmlParsingService]
+        val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
+        val mockMessageService             = mock[MessageService]
+
+        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
+
+        val sut = new MessageBodyController(
+          stubControllerComponents(),
+          mockMovementsRepo,
+          mockObjectStoreService,
+          mockMessagesXmlParsingSerivce,
+          mockMovementsXmlParsingSerivce,
+          mockMessageService,
+          clock
+        )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
 
         status(result) mustBe NOT_FOUND
@@ -368,7 +444,21 @@ class MessageBodyControllerSpec
         when(mockObjectStoreService.getObjectStoreFile(ObjectStoreResourceLocation(eqTo(objectStoreUri.asResourceLocation.get.value)))(any(), any()))
           .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound("...")))
 
-        val sut                    = new MessageBodyController(stubControllerComponents(), mockMovementsRepo, mockObjectStoreService)
+        val mockMessagesXmlParsingSerivce  = mock[MessagesXmlParsingService]
+        val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
+        val mockMessageService             = mock[MessageService]
+
+        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
+
+        val sut = new MessageBodyController(
+          stubControllerComponents(),
+          mockMovementsRepo,
+          mockObjectStoreService,
+          mockMessagesXmlParsingSerivce,
+          mockMovementsXmlParsingSerivce,
+          mockMessageService,
+          clock
+        )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
 
         status(result) mustBe INTERNAL_SERVER_ERROR

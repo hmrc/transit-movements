@@ -23,6 +23,7 @@ import akka.util.ByteString
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.transitmovements.models.BodyStorage
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
@@ -75,6 +76,10 @@ trait MessageService {
     received: OffsetDateTime
   ): Message
 
+  def storeIfAppropriate(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, _])(implicit
+    hc: HeaderCarrier
+  ): EitherT[Future, StreamError, BodyStorage]
+
 }
 
 class MessageServiceImpl @Inject() (
@@ -100,18 +105,18 @@ class MessageServiceImpl @Inject() (
     status: MessageStatus
   )(implicit hc: HeaderCarrier): EitherT[Future, StreamError, Message] = {
     val messageId = generateId()
-    processBody(movementId, messageId, size, source).map {
-      either =>
+    storeIfAppropriate(movementId, messageId, size, source).map {
+      bodyStorage =>
         Message(
           id = messageId,
           received = received,
           generated = Some(generationDate),
           messageType = messageType,
           triggerId = triggerId,
-          uri = either.swap.toOption.map(
+          uri = bodyStorage.objectStore.map(
             x => new URI(x.value)
           ),
-          body = either.toOption,
+          body = bodyStorage.mongo,
           size = Some(size),
           status = Some(status)
         )
@@ -152,11 +157,11 @@ class MessageServiceImpl @Inject() (
       status = Some(MessageStatus.Pending)
     )
 
-  private def processBody(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, _])(implicit
+  override def storeIfAppropriate(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, _])(implicit
     hc: HeaderCarrier
-  ): EitherT[Future, StreamError, Either[ObjectStoreURI, String]] =
-    if (smallMessageLimitService.isLarge(size)) createObjectStoreObject(movementId, messageId, src).map(Left.apply)
-    else getMessageBody(src).map(Right.apply)
+  ): EitherT[Future, StreamError, BodyStorage] =
+    if (smallMessageLimitService.isLarge(size)) createObjectStoreObject(movementId, messageId, src).map(BodyStorage.objectStore)
+    else getMessageBody(src).map(BodyStorage.mongo)
 
   private def createObjectStoreObject(movementId: MovementId, messageId: MessageId, src: Source[ByteString, _])(implicit
     hc: HeaderCarrier
