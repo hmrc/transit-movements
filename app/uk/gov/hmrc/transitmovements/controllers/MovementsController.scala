@@ -177,7 +177,15 @@ class MovementsController @Inject() (
           .asPresentation
       } yield Ok
 
-    def updateMessageWithBody(uri: ObjectStoreURI, status: MessageStatus, messageType: Option[MessageType], received: OffsetDateTime)(implicit
+    def verifyMessageType(messageType: MessageType, expectedType: Option[MessageType]): EitherT[Future, PresentationError, Unit] =
+      expectedType match {
+        // If we have already set a message type, we should verify that's what we have.
+        case None                        => EitherT.rightT(())
+        case Some(t) if t == messageType => EitherT.rightT(())
+        case Some(_)                     => EitherT.leftT(PresentationError.badRequestError("Message type does not match"))
+      }
+
+    def updateMessageWithBody(uri: ObjectStoreURI, status: MessageStatus, messageType: MessageType, received: OffsetDateTime)(implicit
       hc: HeaderCarrier
     ) =
       for {
@@ -187,15 +195,16 @@ class MovementsController @Inject() (
           case Some(x) => EitherT.rightT[Future, PresentationError](x)
           case None    => EitherT.leftT[Future, MessageResponse](PresentationError.notFoundError("Message does not exist"))
         }
+        _ <- verifyMessageType(messageType, message.messageType)
         generatedDate <- updateMetadataIfRequired(
           movementId,
-          message.messageType.orElse(messageType),
+          message.messageType.getOrElse(messageType),
           uri,
           received,
           movement.movementEORINumber.isDefined
         )
         _ <- repo
-          .updateMessage(movementId, messageId, UpdateMessageData(Some(uri), None, None, status, messageType, generatedDate), received)
+          .updateMessage(movementId, messageId, UpdateMessageData(Some(uri), None, None, status, Some(messageType), Some(generatedDate)), received)
           .asPresentation
       } yield Ok
 
@@ -209,8 +218,10 @@ class MovementsController @Inject() (
           .flatMap {
             case UpdateMessageMetadata(None, status, messageType) =>
               updateMessageMetadataOnly(status, messageType, received)
-            case UpdateMessageMetadata(Some(uri), status, messageType) =>
+            case UpdateMessageMetadata(Some(uri), status, Some(messageType)) =>
               updateMessageWithBody(uri, status, messageType, received)
+            case _ =>
+              EitherT.leftT[Future, Status](PresentationError.badRequestError("A message type must be supplied when a body/uri is supplied"))
           }
           .valueOr[Result](
             presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError))
@@ -340,30 +351,18 @@ class MovementsController @Inject() (
   // Large Messages: Only perform this step if we haven't updated the movement EORI and we have an Object Store reference
   private def updateMetadataIfRequired(
     movementId: MovementId,
-    messageType: Option[MessageType],
+    messageType: MessageType,
     objectStoreURI: ObjectStoreURI,
     received: OffsetDateTime,
     hasEoriAlready: Boolean
-  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Option[OffsetDateTime]] = {
+  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, OffsetDateTime] = {
 
-    def extractAndUpdate(source: Source[ByteString, _]): EitherT[Future, PresentationError, Option[OffsetDateTime]] =
+    def extractAndUpdate(source: Source[ByteString, _]): EitherT[Future, PresentationError, OffsetDateTime] =
       withReusableSource(source) {
         fileSource =>
           for {
-            extractedData <- messageType
-              .map(
-                t => movementsXmlParsingService.extractData(t, fileSource).asPresentation
-              )
-              .getOrElse(EitherT {
-                Future.successful[Either[PresentationError, Option[ExtractedData]]](Right(None))
-              })
-            extractedMessageData <- messageType
-              .map(
-                t => messagesXmlParsingService.extractMessageData(fileSource, t).asPresentation.map(Option.apply)
-              )
-              .getOrElse(EitherT {
-                Future.successful[Either[PresentationError, Option[MessageData]]](Right(None))
-              })
+            extractedData        <- movementsXmlParsingService.extractData(messageType, fileSource).asPresentation
+            extractedMessageData <- messagesXmlParsingService.extractMessageData(fileSource, messageType).asPresentation
             _ <- repo
               .updateMovement(
                 movementId,
@@ -376,7 +375,7 @@ class MovementsController @Inject() (
                 received
               )
               .asPresentation
-          } yield extractedMessageData.map(_.generationDate)
+          } yield extractedMessageData.generationDate
       }
 
     for {

@@ -62,6 +62,7 @@ import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
@@ -1248,7 +1249,6 @@ class MovementsControllerSpec
             )
               .thenReturn(EitherT.rightT(Source.empty[ByteString]))
 
-            println(messageType)
             when(
               mockMovementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]])
             )
@@ -1460,7 +1460,8 @@ class MovementsControllerSpec
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
             val body = Json.obj(
               "objectStoreURI" -> "common-transit-convention-traders/movements/abcdef0123456789/abc.xml",
-              "status"         -> "Success"
+              "status"         -> "Success",
+              "messageType"    -> messageType.code
             )
             val request = FakeRequest(
               method = POST,
@@ -1544,7 +1545,8 @@ class MovementsControllerSpec
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
             val body = Json.obj(
               "objectStoreURI" -> "something/movements/abcdef0123456789/abc.xml",
-              "status"         -> "Success"
+              "status"         -> "Success",
+              "messageType"    -> messageType.code
             )
             val request = FakeRequest(
               method = POST,
@@ -1836,6 +1838,77 @@ class MovementsControllerSpec
             "code"    -> "BAD_REQUEST",
             "message" -> "Invalid messageType value: ArrivalNotification"
           )
+      }
+
+      "must return BAD_REQUEST if the message type does not match the expected type, if one exists" in forAll(
+        arbitrary[EORINumber],
+        arbitrary[MovementId],
+        arbitrary[MessageId],
+        Gen.oneOf(MessageType.departureRequestValues)
+      ) {
+        (eori, movementId, messageId, messageType) =>
+          val movementType = MovementType.Departure
+
+          when(
+            mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
+          )
+            .thenReturn(EitherT.rightT(Some(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))))
+
+          when(
+            mockRepository.getSingleMessage(
+              EORINumber(eqTo(eori.value)),
+              MovementId(eqTo(movementId.value)),
+              MessageId(eqTo(messageId.value)),
+              eqTo(movementType)
+            )
+          )
+            .thenReturn(EitherT.rightT(Some(MessageResponse(messageId, now, Some(MessageType.ArrivalNotification), None, Some(MessageStatus.Pending), None))))
+
+          when(
+            mockMovementsXmlParsingService.extractData(eqTo(MovementType.Departure), any[Source[ByteString, _]])
+          )
+            .thenReturn(EitherT.rightT(DeclarationData(eori, OffsetDateTime.now(clock))))
+
+          when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(MessageType.DeclarationData)))
+            .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))
+
+          when(
+            mockRepository.updateMessage(
+              MovementId(eqTo(movementId.value)),
+              MessageId(eqTo(messageId.value)),
+              any[UpdateMessageData],
+              any[OffsetDateTime]
+            )
+          )
+            .thenReturn(EitherT.rightT(()))
+
+          val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
+          val body = Json.obj(
+            "objectStoreURI" -> "common-transit-convention-traders/test/abc.xml",
+            "status"         -> "Success",
+            "messageType"    -> messageType.code
+          )
+          val request = FakeRequest(
+            method = POST,
+            uri = routes.MovementsController.updateMessage(eori, MovementType.Departure, movementId, messageId).url,
+            headers = headers,
+            body = body
+          )
+
+          val result = controller.updateMessage(eori, MovementType.Departure, movementId, messageId)(request)
+
+          status(result) mustBe BAD_REQUEST
+          contentAsJson(result) mustBe Json.obj(
+            "code"    -> "BAD_REQUEST",
+            "message" -> "Message type does not match"
+          )
+          verify(mockRepository, times(0)).updateMessage(
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(messageId.value)),
+            any[UpdateMessageData],
+            any[OffsetDateTime]
+          )
+          verify(mockRepository, times(0)).updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(None), any[OffsetDateTime])
       }
 
       "must return BAD_REQUEST given invalid messageType for arrival message" in forAll(arbitrary[EORINumber]) {
