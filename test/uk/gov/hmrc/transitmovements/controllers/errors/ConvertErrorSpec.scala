@@ -22,6 +22,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
+import play.api.Logging
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.InternalServerError
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.NotFound
@@ -35,7 +36,7 @@ import scala.concurrent.Future
 
 class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with ScalaFutures with MockitoSugar {
 
-  object Harness extends ConvertError
+  object Harness extends ConvertError with Logging
 
   import Harness._
 

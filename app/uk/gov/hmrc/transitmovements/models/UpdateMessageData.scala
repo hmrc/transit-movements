@@ -19,9 +19,13 @@ package uk.gov.hmrc.transitmovements.models
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.requests.UpdateStatus
 
+import java.time.OffsetDateTime
+
 object UpdateMessageData {
-  def apply(status: UpdateStatus): UpdateMessageData            = UpdateMessageData(None, None, None, status.status, None)
-  def apply(metadata: UpdateMessageMetadata): UpdateMessageData = UpdateMessageData(metadata.objectStoreURI, None, None, metadata.status, metadata.messageType)
+  def apply(status: UpdateStatus): UpdateMessageData = UpdateMessageData(None, None, None, status.status, None)
+
+  def apply(metadata: UpdateMessageMetadata, generationDate: Option[OffsetDateTime]): UpdateMessageData =
+    UpdateMessageData(metadata.objectStoreURI, None, None, metadata.status, metadata.messageType, generationDate)
 }
 
 final case class UpdateMessageData(
@@ -29,5 +33,6 @@ final case class UpdateMessageData(
   body: Option[String] = None,
   size: Option[Long] = None,
   status: MessageStatus,
-  messageType: Option[MessageType] = None
+  messageType: Option[MessageType] = None,
+  generationDate: Option[OffsetDateTime] = None
 )

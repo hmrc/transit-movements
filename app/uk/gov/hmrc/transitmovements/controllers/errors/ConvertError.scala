@@ -17,6 +17,7 @@
 package uk.gov.hmrc.transitmovements.controllers.errors
 
 import cats.data.EitherT
+import play.api.Logging
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError.FileNotFound
@@ -27,6 +28,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 trait ConvertError {
+  self: Logging =>
 
   implicit class ErrorConverter[E, A](value: EitherT[Future, E, A]) {
 

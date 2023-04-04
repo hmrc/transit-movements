@@ -16,6 +16,12 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import play.api.libs.json.JsError
+import play.api.libs.json.JsString
+import play.api.libs.json.JsSuccess
+import play.api.libs.json.Reads
+import play.api.libs.json.Writes
+
 sealed trait MessageType extends Product with Serializable {
   def code: String
   def rootNode: String
@@ -71,6 +77,17 @@ sealed abstract class ErrorMessageType(val code: String, val rootNode: String, v
     with DepartureMessageType
 
 object MessageType {
+
+  implicit val messageTokenWrites: Writes[MessageType] = Writes {
+    t => JsString(t.code)
+  }
+
+  implicit val messageTokenReads: Reads[MessageType] = Reads {
+    case JsString(value) =>
+      values.find(_.code == value).map(JsSuccess(_)).getOrElse(JsError(s"Message type $value could not be found"))
+    case x => JsError(s"Invalid value: $x")
+  }
+
   // *******************
   // Departures Requests
   // *******************

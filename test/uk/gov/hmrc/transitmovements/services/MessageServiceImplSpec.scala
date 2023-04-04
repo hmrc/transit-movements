@@ -114,7 +114,6 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
 
         whenReady(result.value) {
           r =>
-            println(Mockito.mockingDetails(smallMessageLimitServiceMock).printInvocations())
             r mustBe Right(
               Message(
                 messageId,
