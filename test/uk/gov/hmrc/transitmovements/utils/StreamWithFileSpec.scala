@@ -30,6 +30,7 @@ import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.base.TestSourceProvider
+import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContext.Implicits.global

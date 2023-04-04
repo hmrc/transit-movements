@@ -78,11 +78,11 @@ sealed abstract class ErrorMessageType(val code: String, val rootNode: String, v
 
 object MessageType {
 
-  implicit val messageTokenWrites: Writes[MessageType] = Writes {
+  implicit val messageTypeWrites: Writes[MessageType] = Writes {
     t => JsString(t.code)
   }
 
-  implicit val messageTokenReads: Reads[MessageType] = Reads {
+  implicit val messageTypeReads: Reads[MessageType] = Reads {
     case JsString(value) =>
       values.find(_.code == value).map(JsSuccess(_)).getOrElse(JsError(s"Message type $value could not be found"))
     case x => JsError(s"Invalid value: $x")
