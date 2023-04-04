@@ -46,6 +46,7 @@ import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
+import uk.gov.hmrc.transitmovements.utils.StreamWithFile
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -71,6 +72,7 @@ class MovementsController @Inject() (
 ) extends BackendController(cc)
     with Logging
     with StreamingParsers
+    with StreamWithFile
     with ConvertError
     with MessageTypeHeaderExtractor
     with PresentationFormats
@@ -205,8 +207,10 @@ class MovementsController @Inject() (
           _                     <- validateMessageType(updateMessageMetadata.messageType, movementType).asPresentation
         } yield updateMessageMetadata)
           .flatMap {
-            case UpdateMessageMetadata(None, status, messageType)      => updateMessageMetadataOnly(status, messageType, received)
-            case UpdateMessageMetadata(Some(uri), status, messageType) => updateMessageWithBody(uri, status, messageType, received)
+            case UpdateMessageMetadata(None, status, messageType) =>
+              updateMessageMetadataOnly(status, messageType, received)
+            case UpdateMessageMetadata(Some(uri), status, messageType) =>
+              updateMessageWithBody(uri, status, messageType, received)
           }
           .valueOr[Result](
             presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError))
@@ -340,37 +344,47 @@ class MovementsController @Inject() (
     objectStoreURI: ObjectStoreURI,
     received: OffsetDateTime,
     hasEoriAlready: Boolean
-  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Option[OffsetDateTime]] =
+  )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Option[OffsetDateTime]] = {
+
+    def extractAndUpdate(source: Source[ByteString, _]): EitherT[Future, PresentationError, Option[OffsetDateTime]] =
+      withReusableSource(source) {
+        fileSource =>
+          for {
+            extractedData <- messageType
+              .map(
+                t => movementsXmlParsingService.extractData(t, fileSource).asPresentation
+              )
+              .getOrElse(EitherT {
+                Future.successful[Either[PresentationError, Option[ExtractedData]]](Right(None))
+              })
+            extractedMessageData <- messageType
+              .map(
+                t => messagesXmlParsingService.extractMessageData(fileSource, t).asPresentation.map(Option.apply)
+              )
+              .getOrElse(EitherT {
+                Future.successful[Either[PresentationError, Option[MessageData]]](Right(None))
+              })
+            _ <- repo
+              .updateMovement(
+                movementId,
+                extractedData
+                  .filterNot(
+                    _ => hasEoriAlready
+                  )
+                  .map(_.movementEoriNumber),
+                extractedData.flatMap(_.movementReferenceNumber),
+                received
+              )
+              .asPresentation
+          } yield extractedMessageData.map(_.generationDate)
+      }
+
     for {
       resourceLocation <- extractResourceLocation(objectStoreURI)
       source           <- objectStoreService.getObjectStoreFile(resourceLocation).asPresentation
-      extractedData <- messageType
-        .map(
-          t => movementsXmlParsingService.extractData(t, source).asPresentation
-        )
-        .getOrElse(EitherT {
-          Future.successful[Either[PresentationError, Option[ExtractedData]]](Right(None))
-        })
-      extractedMessageData <- messageType
-        .map(
-          t => messagesXmlParsingService.extractMessageData(source, t).asPresentation.map(Option.apply)
-        )
-        .getOrElse(EitherT {
-          Future.successful[Either[PresentationError, Option[MessageData]]](Right(None))
-        })
-      _ <- repo
-        .updateMovement(
-          movementId,
-          extractedData
-            .filterNot(
-              _ => hasEoriAlready
-            )
-            .map(_.movementEoriNumber),
-          extractedData.flatMap(_.movementReferenceNumber),
-          received
-        )
-        .asPresentation
-    } yield extractedMessageData.map(_.generationDate)
+      date             <- extractAndUpdate(source)
+    } yield date
+  }
 
   private def require[T: Reads](responseBody: JsValue): EitherT[Future, PresentationError, T] =
     EitherT {
