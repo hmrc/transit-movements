@@ -28,7 +28,6 @@ import play.api.libs.json.Reads
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
-import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -88,9 +87,8 @@ class MovementsController @Inject() (
     }
 
   private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithSize {
-    (request: Request[Source[ByteString, _]], size: Long) =>
+    implicit request => size =>
       {
-        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         for {
           arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
           received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
@@ -105,7 +103,7 @@ class MovementsController @Inject() (
   }
 
   private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithSize {
-    (request: Request[Source[ByteString, _]], size: Long) =>
+    implicit request => size =>
       {
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         for {
@@ -156,7 +154,9 @@ class MovementsController @Inject() (
       implicit request =>
         (for {
           updateStatus <- require[UpdateStatus](request.body)
-          _            <- repo.updateMessage(movementId, messageId, updateStatus.asUpdateMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
+          _ <- repo
+            .updateMessage(movementId, messageId, UpdateMessageData(updateStatus), OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
+            .asPresentation
         } yield Ok)
           .valueOr[Result](
             presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError))
@@ -167,13 +167,16 @@ class MovementsController @Inject() (
   def updateMessage(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[JsValue] =
     Action.async(parse.json) {
       implicit request =>
+        val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
         (for {
           updateMessageMetadata <- require[UpdateMessageMetadata](request.body)
           _                     <- validateMessageType(updateMessageMetadata.messageType, movementType).asPresentation
           maybeMovementToUpdate <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
           movementToUpdate      <- ensureMovement(maybeMovementToUpdate, movementId)
-          _                     <- updateMetadataIfRequired(movementId, movementType, movementToUpdate, updateMessageMetadata.objectStoreURI)
-          _                     <- repo.updateMessage(movementId, messageId, updateMessageMetadata, OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)).asPresentation
+          _                     <- updateMetadataIfRequired(movementId, movementType, movementToUpdate, updateMessageMetadata.objectStoreURI, received)
+          _ <- repo
+            .updateMessage(movementId, messageId, UpdateMessageData(updateMessageMetadata), received)
+            .asPresentation
         } yield Ok)
           .valueOr[Result](
             presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError))
@@ -210,7 +213,7 @@ class MovementsController @Inject() (
 
   private def updateMovementWithStream(movementId: MovementId, triggerId: Option[MessageId]): Action[Source[ByteString, _]] =
     Action.streamWithSize {
-      (request: Request[Source[ByteString, _]], size: Long) =>
+      implicit request => size =>
         {
           implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
           for {
@@ -304,7 +307,8 @@ class MovementsController @Inject() (
     movementId: MovementId,
     movementType: MovementType,
     movementToUpdate: MovementWithoutMessages,
-    objectStoreURI: Option[ObjectStoreURI]
+    objectStoreURI: Option[ObjectStoreURI],
+    received: OffsetDateTime
   )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Unit] =
     (movementToUpdate.movementEORINumber, objectStoreURI) match {
       case (None, Some(location)) =>
@@ -313,7 +317,7 @@ class MovementsController @Inject() (
           source           <- objectStoreService.getObjectStoreFile(resourceLocation).asPresentation
           extractedData    <- movementsXmlParsingService.extractData(movementType, source).asPresentation
           _ <- repo
-            .updateMovement(movementId, Some(extractedData.movementEoriNumber), extractedData.movementReferenceNumber, extractedData.generationDate)
+            .updateMovement(movementId, Some(extractedData.movementEoriNumber), extractedData.movementReferenceNumber, received)
             .asPresentation
         } yield ()
       case _ => EitherT.rightT((): Unit)

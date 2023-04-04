@@ -14,14 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.requests
+package uk.gov.hmrc.transitmovements.models
 
-import play.api.libs.json.Format
-import play.api.libs.json.Json
-import uk.gov.hmrc.transitmovements.models.MessageStatus
+object BodyStorage {
+  def mongo(mongo: String) = new BodyStorage(Some(mongo), None)
 
-object UpdateStatus {
-  implicit val updateStatusFormat: Format[UpdateStatus] = Json.format[UpdateStatus]
+  def objectStore(objectStoreURI: ObjectStoreURI) = new BodyStorage(None, Some(objectStoreURI))
 }
 
-final case class UpdateStatus(status: MessageStatus)
+case class BodyStorage private (mongo: Option[String], objectStore: Option[ObjectStoreURI])
