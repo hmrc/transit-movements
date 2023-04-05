@@ -14,16 +14,27 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.requests
+package uk.gov.hmrc.transitmovements.matchers
 
-import play.api.libs.json.Json
+import org.mockito.ArgumentMatcher
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
-import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
+import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 
-object UpdateMessageMetadata extends CommonFormats {
-  implicit val updateMessageMetadata = Json.format[UpdateMessageMetadata]
+case class UpdateMessageDataMatcher(
+  objectStoreURI: Option[ObjectStoreURI] = None,
+  body: Option[String] = None,
+  status: MessageStatus,
+  messageType: Option[MessageType] = None,
+  expectSize: Boolean = true
+) extends ArgumentMatcher[UpdateMessageData] {
+
+  // intentionally ignores size, other than to check it's there
+  override def matches(argument: UpdateMessageData): Boolean =
+    argument.body == body &&
+      argument.messageType == messageType &&
+      argument.status == status &&
+      argument.objectStoreURI == objectStoreURI &&
+      argument.size.isDefined == expectSize
 }
-
-final case class UpdateMessageMetadata(objectStoreURI: Option[ObjectStoreURI] = None, status: MessageStatus, messageType: Option[MessageType] = None)

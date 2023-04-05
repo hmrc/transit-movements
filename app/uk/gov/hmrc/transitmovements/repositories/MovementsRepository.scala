@@ -42,9 +42,9 @@ import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
+import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
@@ -109,10 +109,17 @@ trait MovementsRepository {
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
+  def updateMessages(
+    movementId: MovementId,
+    message: Message,
+    mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit]
+
   def updateMessage(
     movementId: MovementId,
     messageId: MessageId,
-    message: UpdateMessageMetadata,
+    message: UpdateMessageData,
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
@@ -341,10 +348,44 @@ class MovementsRepositoryImpl @Inject() (
     })
   }
 
+  def updateMessages(
+    movementId: MovementId,
+    message: Message,
+    mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit] = {
+
+    val filter: Bson = mEq(movementId)
+
+    val setUpdated   = mSet("updated", received)
+    val pushMessages = mPush("messages", message)
+
+    val combined = Seq(setUpdated, pushMessages) ++ mrn
+      .map(
+        x => Seq(mSet("movementReferenceNumber", x))
+      )
+      .getOrElse(Seq())
+
+    mongoRetry(Try(collection.updateOne(filter, mCombine(combined: _*))) match {
+      case Success(obs) =>
+        obs.toFuture().map {
+          result =>
+            if (result.wasAcknowledged()) {
+              if (result.getModifiedCount == 0) Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+              else Right(())
+            } else {
+              Left(UpdateNotAcknowledged(s"Message update failed for movement: $movementId"))
+            }
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+  }
+
   def updateMessage(
     movementId: MovementId,
     messageId: MessageId,
-    message: UpdateMessageMetadata,
+    message: UpdateMessageData,
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit] = {
 
@@ -355,20 +396,27 @@ class MovementsRepositoryImpl @Inject() (
 
     val arrayFilters = new UpdateOptions().arrayFilters(Collections.singletonList(Filters.in("element.id", messageId.value)))
 
-    val combined = Seq(setUpdated, setStatus) ++ message.objectStoreURI
-      .map(
-        x => Seq(mSet("messages.$[element].uri", x.value))
-      )
-      .getOrElse(Seq())
+    val combined = Seq(setUpdated, setStatus) ++
+      createSet("messages.$[element].uri", message.objectStoreURI.map(_.value)) ++
+      createSet("messages.$[element].body", message.body) ++
+      createSet("messages.$[element].size", message.size) ++
+      createSet("messages.$[element].messageType", message.messageType.map(_.code))
 
     executeUpdate(movementId, filter, combined, arrayFilters)
   }
+
+  private def createSet[A](path: String, value: Option[A]): Seq[Bson] =
+    value
+      .map(
+        v => Seq(mSet(path, v))
+      )
+      .getOrElse(Seq.empty)
 
   override def updateMovement(
     movementId: MovementId,
     movementEORI: Option[EORINumber],
     mrn: Option[MovementReferenceNumber],
-    received: OffsetDateTime
+    updated: OffsetDateTime
   ): EitherT[Future, MongoError, Unit] = {
     val filter: Bson = mEq(movementId.value)
 
@@ -386,7 +434,7 @@ class MovementsRepositoryImpl @Inject() (
 
     // If we don't have to update anything, don't bother going to Mongo.
     if (combined.isEmpty) EitherT.rightT(())
-    else executeUpdate(movementId, filter, combined ++ Seq(mSet("updated", received)))
+    else executeUpdate(movementId, filter, combined ++ Seq(mSet("updated", updated)))
   }
 
   private def executeUpdate(

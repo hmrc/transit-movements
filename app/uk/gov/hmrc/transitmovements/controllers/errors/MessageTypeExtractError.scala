@@ -14,19 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.controllers.errors
 
-import java.net.URI
-import java.time.OffsetDateTime
+sealed abstract class MessageTypeExtractError
 
-case class Message(
-  id: MessageId,
-  received: OffsetDateTime,
-  generated: Option[OffsetDateTime],
-  messageType: Option[MessageType],
-  triggerId: Option[MessageId],
-  uri: Option[URI],
-  body: Option[String],
-  size: Option[Long],
-  status: Option[MessageStatus]
-)
+object MessageTypeExtractError {
+  case class NoHeaderFound(element: String)      extends MessageTypeExtractError
+  case class InvalidMessageType(element: String) extends MessageTypeExtractError
+
+}

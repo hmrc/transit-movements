@@ -21,8 +21,8 @@ import play.api.http.HeaderNames
 import play.api.http.MimeTypes
 import play.api.mvc.Headers
 import uk.gov.hmrc.transitmovements.base.SpecBase
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
+import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
+import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.NoHeaderFound
 import uk.gov.hmrc.transitmovements.models.MessageType
 
 class MessageTypeHeaderExtractorSpec extends SpecBase {

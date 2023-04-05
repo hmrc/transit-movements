@@ -32,6 +32,7 @@ object ErrorCode {
   case object InternalServerError  extends ErrorCode("INTERNAL_SERVER_ERROR", INTERNAL_SERVER_ERROR)
   case object GatewayTimeout       extends ErrorCode("GATEWAY_TIMEOUT", GATEWAY_TIMEOUT)
   case object UnsupportedMediaType extends ErrorCode("UNSUPPORTED_MEDIA_TYPE", UNSUPPORTED_MEDIA_TYPE)
+  case object Conflict             extends ErrorCode("CONFLICT", CONFLICT)
 
   lazy val errorCodes: Seq[ErrorCode] = Seq(
     BadRequest,
@@ -39,7 +40,8 @@ object ErrorCode {
     Forbidden,
     InternalServerError,
     GatewayTimeout,
-    UnsupportedMediaType
+    UnsupportedMediaType,
+    Conflict
   )
 
   implicit val errorCodeWrites: Writes[ErrorCode] = Writes {
@@ -50,4 +52,5 @@ object ErrorCode {
     case JsString(errorCode) => errorCodes.find(_.code == errorCode).map(JsSuccess(_)).getOrElse(JsError())
     case _                   => JsError()
   }
+
 }

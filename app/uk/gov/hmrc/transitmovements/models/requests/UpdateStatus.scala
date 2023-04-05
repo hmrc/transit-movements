@@ -14,19 +14,14 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.models.requests
 
-import java.net.URI
-import java.time.OffsetDateTime
+import play.api.libs.json.Format
+import play.api.libs.json.Json
+import uk.gov.hmrc.transitmovements.models.MessageStatus
 
-case class Message(
-  id: MessageId,
-  received: OffsetDateTime,
-  generated: Option[OffsetDateTime],
-  messageType: Option[MessageType],
-  triggerId: Option[MessageId],
-  uri: Option[URI],
-  body: Option[String],
-  size: Option[Long],
-  status: Option[MessageStatus]
-)
+object UpdateStatus {
+  implicit val updateStatusFormat: Format[UpdateStatus] = Json.format[UpdateStatus]
+}
+
+final case class UpdateStatus(status: MessageStatus)

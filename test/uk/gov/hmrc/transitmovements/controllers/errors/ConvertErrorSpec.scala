@@ -25,10 +25,11 @@ import org.scalatestplus.mockito.MockitoSugar
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.InternalServerError
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.NotFound
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.InvalidMessageType
-import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError.NoHeaderFound
+import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
+import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.NoHeaderFound
 
 import java.time.format.DateTimeParseException
+import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -115,7 +116,7 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
   "Header extract error" - {
 
     "for a success" in {
-      val input = Right[HeaderExtractError, Unit](()).toEitherT[Future]
+      val input = Right[MessageTypeExtractError, Unit](()).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Right(())
       }
@@ -123,7 +124,7 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
 
     for (error <- Seq(NoHeaderFound("test"), InvalidMessageType("test")))
       s"${error.getClass.toString().split("\\$").last} should result in InternalServerError status" in {
-        val input = Left[HeaderExtractError, Unit](error).toEitherT[Future]
+        val input = Left[MessageTypeExtractError, Unit](error).toEitherT[Future]
         whenReady(input.asPresentation.value) {
           _.left.toOption.get.code mustBe BadRequest
         }
@@ -153,6 +154,34 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       val input = Left[ObjectStoreError, Unit](FileNotFound("test")).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _.left.toOption.get.code mustBe BadRequest
+      }
+    }
+  }
+
+  "objectStoreErrorWithNotFoundConverter" - {
+    import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
+    import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError._
+
+    "for a success" in {
+      val input = Right[ObjectStoreError, Unit](()).toEitherT[Future]
+      whenReady(input.asPresentation(objectStoreErrorWithNotFoundConverter, implicitly[ExecutionContext]).value) {
+        _ mustBe Right(())
+      }
+    }
+
+    "for a failure" in {
+      val exception = new Exception("unexpected failure")
+      val input     = Left[ObjectStoreError, Unit](UnexpectedError(Some(exception))).toEitherT[Future]
+      whenReady(input.asPresentation(objectStoreErrorWithNotFoundConverter, implicitly[ExecutionContext]).value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
+      }
+    }
+
+    "FileNotFound should result BadRequest status" in {
+      val input = Left[ObjectStoreError, Unit](FileNotFound("test")).toEitherT[Future]
+      whenReady(input.asPresentation(objectStoreErrorWithNotFoundConverter, implicitly[ExecutionContext]).value) {
+        case Left(StandardError("file not found at location: test", NotFound)) => succeed
+        case x                                                                 => fail(s"Expected Left(NotFound), got $x")
       }
     }
   }

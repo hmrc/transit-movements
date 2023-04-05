@@ -51,6 +51,8 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[MovementsXmlParsingServiceImpl])
 trait MovementsXmlParsingService {
 
+  def extractData(messageType: MessageType, source: Source[ByteString, _]): EitherT[Future, ParseError, Option[ExtractedData]]
+
   def extractData(movementType: MovementType, source: Source[ByteString, _]): EitherT[Future, ParseError, ExtractedData]
 
   def extractDeclarationData(source: Source[ByteString, _]): EitherT[Future, ParseError, DeclarationData]
@@ -147,6 +149,13 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
         }
         .runWith(Sink.head[Either[ParseError, ArrivalData]])
     )
+
+  override def extractData(messageType: MessageType, source: Source[ByteString, _]): EitherT[Future, ParseError, Option[ExtractedData]] =
+    messageType match {
+      case MessageType.DeclarationData     => extractDeclarationData(source).widen[ExtractedData].map(Some.apply)
+      case MessageType.ArrivalNotification => extractArrivalData(source).widen[ExtractedData].map(Some.apply)
+      case _                               => EitherT.rightT(None)
+    }
 
   override def extractData(movementType: MovementType, source: Source[ByteString, _]): EitherT[Future, ParseError, ExtractedData] =
     movementType match {

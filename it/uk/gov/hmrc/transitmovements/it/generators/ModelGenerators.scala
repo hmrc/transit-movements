@@ -97,8 +97,9 @@ trait ModelGenerators extends BaseGenerators {
         triggerId   <- arbitrary[Option[MessageId]]
         url         <- arbitrary[Option[URI]]
         body        <- arbitrary[Option[String]]
+        size        <- Gen.chooseNum(1L, 250000L)
         status      <- Gen.oneOf(MessageStatus.statusValues)
-      } yield Message(id, received, generated, Some(messageType), triggerId, url, body, Some(status))
+      } yield Message(id, received, generated, Some(messageType), triggerId, url, body, Some(size), Some(status))
     }
 
   implicit lazy val arbitraryMovement: Arbitrary[Movement] =

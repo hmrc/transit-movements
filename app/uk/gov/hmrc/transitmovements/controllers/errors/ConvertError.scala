@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovements.controllers.errors
 import cats.data.EitherT
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
+import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError.FileNotFound
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -78,10 +79,28 @@ trait ConvertError {
     }
   }
 
-  implicit val headerExtractErrorConverter = new Converter[HeaderExtractError] {
-    import uk.gov.hmrc.transitmovements.controllers.errors.HeaderExtractError._
+  // Needed for the object store controller (pass by URL instead of header).
+  val objectStoreErrorWithNotFoundConverter = new Converter[ObjectStoreError] {
 
-    def convert(headerExtractError: HeaderExtractError): PresentationError = headerExtractError match {
+    override def convert(input: ObjectStoreError): PresentationError = input match {
+      case FileNotFound(fileLocation) => PresentationError.notFoundError(s"file not found at location: $fileLocation")
+      case x                          => objectStoreErrorConverter.convert(x)
+    }
+  }
+
+  // Needed for the message body controller
+  val objectStoreErrorWithInternalServiceErrorConverter = new Converter[ObjectStoreError] {
+
+    override def convert(input: ObjectStoreError): PresentationError = input match {
+      case FileNotFound(fileLocation) => PresentationError.internalServiceError(s"file not found at location: $fileLocation", cause = None)
+      case err                        => objectStoreErrorConverter.convert(err)
+    }
+  }
+
+  implicit val messageTypeExtractErrorConverter = new Converter[MessageTypeExtractError] {
+    import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError._
+
+    def convert(messageTypeExtractError: MessageTypeExtractError): PresentationError = messageTypeExtractError match {
       case NoHeaderFound(message)      => PresentationError.badRequestError(message)
       case InvalidMessageType(message) => PresentationError.badRequestError(message)
     }

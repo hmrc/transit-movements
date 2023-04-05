@@ -21,4 +21,6 @@ object Constants {
   val ObjectStoreURI = "X-Object-Store-Uri"
   val MessageType    = "X-Message-Type"
 
+  val ObjectStoreOwner = "common-transit-convention-traders"
+
 }

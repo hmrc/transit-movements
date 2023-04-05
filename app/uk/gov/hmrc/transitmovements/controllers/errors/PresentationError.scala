@@ -44,6 +44,9 @@ object PresentationError extends CommonFormats with Logging {
   def notFoundError(message: String): PresentationError =
     StandardError(message, ErrorCode.NotFound)
 
+  def conflictError(message: String): PresentationError =
+    StandardError(message, ErrorCode.Conflict)
+
   def upstreamServiceError(
     message: String = "Internal server error",
     code: ErrorCode = ErrorCode.InternalServerError,

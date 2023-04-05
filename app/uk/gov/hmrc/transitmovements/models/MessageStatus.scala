@@ -23,7 +23,7 @@ import play.api.libs.json.Json
 import play.api.libs.json.Reads
 import play.api.libs.json.Writes
 
-sealed trait MessageStatus
+sealed trait MessageStatus extends Product with Serializable
 
 object MessageStatus {
   final case object Received extends MessageStatus

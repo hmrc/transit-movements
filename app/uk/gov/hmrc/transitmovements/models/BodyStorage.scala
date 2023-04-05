@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.controllers.errors
+package uk.gov.hmrc.transitmovements.models
 
-sealed abstract class HeaderExtractError
+object BodyStorage {
+  def mongo(mongo: String) = new BodyStorage(Some(mongo), None)
 
-object HeaderExtractError {
-  case class NoHeaderFound(element: String)      extends HeaderExtractError
-  case class InvalidMessageType(element: String) extends HeaderExtractError
-
+  def objectStore(objectStoreURI: ObjectStoreURI) = new BodyStorage(None, Some(objectStoreURI))
 }
+
+case class BodyStorage private (mongo: Option[String], objectStore: Option[ObjectStoreURI])

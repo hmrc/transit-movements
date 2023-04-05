@@ -18,17 +18,17 @@ package uk.gov.hmrc.transitmovements.models
 
 import play.api.libs.json.Format
 import play.api.libs.json.Json
+import uk.gov.hmrc.transitmovements.config.Constants
 
 import scala.util.matching.Regex
 
 object ObjectStoreURI {
-  val expectedOwner = "common-transit-convention-traders"
 
   // The URI consists of the service name in the first part of the path, followed
   // by the location of the object in the context of that service. As this service
   // targets common-transit-convention-traders' objects exclusively, we ensure
   // the URI is targeting that context. This regex ensures that this is the case.
-  lazy val expectedUriPattern: Regex = s"^$expectedOwner/(.+)$$".r
+  lazy val expectedUriPattern: Regex = s"^${Constants.ObjectStoreOwner}/(.+)$$".r
 
   implicit val objectStoreURIformat: Format[ObjectStoreURI] = Json.valueFormat[ObjectStoreURI]
 }

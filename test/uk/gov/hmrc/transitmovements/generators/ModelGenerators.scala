@@ -31,6 +31,7 @@ import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
@@ -98,9 +99,10 @@ trait ModelGenerators extends BaseGenerators {
         messageType <- arbitrary[MessageType]
         triggerId   <- arbitrary[Option[MessageId]]
         url         <- arbitrary[Option[URI]]
+        size        <- Gen.chooseNum(1L, 250000L)
         body        <- arbitrary[Option[String]]
         status      <- Gen.oneOf(MessageStatus.statusValues)
-      } yield Message(id, received, generated, Some(messageType), triggerId, url, body, Some(status))
+      } yield Message(id, received, generated, Some(messageType), triggerId, url, body, Some(size), Some(status))
     }
 
   implicit lazy val arbitraryMovement: Arbitrary[Movement] =
@@ -121,16 +123,16 @@ trait ModelGenerators extends BaseGenerators {
       for {
         id             <- arbitrary[MessageId]
         offsetDateTime <- arbitrary[OffsetDateTime]
-        messageType    <- arbitrary[MessageType]
+        messageType    <- Gen.option(arbitrary[MessageType])
         status         <- Gen.oneOf(MessageStatus.statusValues)
-      } yield MessageResponse(id, offsetDateTime, Some(messageType), None, Some(status))
+      } yield MessageResponse(id, offsetDateTime, messageType, None, Some(status))
     }
 
   implicit lazy val arbitraryUpdateMessageMetadata: Arbitrary[UpdateMessageMetadata] =
     Arbitrary {
       for {
         status <- Gen.oneOf(MessageStatus.statusValues)
-      } yield UpdateMessageMetadata(None, status)
+      } yield UpdateMessageMetadata(None, status, None)
     }
 
   implicit lazy val arbitraryObjectSummaryWithMd5: Arbitrary[ObjectSummaryWithMd5] = Arbitrary {
@@ -152,5 +154,21 @@ trait ModelGenerators extends BaseGenerators {
   implicit lazy val arbitraryMessageStatus: Arbitrary[MessageStatus] =
     Arbitrary {
       Gen.oneOf(MessageStatus.statusValues)
+    }
+
+  lazy val dateTimeFormat = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+
+  private val objectStoreOwner = "common-transit-convention-traders"
+
+  def testObjectStoreURI(movementId: MovementId, messageId: MessageId, dateTime: OffsetDateTime): ObjectStoreURI =
+    ObjectStoreURI(s"$objectStoreOwner/movements/${movementId.value}/${movementId.value}-${messageId.value}-${dateTimeFormat.format(dateTime)}.xml")
+
+  implicit lazy val arbitraryObjectStoreURI: Arbitrary[ObjectStoreURI] =
+    Arbitrary {
+      for {
+        movementId <- arbitrary[MovementId]
+        messageId  <- arbitrary[MessageId]
+        dateTime   <- arbitrary[OffsetDateTime]
+      } yield testObjectStoreURI(movementId, messageId, dateTime)
     }
 }
