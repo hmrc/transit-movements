@@ -109,13 +109,6 @@ trait MovementsRepository {
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
-  def updateMessages(
-    movementId: MovementId,
-    message: Message,
-    mrn: Option[MovementReferenceNumber],
-    received: OffsetDateTime
-  ): EitherT[Future, MongoError, Unit]
-
   def updateMessage(
     movementId: MovementId,
     messageId: MessageId,
@@ -315,40 +308,6 @@ class MovementsRepositoryImpl @Inject() (
     }
 
   def attachMessage(
-    movementId: MovementId,
-    message: Message,
-    mrn: Option[MovementReferenceNumber],
-    received: OffsetDateTime
-  ): EitherT[Future, MongoError, Unit] = {
-
-    val filter: Bson = mEq(movementId)
-
-    val setUpdated   = mSet("updated", received)
-    val pushMessages = mPush("messages", message)
-
-    val combined = Seq(setUpdated, pushMessages) ++ mrn
-      .map(
-        x => Seq(mSet("movementReferenceNumber", x))
-      )
-      .getOrElse(Seq())
-
-    mongoRetry(Try(collection.updateOne(filter, mCombine(combined: _*))) match {
-      case Success(obs) =>
-        obs.toFuture().map {
-          result =>
-            if (result.wasAcknowledged()) {
-              if (result.getModifiedCount == 0) Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
-              else Right(())
-            } else {
-              Left(UpdateNotAcknowledged(s"Message update failed for movement: $movementId"))
-            }
-        }
-      case Failure(NonFatal(ex)) =>
-        Future.successful(Left(UnexpectedError(Some(ex))))
-    })
-  }
-
-  def updateMessages(
     movementId: MovementId,
     message: Message,
     mrn: Option[MovementReferenceNumber],

@@ -214,7 +214,7 @@ class MovementsController @Inject() (
           objectStoreURI,
           messageType.statusOnAttach
         )
-      _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
+      _ <- repo.attachMessage(movementId, message, messageData.mrn, received).asPresentation
     } yield message.id).fold[Result](
       baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
       id => Ok(Json.toJson(UpdateMovementResponse(id)))
@@ -241,7 +241,7 @@ class MovementsController @Inject() (
                 messageType.statusOnAttach
               )
               .asPresentation
-            _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
+            _ <- repo.attachMessage(movementId, message, messageData.mrn, received).asPresentation
           } yield message.id
         }.fold[Result](
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
