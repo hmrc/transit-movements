@@ -102,7 +102,7 @@ trait MovementsRepository {
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
-  def updateMessages(
+  def attachMessage(
     movementId: MovementId,
     message: Message,
     mrn: Option[MovementReferenceNumber],
@@ -307,7 +307,7 @@ class MovementsRepositoryImpl @Inject() (
       case _                  => empty()
     }
 
-  def updateMessages(
+  def attachMessage(
     movementId: MovementId,
     message: Message,
     mrn: Option[MovementReferenceNumber],

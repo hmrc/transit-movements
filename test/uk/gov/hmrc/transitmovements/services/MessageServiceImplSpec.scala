@@ -89,7 +89,7 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
 
         whenReady(result.value) {
           r =>
-            r mustBe Right(Message(messageId, instant, Some(instant), messageType, triggerId, None, Some("test"), Some(4), Some(Received)))
+            r mustBe Right(Message(messageId, instant, Some(instant), Some(messageType), triggerId, None, Some("test"), Some(4), Some(Received)))
 
             verify(objectStoreServiceMock, times(0)).putObjectStoreFile(MovementId(any()), MessageId(any()), any())(any(), any()) // must not be called at all
         }
@@ -120,7 +120,7 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
                 messageId,
                 instant,
                 Some(instant),
-                messageType,
+                Some(messageType),
                 triggerId,
                 Some(new URI(objectSummaryWithMd5.location.asUri)),
                 None,
@@ -199,7 +199,7 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
         val os     = testObjectStoreURI(movementId, messageId, instant)
         val result = sut.create(movementId, messageType, instant, instant, triggerId, os, messageStatus)
 
-        result mustBe Message(messageId, instant, Some(instant), messageType, triggerId, Some(new URI(os.value)), None, None, Some(messageStatus))
+        result mustBe Message(messageId, instant, Some(instant), Some(messageType), triggerId, Some(new URI(os.value)), None, None, Some(messageStatus))
 
     }
   }
@@ -218,8 +218,8 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
     }
 
     "will create a message without a body" in {
-      val result = sut.createEmptyMessage(MessageType.ArrivalNotification, instant)
-      result mustBe Message(messageId, instant, None, MessageType.ArrivalNotification, None, None, None, None, Some(Pending))
+      val result = sut.createEmptyMessage(Some(MessageType.ArrivalNotification), instant)
+      result mustBe Message(messageId, instant, None, Some(MessageType.ArrivalNotification), None, None, None, None, Some(Pending))
 
     }
 
