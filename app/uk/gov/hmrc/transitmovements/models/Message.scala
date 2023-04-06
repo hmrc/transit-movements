@@ -23,7 +23,7 @@ case class Message(
   id: MessageId,
   received: OffsetDateTime,
   generated: Option[OffsetDateTime],
-  messageType: MessageType,
+  messageType: Option[MessageType],
   triggerId: Option[MessageId],
   uri: Option[URI],
   body: Option[String],

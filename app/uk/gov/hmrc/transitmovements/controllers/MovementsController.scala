@@ -28,10 +28,12 @@ import play.api.libs.json.Reads
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
+import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
+import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
@@ -132,7 +134,8 @@ class MovementsController @Inject() (
         case MovementType.Arrival   => MessageType.ArrivalNotification
         case MovementType.Departure => MessageType.DeclarationData
       }
-      val message  = messageService.createEmptyMessage(messageType, received)
+
+      val message  = messageService.createEmptyMessage(Some(messageType), received)
       val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received)
 
       (for {
@@ -146,8 +149,16 @@ class MovementsController @Inject() (
   def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
     contentTypeRoute {
       case Some(_) => updateMovementWithStream(movementId, triggerId)
-      case None    => updateMovementWithObjectStoreURI(movementId, triggerId)
+      case None    => attachLargeMessage(movementId, triggerId)
     }
+
+  private def attachLargeMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[AnyContent] = Action.async(parse.anyContent) {
+    implicit request =>
+      request.headers.get(Constants.ObjectStoreURI).map(ObjectStoreURI.apply) match {
+        case Some(objectStoreURI) => updateMovementWithObjectStoreURI(movementId, objectStoreURI, triggerId)
+        case None                 => attachEmptyMessage(movementId)
+      }
+  }
 
   // PATCH methods for updating a specific message
 
@@ -230,32 +241,30 @@ class MovementsController @Inject() (
   }
 
   @nowarn // deprecation
-  private def updateMovementWithObjectStoreURI(movementId: MovementId, triggerId: Option[MessageId] = None): Action[AnyContent] =
-    Action.async(parse.anyContent) {
-      implicit request =>
-        (for {
-          messageType                 <- extract(request.headers).asPresentation
-          objectStoreURI              <- extractObjectStoreURI(request.headers)
-          objectStoreResourceLocation <- extractResourceLocation(objectStoreURI)
-          sourceFile                  <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
-          messageData                 <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
-          received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-          message = messageService
-            .create(
-              movementId,
-              messageType,
-              messageData.generationDate,
-              received,
-              triggerId,
-              objectStoreURI,
-              messageType.statusOnAttach
-            )
-          _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
-        } yield message.id).fold[Result](
-          baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-          id => Ok(Json.toJson(UpdateMovementResponse(id)))
+  private def updateMovementWithObjectStoreURI(movementId: MovementId, objectStoreURI: ObjectStoreURI, triggerId: Option[MessageId] = None)(implicit
+    request: Request[_]
+  ) =
+    (for {
+      messageType                 <- extract(request.headers).asPresentation
+      objectStoreResourceLocation <- extractResourceLocation(objectStoreURI)
+      sourceFile                  <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
+      messageData                 <- messagesXmlParsingService.extractMessageData(sourceFile, messageType).asPresentation
+      received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+      message = messageService
+        .create(
+          movementId,
+          messageType,
+          messageData.generationDate,
+          received,
+          triggerId,
+          objectStoreURI,
+          messageType.statusOnAttach
         )
-    }
+      _ <- repo.attachMessage(movementId, message, messageData.mrn, received).asPresentation
+    } yield message.id).fold[Result](
+      baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+      id => Ok(Json.toJson(UpdateMovementResponse(id)))
+    )
 
   private def updateMovementWithStream(movementId: MovementId, triggerId: Option[MessageId]): Action[Source[ByteString, _]] =
     Action.streamWithSize {
@@ -278,7 +287,7 @@ class MovementsController @Inject() (
                 messageType.statusOnAttach
               )
               .asPresentation
-            _ <- repo.updateMessages(movementId, message, messageData.mrn, received).asPresentation
+            _ <- repo.attachMessage(movementId, message, messageData.mrn, received).asPresentation
           } yield message.id
         }.fold[Result](
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
@@ -420,5 +429,20 @@ class MovementsController @Inject() (
         case (None, _) => Future.successful(Right((): Unit))
       }
     }
+
+  private def attachEmptyMessage(movementId: MovementId) = {
+    val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+
+    val message = messageService.createEmptyMessage(
+      None,
+      received
+    )
+    (for {
+      _ <- repo.attachMessage(movementId, message, None, received).asPresentation
+    } yield message).fold[Result](
+      baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+      message => Ok(Json.toJson(UpdateMovementResponse(message.id)))
+    )
+  }
 
 }

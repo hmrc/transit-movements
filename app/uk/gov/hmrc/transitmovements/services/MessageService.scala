@@ -71,7 +71,7 @@ trait MessageService {
   ): Message
 
   def createEmptyMessage(
-    messageType: MessageType,
+    messageType: Option[MessageType],
     received: OffsetDateTime
   ): Message
 
@@ -110,7 +110,7 @@ class MessageServiceImpl @Inject() (
           id = messageId,
           received = received,
           generated = Some(generationDate),
-          messageType = messageType,
+          messageType = Some(messageType),
           triggerId = triggerId,
           uri = bodyStorage.objectStore.map(
             x => new URI(x.value)
@@ -135,7 +135,7 @@ class MessageServiceImpl @Inject() (
       id = generateId(),
       received = received,
       generated = Some(generationDate),
-      messageType = messageType,
+      messageType = Some(messageType),
       triggerId = triggerId,
       uri = Some(new URI(objectStoreURI.value)),
       body = None,
@@ -143,7 +143,10 @@ class MessageServiceImpl @Inject() (
       status = Some(status)
     )
 
-  override def createEmptyMessage(messageType: MessageType, received: OffsetDateTime): Message =
+  def createEmptyMessage(
+    messageType: Option[MessageType],
+    received: OffsetDateTime
+  ): Message =
     Message(
       id = generateId(),
       received = received,

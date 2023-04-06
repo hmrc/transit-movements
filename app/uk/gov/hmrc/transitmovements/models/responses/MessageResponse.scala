@@ -49,7 +49,7 @@ object MessageResponse {
     MessageResponse(
       message.id,
       message.received,
-      Some(message.messageType),
+      message.messageType,
       message.body,
       message.status,
       None
@@ -59,7 +59,7 @@ object MessageResponse {
     MessageResponse(
       message.id,
       message.received,
-      Some(message.messageType),
+      message.messageType,
       None,
       message.status,
       message.uri
