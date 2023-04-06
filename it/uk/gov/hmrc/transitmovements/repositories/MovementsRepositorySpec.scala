@@ -729,7 +729,7 @@ class MovementsRepositorySpec
   "updateMessage" should "update the existing message with status, object store url, size, messageType and generationDate" in {
 
     val message1 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = MessageType.DeclarationData, triggerId = None, status = Some(MessageStatus.Pending))
+      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
 
     val departureMovement =
       arbitrary[Movement].sample.value
@@ -769,7 +769,7 @@ class MovementsRepositorySpec
         val message = movement.messages.head
         message.status shouldBe Some(message2.status)
         message.uri.value.toString shouldBe message2.objectStoreURI.get.value
-        message.messageType.code shouldBe message2.messageType.get.code
+        message.messageType.get.code shouldBe message2.messageType.get.code
         message.size shouldBe Some(4L)
         message.generated shouldBe Some(now)
     }

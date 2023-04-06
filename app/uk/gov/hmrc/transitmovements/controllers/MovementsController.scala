@@ -152,7 +152,7 @@ class MovementsController @Inject() (
       case None    => attachLargeMessage(movementId, triggerId)
     }
 
-  private def attachLargeMessage(movementId: MovementId, triggerId: Option[MessageId] = None): Action[AnyContent] = Action.async(parse.anyContent) {
+  private def attachLargeMessage(movementId: MovementId, triggerId: Option[MessageId]): Action[AnyContent] = Action.async(parse.anyContent) {
     implicit request =>
       request.headers.get(Constants.ObjectStoreURI).map(ObjectStoreURI.apply) match {
         case Some(objectStoreURI) => updateMovementWithObjectStoreURI(movementId, objectStoreURI, triggerId)
