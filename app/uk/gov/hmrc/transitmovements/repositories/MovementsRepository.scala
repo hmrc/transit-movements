@@ -359,7 +359,8 @@ class MovementsRepositoryImpl @Inject() (
       createSet("messages.$[element].uri", message.objectStoreURI.map(_.value)) ++
       createSet("messages.$[element].body", message.body) ++
       createSet("messages.$[element].size", message.size) ++
-      createSet("messages.$[element].messageType", message.messageType.map(_.code))
+      createSet("messages.$[element].messageType", message.messageType.map(_.code)) ++
+      createSet("messages.$[element].generated", message.generationDate)
 
     executeUpdate(movementId, filter, combined, arrayFilters)
   }

@@ -545,7 +545,7 @@ class MessageBodyControllerSpec
           movementsRepository.updateMessage(
             MovementId(eqTo(movementId.value)),
             MessageId(eqTo(messageId.value)),
-            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType))),
+            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
             eqTo(now)
           )
         ).thenReturn(EitherT.rightT((): Unit))
@@ -610,7 +610,7 @@ class MessageBodyControllerSpec
           movementsRepository.updateMessage(
             MovementId(eqTo(movementId.value)),
             MessageId(eqTo(messageId.value)),
-            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType))),
+            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
             eqTo(now)
           )
         ).thenReturn(EitherT.rightT((): Unit))
@@ -675,7 +675,7 @@ class MessageBodyControllerSpec
           movementsRepository.updateMessage(
             MovementId(eqTo(movementId.value)),
             MessageId(eqTo(messageId.value)),
-            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType))),
+            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
             eqTo(now)
           )
         ).thenReturn(EitherT.rightT((): Unit))
@@ -741,7 +741,7 @@ class MessageBodyControllerSpec
           movementsRepository.updateMessage(
             MovementId(eqTo(movementId.value)),
             MessageId(eqTo(messageId.value)),
-            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType))),
+            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
             eqTo(now)
           )
         ).thenReturn(EitherT.rightT((): Unit))
@@ -1142,7 +1142,7 @@ class MessageBodyControllerSpec
           movementsRepository.updateMessage(
             MovementId(eqTo(movementId.value)),
             MessageId(eqTo(messageId.value)),
-            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType))),
+            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
             eqTo(now)
           )
         ).thenReturn(EitherT.leftT(MongoError.UnexpectedError(None)))
@@ -1205,7 +1205,7 @@ class MessageBodyControllerSpec
           movementsRepository.updateMessage(
             MovementId(eqTo(movementId.value)),
             MessageId(eqTo(messageId.value)),
-            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType))),
+            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
             eqTo(now)
           )
         ).thenReturn(EitherT.rightT((): Unit))

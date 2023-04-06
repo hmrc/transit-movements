@@ -101,7 +101,14 @@ class MessageBodyController @Inject() (
             .updateMessage(
               movementId,
               messageId,
-              UpdateMessageData(bodyStorage.objectStore, bodyStorage.mongo, Some(size), messageType.statusOnAttach, Some(messageType)),
+              UpdateMessageData(
+                bodyStorage.objectStore,
+                bodyStorage.mongo,
+                Some(size),
+                messageType.statusOnAttach,
+                Some(messageType),
+                Some(messageData.generationDate)
+              ),
               received
             )
             .asPresentation

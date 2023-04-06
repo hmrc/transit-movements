@@ -22,11 +22,14 @@ import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 
+import java.time.OffsetDateTime
+
 case class UpdateMessageDataMatcher(
   objectStoreURI: Option[ObjectStoreURI] = None,
   body: Option[String] = None,
   status: MessageStatus,
   messageType: Option[MessageType] = None,
+  generationDate: Option[OffsetDateTime] = None,
   expectSize: Boolean = true
 ) extends ArgumentMatcher[UpdateMessageData] {
 
@@ -36,5 +39,6 @@ case class UpdateMessageDataMatcher(
       argument.messageType == messageType &&
       argument.status == status &&
       argument.objectStoreURI == objectStoreURI &&
+      argument.generationDate == generationDate &&
       argument.size.isDefined == expectSize
 }

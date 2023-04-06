@@ -37,6 +37,7 @@ import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class MovementsRepositorySpec
@@ -722,6 +723,55 @@ class MovementsRepositorySpec
         message.uri.value.toString shouldBe message2.objectStoreURI.get.value
         message.messageType.get.code shouldBe message2.messageType.get.code
         message.size shouldBe Some(4L)
+    }
+  }
+
+  "updateMessage" should "update the existing message with status, object store url, size, messageType and generationDate" in {
+
+    val message1 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
+
+    val departureMovement =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(message1)
+        )
+
+    await(
+      repository.insert(departureMovement).value
+    )
+
+    val now = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS)
+
+    val message2 = UpdateMessageData(
+      objectStoreURI = Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")),
+      status = MessageStatus.Success,
+      size = Option(4L),
+      messageType = Some(MessageType.DeclarationAmendment),
+      generationDate = Some(now)
+    )
+
+    val result = await(
+      repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
+    )
+
+    result should be(Right(()))
+
+    whenReady(
+      repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
+    ) {
+      movement =>
+        movement.updated shouldEqual receivedInstant
+        movement.messages.length should be(1)
+
+        val message = movement.messages.head
+        message.status shouldBe Some(message2.status)
+        message.uri.value.toString shouldBe message2.objectStoreURI.get.value
+        message.messageType.get.code shouldBe message2.messageType.get.code
+        message.size shouldBe Some(4L)
+        message.generated shouldBe Some(now)
     }
   }
 
