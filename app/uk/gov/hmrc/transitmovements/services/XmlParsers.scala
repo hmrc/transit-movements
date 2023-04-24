@@ -38,12 +38,7 @@ object XmlParsers extends XmlParsingServiceHelpers {
       .collect {
         case element if element.getTextContent.nonEmpty => EORINumber(element.getTextContent)
       }
-      .single("identificationNumber")
-      .map {
-        case Left(parseError) if parseError.isInstanceOf[ParseError.NoElementFound] => Right(None)
-        case Left(error)                                                            => Left(error)
-        case Right(eori)                                                            => Right(Some(eori))
-      }
+      .singleOption("identificationNumber")
 
   def preparationDateTimeExtractor(messageType: MessageType): Flow[ParseEvent, ParseResult[OffsetDateTime], NotUsed] = XmlParsing
     .subtree(messageType.rootNode :: "preparationDateAndTime" :: Nil)
