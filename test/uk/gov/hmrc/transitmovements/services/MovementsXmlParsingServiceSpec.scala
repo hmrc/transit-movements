@@ -158,7 +158,7 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val result = service.extractData(MovementType.Departure, source)
 
       whenReady(result.value) {
-        _ mustBe Right(DeclarationData(EORINumber("GB1234"), testDate))
+        _ mustBe Right(DeclarationData(Some(EORINumber("GB1234")), testDate))
       }
     }
 
@@ -168,7 +168,7 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val result = service.extractData(MovementType.Arrival, source)
 
       whenReady(result.value) {
-        _ mustBe Right(ArrivalData(EORINumber("GB1234"), testDate, MovementReferenceNumber("token")))
+        _ mustBe Right(ArrivalData(Some(EORINumber("GB1234")), testDate, MovementReferenceNumber("token")))
       }
     }
   }
@@ -182,17 +182,17 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        _ mustBe Right(DeclarationData(EORINumber("GB1234"), testDate))
+        _ mustBe Right(DeclarationData(Some(EORINumber("GB1234")), testDate))
       }
     }
 
-    "if it doesn't have a identificationNumber, return ParseError.NoElementFound for the message sender" in {
-      val source = createStream(noSenderForArrivalData)
+    "if it doesn't have a identificationNumber, return Right of DeclarationData with movementEoriNumber set to None" in {
+      val source = createStream(noSenderForDeclarationData)
 
-      val result = service.extractArrivalData(source)
+      val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        _ mustBe Left(ParseError.NoElementFound("identificationNumber"))
+        _ mustBe Right(DeclarationData(None, testDate))
       }
     }
 
@@ -288,17 +288,17 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val result = service.extractArrivalData(source)
 
       whenReady(result.value) {
-        _ mustBe Right(ArrivalData(EORINumber("GB1234"), testDate, MovementReferenceNumber("token")))
+        _ mustBe Right(ArrivalData(Some(EORINumber("GB1234")), testDate, MovementReferenceNumber("token")))
       }
     }
 
-    "if it doesn't have a identificationNumber, return ParseError.NoElementFound for the message sender" in {
+    "if it doesn't have a identificationNumber, return Right of ArrivalData with movementEoriNumber set to None" in {
       val source = createStream(noSenderForArrivalData)
 
       val result = service.extractArrivalData(source)
 
       whenReady(result.value) {
-        _ mustBe Left(ParseError.NoElementFound("identificationNumber"))
+        _ mustBe Right(ArrivalData(None, testDate, MovementReferenceNumber("token")))
       }
     }
 

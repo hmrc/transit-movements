@@ -359,7 +359,7 @@ class MovementsController @Inject() (
                   .filterNot(
                     _ => hasEoriAlready
                   )
-                  .map(_.movementEoriNumber),
+                  .flatMap(_.movementEoriNumber),
                 extractedData.flatMap(_.movementReferenceNumber),
                 received
               )

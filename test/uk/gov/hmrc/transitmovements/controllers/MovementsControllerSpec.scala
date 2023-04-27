@@ -206,7 +206,7 @@ class MovementsControllerSpec
 
     val validXmlStream: Source[ByteString, _] = Source.single(ByteString(validXml.mkString))
 
-    lazy val declarationData = DeclarationData(eoriNumber, OffsetDateTime.now(ZoneId.of("UTC")))
+    lazy val declarationData = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")))
 
     lazy val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
       EitherT.rightT(declarationData)
@@ -438,7 +438,7 @@ class MovementsControllerSpec
 
     val validXmlStream = Source.single(ByteString(validXml.mkString))
 
-    lazy val arrivalData = ArrivalData(eoriNumber, OffsetDateTime.now(ZoneId.of("UTC")), mrn)
+    lazy val arrivalData = ArrivalData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), mrn)
 
     lazy val arrivalDataEither: EitherT[Future, ParseError, ArrivalData] =
       EitherT.rightT(arrivalData)
@@ -1322,7 +1322,7 @@ class MovementsControllerSpec
             when(
               mockMovementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]])
             )
-              .thenReturn(EitherT.rightT(Some(DeclarationData(eori, OffsetDateTime.now(clock)))))
+              .thenReturn(EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock)))))
 
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
@@ -1412,7 +1412,7 @@ class MovementsControllerSpec
             when(
               mockMovementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]])
             )
-              .thenReturn(EitherT.rightT(Some(ArrivalData(eori, OffsetDateTime.now(clock), mrn))))
+              .thenReturn(EitherT.rightT(Some(ArrivalData(Some(eori), OffsetDateTime.now(clock), mrn))))
 
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))
@@ -1517,7 +1517,7 @@ class MovementsControllerSpec
             when(
               mockMovementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]])
             )
-              .thenReturn(EitherT.rightT(Some(DeclarationData(eori, OffsetDateTime.now(clock)))))
+              .thenReturn(EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock)))))
 
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
@@ -1592,7 +1592,7 @@ class MovementsControllerSpec
             when(
               mockMovementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]])
             )
-              .thenReturn(EitherT.rightT(Some(DeclarationData(eori, OffsetDateTime.now(clock)))))
+              .thenReturn(EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock)))))
 
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))
@@ -1786,7 +1786,7 @@ class MovementsControllerSpec
             when(
               mockMovementsXmlParsingService.extractData(eqTo(MovementType.Departure), any[Source[ByteString, _]])
             )
-              .thenReturn(EitherT.rightT(DeclarationData(eori, OffsetDateTime.now(clock))))
+              .thenReturn(EitherT.rightT(DeclarationData(Some(eori), OffsetDateTime.now(clock))))
 
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(MessageType.DeclarationData)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))
@@ -1937,7 +1937,7 @@ class MovementsControllerSpec
           when(
             mockMovementsXmlParsingService.extractData(eqTo(MovementType.Departure), any[Source[ByteString, _]])
           )
-            .thenReturn(EitherT.rightT(DeclarationData(eori, OffsetDateTime.now(clock))))
+            .thenReturn(EitherT.rightT(DeclarationData(Some(eori), OffsetDateTime.now(clock))))
 
           when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(MessageType.DeclarationData)))
             .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))

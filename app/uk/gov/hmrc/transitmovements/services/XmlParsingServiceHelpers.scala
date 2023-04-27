@@ -35,6 +35,15 @@ trait XmlParsingServiceHelpers {
             case _                                  => Left(ParseError.TooManyElementsFound(element))
           }
       )
+
+    def singleOption(element: String): Flow[ParseEvent, ParseResult[Option[A]], NotUsed] =
+      value.fold[Either[ParseError, Option[A]]](Right(None))(
+        (current, next) =>
+          current match {
+            case Right(None) => Right(Some(next))
+            case _           => Left(ParseError.TooManyElementsFound(element))
+          }
+      )
   }
 
 }

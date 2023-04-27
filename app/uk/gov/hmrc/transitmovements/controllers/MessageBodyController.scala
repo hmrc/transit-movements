@@ -148,7 +148,7 @@ class MessageBodyController @Inject() (
     repo
       .updateMovement(
         movementId,
-        extractedData.map(_.movementEoriNumber),
+        extractedData.flatMap(_.movementEoriNumber),
         extractedData.flatMap(_.movementReferenceNumber).orElse(messageData.mrn),
         received
       )

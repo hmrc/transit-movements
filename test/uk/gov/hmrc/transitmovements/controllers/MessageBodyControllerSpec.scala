@@ -587,7 +587,7 @@ class MessageBodyControllerSpec
           .thenReturn(EitherT.rightT(MessageData(now, None)))
 
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(Some(ArrivalData(movementEori, nowMinusOne, movementReferenceNumber))))
+          .thenReturn(EitherT.rightT(Some(ArrivalData(Some(movementEori), nowMinusOne, movementReferenceNumber))))
 
         when(
           messageService
@@ -650,7 +650,7 @@ class MessageBodyControllerSpec
           .thenReturn(EitherT.rightT(MessageData(now, None)))
 
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(Some(DeclarationData(movementEori, nowMinusOne))))
+          .thenReturn(EitherT.rightT(Some(DeclarationData(Some(movementEori), nowMinusOne))))
 
         when(
           messageService
@@ -714,7 +714,7 @@ class MessageBodyControllerSpec
           .thenReturn(EitherT.rightT(MessageData(now, Some(movementReferenceNumber))))
 
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(Some(DeclarationData(movementEori, nowMinusOne))))
+          .thenReturn(EitherT.rightT(Some(DeclarationData(Some(movementEori), nowMinusOne))))
 
         when(
           messageService
@@ -1049,7 +1049,7 @@ class MessageBodyControllerSpec
           .thenReturn(EitherT.rightT(MessageData(now, Some(movementReferenceNumber))))
 
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(Some(DeclarationData(movementEori, nowMinusOne))))
+          .thenReturn(EitherT.rightT(Some(DeclarationData(Some(movementEori), nowMinusOne))))
 
         when(
           messageService
@@ -1101,7 +1101,7 @@ class MessageBodyControllerSpec
           .thenReturn(EitherT.rightT(MessageData(now, Some(movementReferenceNumber))))
 
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(Some(DeclarationData(movementEori, nowMinusOne))))
+          .thenReturn(EitherT.rightT(Some(DeclarationData(Some(movementEori), nowMinusOne))))
 
         when(
           messageService

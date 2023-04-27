@@ -17,6 +17,9 @@
 package uk.gov.hmrc.transitmovements.repositories
 
 import org.mongodb.scala.model.Filters
+import org.mongodb.scala.model.IndexModel
+import org.mongodb.scala.model.IndexOptions
+import org.mongodb.scala.model.Indexes
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
@@ -32,12 +35,14 @@ import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
+import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.TimeUnit
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class MovementsRepositorySpec
@@ -67,6 +72,16 @@ class MovementsRepositorySpec
 
   "DepartureMovementRepository" should "have the correct name" in {
     repository.collectionName shouldBe "movements"
+  }
+
+  "DepartureMovementRepository" should "have the correct column associated with the expected TTL" in {
+    repository.indexes.head.getKeys shouldEqual Indexes.ascending("updated")
+
+    repository.indexes.head.getOptions.getExpireAfter(TimeUnit.SECONDS) shouldEqual appConfig.documentTtl
+  }
+
+  "DepartureMovementRepository" should "have the correct domain format" in {
+    repository.domainFormat shouldEqual MongoFormats.movementFormat
   }
 
   "insert" should "add the given movement to the database" in {

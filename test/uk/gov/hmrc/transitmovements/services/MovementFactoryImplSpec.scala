@@ -58,7 +58,7 @@ class MovementFactoryImplSpec
     "will create a departure with a message" in forAll(arbitrary[EORINumber], arbitrary[EORINumber], arbitrary[Message]) {
       (enrollmentEori, movementEori, message) =>
         val departure =
-          sut.createDeparture(movementId, enrollmentEori, MovementType.Departure, DeclarationData(movementEori, instant), message, instant, instant)
+          sut.createDeparture(movementId, enrollmentEori, MovementType.Departure, DeclarationData(Some(movementEori), instant), message, instant, instant)
 
         departure.messages.length mustBe 1
         departure.movementReferenceNumber mustBe None
@@ -74,7 +74,7 @@ class MovementFactoryImplSpec
     "will create a arrival with a message" in forAll(arbitrary[MovementReferenceNumber], arbitrary[EORINumber], arbitrary[EORINumber], arbitrary[Message]) {
       (mrn, enrollmentEori, movementEori, message) =>
         val arrival =
-          sut.createArrival(movementId, enrollmentEori, MovementType.Arrival, ArrivalData(movementEori, instant, mrn), message, instant, instant)
+          sut.createArrival(movementId, enrollmentEori, MovementType.Arrival, ArrivalData(Some(movementEori), instant, mrn), message, instant, instant)
 
         arrival.messages.length mustBe 1
         arrival.movementReferenceNumber mustBe Some(mrn)
