@@ -186,11 +186,10 @@ class MovementsRepositoryImpl @Inject() (
     mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
       case Success(obs) =>
         obs
-          .head()
+          .headOption()
           .map {
-            opt =>
-              if (opt != null) Right(opt)
-              else Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+            case Some(opt) => Right(opt)
+            case None      => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
@@ -254,10 +253,9 @@ class MovementsRepositoryImpl @Inject() (
 
     mongoRetry(Try(collection.aggregate[MessageResponse](aggregates)) match {
       case Success(obs) =>
-        obs.head().map {
-          opt =>
-            if (opt != null) Right(opt)
-            else Left(DocumentNotFound(s"Message ID ${messageId.value} for movement ID ${movementId.value} was not found"))
+        obs.headOption().map {
+          case Some(opt) => Right(opt)
+          case None      => Left(DocumentNotFound(s"Message ID ${messageId.value} for movement ID ${movementId.value} was not found"))
         }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
