@@ -43,7 +43,6 @@ import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.requests.UpdateStatus
-import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
@@ -181,8 +180,7 @@ class MovementsController @Inject() (
   def updateMessage(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[JsValue] = {
     def updateMessageMetadataOnly(status: MessageStatus, messageType: Option[MessageType], received: OffsetDateTime) =
       for {
-        maybeMovementToUpdate <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
-        _                     <- ensureMovement(maybeMovementToUpdate, movementId)
+        _ <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
         _ <- repo
           .updateMessage(movementId, messageId, UpdateMessageData(status = status, messageType = messageType), received)
           .asPresentation
@@ -200,13 +198,9 @@ class MovementsController @Inject() (
       hc: HeaderCarrier
     ) =
       for {
-        maybeMovementToUpdate <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
-        movement              <- ensureMovement(maybeMovementToUpdate, movementId)
-        message <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation.flatMap {
-          case Some(x) => EitherT.rightT[Future, PresentationError](x)
-          case None    => EitherT.leftT[Future, MessageResponse](PresentationError.notFoundError("Message does not exist"))
-        }
-        _ <- verifyMessageType(messageType, message.messageType)
+        movement <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
+        message  <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
+        _        <- verifyMessageType(messageType, message.messageType)
         generatedDate <- updateMetadataIfRequired(
           movementId,
           message.messageType.getOrElse(messageType),
@@ -314,13 +308,7 @@ class MovementsController @Inject() (
     repo
       .getMovementWithoutMessages(eoriNumber, movementId, movementType)
       .asPresentation
-      .fold[Result](
-        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        {
-          case Some(arrivalWithoutMessages) => Ok(Json.toJson(arrivalWithoutMessages))
-          case None                         => NotFound
-        }
-      )
+      .fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), arrivalWithoutMessages => Ok(Json.toJson(arrivalWithoutMessages)))
   }
 
   def getMessage(eoriNumber: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[AnyContent] = Action.async {
@@ -329,10 +317,7 @@ class MovementsController @Inject() (
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        {
-          case Some(message) => Ok(Json.toJson(message))
-          case None          => NotFound
-        }
+        message => Ok(Json.toJson(message))
       )
   }
 
@@ -351,11 +336,6 @@ class MovementsController @Inject() (
           messages => if (messages.isEmpty) NotFound else Ok(Json.toJson(messages))
         )
     }
-
-  private def ensureMovement(movement: Option[MovementWithoutMessages], movementId: MovementId): EitherT[Future, PresentationError, MovementWithoutMessages] =
-    EitherT(
-      Future.successful(movement.map(Right.apply).getOrElse(Left(PresentationError.notFoundError(s"Movement with ID ${movementId.value} was not found"))))
-    )
 
   // Large Messages: Only perform this step if we haven't updated the movement EORI and we have an Object Store reference
   private def updateMetadataIfRequired(

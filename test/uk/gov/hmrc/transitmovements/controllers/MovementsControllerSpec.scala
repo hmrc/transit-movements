@@ -721,7 +721,7 @@ class MovementsControllerSpec
 
         "must return OK if departure found" in {
           when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
-            .thenReturn(EitherT.rightT(Some(MovementWithoutMessages.fromMovement(movement))))
+            .thenReturn(EitherT.rightT(MovementWithoutMessages.fromMovement(movement)))
 
           val result = controller.getMovementWithoutMessages(eoriNumber, movementType, movementId)(request)
 
@@ -731,7 +731,7 @@ class MovementsControllerSpec
 
         "must return NOT_FOUND if no departure found" in {
           when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
-            .thenReturn(EitherT.rightT(None))
+            .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
           val result = controller.getMovementWithoutMessages(eoriNumber, movementType, movementId)(request)
 
@@ -755,7 +755,7 @@ class MovementsControllerSpec
           val messageResponse = MessageResponse.fromMessageWithBody(movement.messages.head)
 
           when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
-            .thenReturn(EitherT.rightT(Some(messageResponse)))
+            .thenReturn(EitherT.rightT(messageResponse))
 
           val result = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
 
@@ -767,7 +767,7 @@ class MovementsControllerSpec
           val messageResponse = MessageResponse.fromMessageWithoutBody(movement.messages.head)
 
           when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
-            .thenReturn(EitherT.rightT(Some(messageResponse)))
+            .thenReturn(EitherT.rightT(messageResponse))
 
           val result = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
 
@@ -777,7 +777,7 @@ class MovementsControllerSpec
 
         "must return NOT_FOUND if no message found" in {
           when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
-            .thenReturn(EitherT.rightT(None))
+            .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
           val result = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
 
@@ -1301,7 +1301,7 @@ class MovementsControllerSpec
             when(
               mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
             )
-              .thenReturn(EitherT.rightT(Some(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))))
+              .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
             when(
               mockRepository.getSingleMessage(
@@ -1311,7 +1311,7 @@ class MovementsControllerSpec
                 eqTo(MovementType.Departure)
               )
             )
-              .thenReturn(EitherT.rightT(Some(MessageResponse(messageId, now, None, None, Some(MessageStatus.Pending), None))))
+              .thenReturn(EitherT.rightT(MessageResponse(messageId, now, None, None, Some(MessageStatus.Pending), None)))
 
             when(
               mockObjectStoreService
@@ -1391,7 +1391,7 @@ class MovementsControllerSpec
             when(
               mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Arrival))
             )
-              .thenReturn(EitherT.rightT(Some(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))))
+              .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
             when(
               mockRepository.getSingleMessage(
@@ -1401,7 +1401,7 @@ class MovementsControllerSpec
                 eqTo(MovementType.Arrival)
               )
             )
-              .thenReturn(EitherT.rightT(Some(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None))))
+              .thenReturn(EitherT.rightT(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None)))
 
             when(
               mockObjectStoreService
@@ -1485,7 +1485,7 @@ class MovementsControllerSpec
               mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
             )
               .thenReturn(
-                EitherT.rightT(Some(MovementWithoutMessages(movementId, eori, Some(eori), None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+                EitherT.rightT(MovementWithoutMessages(movementId, eori, Some(eori), None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))
               )
 
             when(
@@ -1502,7 +1502,7 @@ class MovementsControllerSpec
                 eqTo(movementType)
               )
             )
-              .thenReturn(EitherT.rightT(Some(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None))))
+              .thenReturn(EitherT.rightT(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None)))
 
             when(
               mockRepository.updateMessage(
@@ -1571,7 +1571,7 @@ class MovementsControllerSpec
             when(
               mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
             )
-              .thenReturn(EitherT.rightT(Some(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))))
+              .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
             when(
               mockRepository.getSingleMessage(
@@ -1581,7 +1581,7 @@ class MovementsControllerSpec
                 eqTo(movementType)
               )
             )
-              .thenReturn(EitherT.rightT(Some(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None))))
+              .thenReturn(EitherT.rightT(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None)))
 
             when(
               mockObjectStoreService
@@ -1657,7 +1657,7 @@ class MovementsControllerSpec
             mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
             .thenReturn(
-              EitherT.rightT(Some(MovementWithoutMessages(movementId, eori, Some(eori), None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+              EitherT.rightT(MovementWithoutMessages(movementId, eori, Some(eori), None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))
             )
 
           when(
@@ -1668,7 +1668,7 @@ class MovementsControllerSpec
               eqTo(movementType)
             )
           )
-            .thenReturn(EitherT.rightT(Some(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None))))
+            .thenReturn(EitherT.rightT(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None)))
 
           when(
             mockRepository.updateMessage(
@@ -1771,7 +1771,7 @@ class MovementsControllerSpec
             when(
               mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
             )
-              .thenReturn(EitherT.rightT(Some(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))))
+              .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
             when(
               mockRepository.getSingleMessage(
@@ -1781,7 +1781,7 @@ class MovementsControllerSpec
                 eqTo(movementType)
               )
             )
-              .thenReturn(EitherT.rightT(Some(MessageResponse(messageId, now, None, None, Some(MessageStatus.Pending), None))))
+              .thenReturn(EitherT.rightT(MessageResponse(messageId, now, None, None, Some(MessageStatus.Pending), None)))
 
             when(
               mockMovementsXmlParsingService.extractData(eqTo(MovementType.Departure), any[Source[ByteString, _]])
@@ -1837,7 +1837,7 @@ class MovementsControllerSpec
             when(
               mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Arrival))
             )
-              .thenReturn(EitherT.rightT(Some(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))))
+              .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
             when(
               mockRepository.getSingleMessage(
@@ -1847,7 +1847,7 @@ class MovementsControllerSpec
                 eqTo(movementType)
               )
             )
-              .thenReturn(EitherT.rightT(Some(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None))))
+              .thenReturn(EitherT.rightT(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None)))
 
             when(
               mockRepository.updateMessage(
@@ -1922,7 +1922,7 @@ class MovementsControllerSpec
           when(
             mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
           )
-            .thenReturn(EitherT.rightT(Some(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))))
+            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
           when(
             mockRepository.getSingleMessage(
@@ -1932,7 +1932,7 @@ class MovementsControllerSpec
               eqTo(movementType)
             )
           )
-            .thenReturn(EitherT.rightT(Some(MessageResponse(messageId, now, Some(MessageType.ArrivalNotification), None, Some(MessageStatus.Pending), None))))
+            .thenReturn(EitherT.rightT(MessageResponse(messageId, now, Some(MessageType.ArrivalNotification), None, Some(MessageStatus.Pending), None)))
 
           when(
             mockMovementsXmlParsingService.extractData(eqTo(MovementType.Departure), any[Source[ByteString, _]])

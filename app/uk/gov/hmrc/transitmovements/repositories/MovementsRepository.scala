@@ -72,14 +72,14 @@ trait MovementsRepository {
     eoriNumber: EORINumber,
     movementId: MovementId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, Option[MovementWithoutMessages]]
+  ): EitherT[Future, MongoError, MovementWithoutMessages]
 
   def getSingleMessage(
     eoriNumber: EORINumber,
     movementId: MovementId,
     messageId: MessageId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, Option[MessageResponse]]
+  ): EitherT[Future, MongoError, MessageResponse]
 
   def getMessages(
     eoriNumber: EORINumber,
@@ -169,7 +169,7 @@ class MovementsRepositoryImpl @Inject() (
     eoriNumber: EORINumber,
     movementId: MovementId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, Option[MovementWithoutMessages]] = {
+  ): EitherT[Future, MongoError, MovementWithoutMessages] = {
 
     val selector = mAnd(
       mEq("_id", movementId.value),
@@ -185,9 +185,13 @@ class MovementsRepositoryImpl @Inject() (
 
     mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
       case Success(obs) =>
-        obs.headOption().map {
-          opt => Right(opt)
-        }
+        obs
+          .head()
+          .map {
+            opt =>
+              if (opt != null) Right(opt)
+              else Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+          }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
@@ -236,7 +240,7 @@ class MovementsRepositoryImpl @Inject() (
     movementId: MovementId,
     messageId: MessageId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, Option[MessageResponse]] = {
+  ): EitherT[Future, MongoError, MessageResponse] = {
 
     val selector = mAnd(
       mEq("_id", movementId.value),
@@ -250,8 +254,10 @@ class MovementsRepositoryImpl @Inject() (
 
     mongoRetry(Try(collection.aggregate[MessageResponse](aggregates)) match {
       case Success(obs) =>
-        obs.headOption().map {
-          opt => Right(opt)
+        obs.head().map {
+          opt =>
+            if (opt != null) Right(opt)
+            else Left(DocumentNotFound(s"Message ID ${messageId.value} for movement ID ${movementId.value} was not found"))
         }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))

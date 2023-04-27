@@ -121,16 +121,14 @@ class MessageBodyControllerSpec
           .sample
           .get
         val mockMovementsRepo = mock[MovementsRepository]
-        val expectedResponse: EitherT[Future, MongoError, Option[MessageResponse]] = EitherT.rightT[Future, MongoError](
-          Some(
-            MessageResponse(
-              messageId,
-              now,
-              Some(messageType),
-              Some(xml),
-              Some(MessageStatus.Success),
-              None
-            )
+        val expectedResponse: EitherT[Future, MongoError, MessageResponse] = EitherT.rightT[Future, MongoError](
+          MessageResponse(
+            messageId,
+            now,
+            Some(messageType),
+            Some(xml),
+            Some(MessageStatus.Success),
+            None
           )
         )
         when(
@@ -200,17 +198,15 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT(
-              Future.successful[Either[MongoError, Option[MessageResponse]]](
+              Future.successful[Either[MongoError, MessageResponse]](
                 Right(
-                  Some(
-                    MessageResponse(
-                      messageId,
-                      now,
-                      Some(messageType),
-                      None,
-                      Some(MessageStatus.Success),
-                      Some(new URI(objectStoreUri.value))
-                    )
+                  MessageResponse(
+                    messageId,
+                    now,
+                    Some(messageType),
+                    None,
+                    Some(MessageStatus.Success),
+                    Some(new URI(objectStoreUri.value))
                   )
                 )
               )
@@ -269,15 +265,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT[Future, MongoError](
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  Some(messageType),
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                Some(messageType),
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
@@ -332,7 +326,7 @@ class MessageBodyControllerSpec
             eqTo(movementType)
           )
         )
-          .thenReturn(EitherT.leftT[Future, Option[MessageResponse]](MongoError.DocumentNotFound("not found")))
+          .thenReturn(EitherT.leftT[Future, MessageResponse](MongoError.DocumentNotFound("not found")))
 
         val mockObjectStoreService = mock[ObjectStoreService]
 
@@ -385,7 +379,7 @@ class MessageBodyControllerSpec
             eqTo(movementType)
           )
         )
-          .thenReturn(EitherT.rightT[Future, MongoError](None))
+          .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(s"Body of message ID ${messageId.value} for movement ID ${movementId.value} was not found")))
 
         val mockObjectStoreService = mock[ObjectStoreService]
 
@@ -443,15 +437,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT[Future, MongoError](
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  Some(messageType),
-                  None,
-                  Some(MessageStatus.Success),
-                  Some(new URI(objectStoreUri.value))
-                )
+              MessageResponse(
+                messageId,
+                now,
+                Some(messageType),
+                None,
+                Some(MessageStatus.Success),
+                Some(new URI(objectStoreUri.value))
               )
             )
           )
@@ -517,15 +509,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
@@ -582,15 +572,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
@@ -647,15 +635,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
@@ -713,15 +699,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
@@ -775,7 +759,7 @@ class MessageBodyControllerSpec
             eqTo(movementType)
           )
         )
-          .thenReturn(EitherT.rightT(None))
+          .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -833,15 +817,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  Some(string),
-                  Some(MessageStatus.Processing),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                Some(string),
+                Some(MessageStatus.Processing),
+                None
               )
             )
           )
@@ -875,15 +857,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
@@ -919,15 +899,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
@@ -964,15 +942,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
@@ -1011,15 +987,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
@@ -1060,15 +1034,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
@@ -1114,15 +1086,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
@@ -1177,15 +1147,13 @@ class MessageBodyControllerSpec
         )
           .thenReturn(
             EitherT.rightT(
-              Some(
-                MessageResponse(
-                  messageId,
-                  now,
-                  None,
-                  None,
-                  Some(MessageStatus.Pending),
-                  None
-                )
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
               )
             )
           )
