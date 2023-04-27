@@ -61,7 +61,7 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
       val parsedResult = stream.via(XmlParsers.movementEORINumberExtractor("CC015C", "HolderOfTheTransitProcedure")).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _ mustBe Right(EORINumber("GB1234"))
+        _ mustBe Right(Some(EORINumber("GB1234")))
       }
     }
 
@@ -70,7 +70,7 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
       val parsedResult = stream.via(XmlParsers.movementEORINumberExtractor("CC015C", "HolderOfTheTransitProcedure")).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _ mustBe Left(ParseError.NoElementFound("identificationNumber"))
+        _ mustBe Right(None)
       }
     }
 

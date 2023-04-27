@@ -32,13 +32,13 @@ import java.time.format.DateTimeParseException
 
 object XmlParsers extends XmlParsingServiceHelpers {
 
-  def movementEORINumberExtractor(rootNode: String, eori: String): Flow[ParseEvent, ParseResult[EORINumber], NotUsed] =
+  def movementEORINumberExtractor(rootNode: String, eori: String): Flow[ParseEvent, ParseResult[Option[EORINumber]], NotUsed] =
     XmlParsing
       .subtree(rootNode :: eori :: "identificationNumber" :: Nil)
       .collect {
         case element if element.getTextContent.nonEmpty => EORINumber(element.getTextContent)
       }
-      .single("identificationNumber")
+      .singleOption("identificationNumber")
 
   def preparationDateTimeExtractor(messageType: MessageType): Flow[ParseEvent, ParseResult[OffsetDateTime], NotUsed] = XmlParsing
     .subtree(messageType.rootNode :: "preparationDateAndTime" :: Nil)

@@ -67,7 +67,7 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
   // we don't want to starve the Play pool
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
-  private def buildDeclarationData(eoriMaybe: ParseResult[EORINumber], dateMaybe: ParseResult[OffsetDateTime]): ParseResult[DeclarationData] =
+  private def buildDeclarationData(eoriMaybe: ParseResult[Option[EORINumber]], dateMaybe: ParseResult[OffsetDateTime]): ParseResult[DeclarationData] =
     for {
       eoriNumber     <- eoriMaybe
       generationDate <- dateMaybe
@@ -80,7 +80,7 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
           import GraphDSL.Implicits._
 
           val broadcast = builder.add(Broadcast[ParseEvent](2))
-          val combiner  = builder.add(ZipWith[ParseResult[EORINumber], ParseResult[OffsetDateTime], ParseResult[DeclarationData]](buildDeclarationData))
+          val combiner  = builder.add(ZipWith[ParseResult[Option[EORINumber]], ParseResult[OffsetDateTime], ParseResult[DeclarationData]](buildDeclarationData))
 
           val xmlParsing = builder.add(XmlParsing.parser)
           val eoriFlow   = builder.add(XmlParsers.movementEORINumberExtractor("CC015C", "HolderOfTheTransitProcedure"))
@@ -102,7 +102,9 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
 
           val broadcast = builder.add(Broadcast[ParseEvent](3))
           val combiner = builder.add(
-            ZipWith[ParseResult[EORINumber], ParseResult[OffsetDateTime], ParseResult[MovementReferenceNumber], ParseResult[ArrivalData]](buildArrivalData)
+            ZipWith[ParseResult[Option[EORINumber]], ParseResult[OffsetDateTime], ParseResult[MovementReferenceNumber], ParseResult[ArrivalData]](
+              buildArrivalData
+            )
           )
 
           val xmlParsing = builder.add(XmlParsing.parser)
@@ -120,7 +122,7 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
     )
 
   private def buildArrivalData(
-    eoriMaybe: ParseResult[EORINumber],
+    eoriMaybe: ParseResult[Option[EORINumber]],
     dateMaybe: ParseResult[OffsetDateTime],
     mrnMaybe: ParseResult[MovementReferenceNumber]
   ): ParseResult[ArrivalData] =
