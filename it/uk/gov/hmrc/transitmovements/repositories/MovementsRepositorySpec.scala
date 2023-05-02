@@ -126,7 +126,7 @@ class MovementsRepositorySpec
     await(repository.insert(movement).value)
 
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
-    result.toOption.get.get should be(MovementWithoutMessages.fromMovement(movement))
+    result.toOption.get should be(MovementWithoutMessages.fromMovement(movement))
   }
 
   "getMovementWithoutMessages" should "return none if the movement doesn't exist" in {
@@ -136,7 +136,7 @@ class MovementsRepositorySpec
 
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, MovementId("2"), movement.movementType).value)
 
-    result.toOption.get.isEmpty should be(true)
+    result.toOption.isEmpty should be(true)
   }
 
   "getSingleMessage" should "return message response with uri if it exists" in {
@@ -155,7 +155,7 @@ class MovementsRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id, departure.movementType).value)
-    result.toOption.get.get should be(MessageResponse.fromMessageWithoutBody(departure.messages.head))
+    result.toOption.get should be(MessageResponse.fromMessageWithoutBody(departure.messages.head))
   }
 
   "getSingleMessage" should "return message response with Body if it exists" in {
@@ -180,7 +180,7 @@ class MovementsRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id, departure.movementType).value)
-    result.toOption.get.get should be(MessageResponse.fromMessageWithBody(departure.messages.head))
+    result.toOption.get should be(MessageResponse.fromMessageWithBody(departure.messages.head))
   }
 
   "getSingleMessage" should "return none if the message doesn't exist" in {
@@ -189,7 +189,7 @@ class MovementsRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, MessageId("X"), departure.movementType).value)
-    result.toOption.get.isEmpty should be(true)
+    result.toOption.isEmpty should be(true)
   }
 
   "getMessages" should "return message responses if there are messages" in {

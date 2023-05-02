@@ -76,9 +76,8 @@ class MessageBodyController @Inject() (
   def getBody(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[AnyContent] = Action.async {
     implicit request =>
       (for {
-        maybeMessage <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
-        message      <- ensureMessage(maybeMessage, messageId, movementId)
-        stream       <- body(message, messageId, movementId)
+        message <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
+        stream  <- body(message, messageId, movementId)
       } yield Ok.chunked(stream, Some(MimeTypes.XML)))
         .valueOrF(
           error => Future.successful(Status(error.code.statusCode)(Json.toJson(error)))
@@ -90,8 +89,7 @@ class MessageBodyController @Inject() (
       implicit request => size =>
         val received = OffsetDateTime.now(clock)
         (for {
-          maybeMessage  <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
-          message       <- ensureMessage(maybeMessage, messageId, movementId)
+          message       <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
           _             <- ensureNoMessageBody(message)
           messageType   <- extract(request.headers).asPresentation
           messageData   <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
@@ -122,13 +120,6 @@ class MessageBodyController @Inject() (
   private def ensureNoMessageBody(messageResponse: MessageResponse): EitherT[Future, PresentationError, Unit] =
     if (messageResponse.status.contains(MessageStatus.Pending)) EitherT.rightT((): Unit)
     else EitherT.leftT(PresentationError.conflictError(s"Body for ${messageResponse.id.value} already exists"))
-
-  private def ensureMessage(
-    message: Option[MessageResponse],
-    messageId: MessageId,
-    movementId: MovementId
-  ): EitherT[Future, PresentationError, MessageResponse] =
-    message.map(EitherT.rightT[Future, PresentationError](_)).getOrElse(notFound(messageId, movementId))
 
   private def body(messageResponse: MessageResponse, messageId: MessageId, movementId: MovementId)(implicit
     hc: HeaderCarrier
