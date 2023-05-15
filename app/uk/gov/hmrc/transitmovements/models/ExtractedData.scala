@@ -22,12 +22,24 @@ sealed trait ExtractedData {
   def movementEoriNumber: Option[EORINumber]
   def generationDate: OffsetDateTime
   def movementReferenceNumber: Option[MovementReferenceNumber]
+  def lrn: Option[LocalReferenceNumber]
+  def messageSender: Option[MessageSender]
 }
 
 case class ArrivalData(movementEoriNumber: Option[EORINumber], generationDate: OffsetDateTime, mrn: MovementReferenceNumber) extends ExtractedData {
   lazy val movementReferenceNumber = Some(mrn)
+  lazy val lrn                     = None
+  lazy val messageSender           = None
 }
 
-case class DeclarationData(movementEoriNumber: Option[EORINumber], generationDate: OffsetDateTime) extends ExtractedData {
+case class DeclarationData(
+  movementEoriNumber: Option[EORINumber],
+  generationDate: OffsetDateTime,
+  movementLRN: LocalReferenceNumber,
+  movementMessageSender: MessageSender
+) extends ExtractedData {
   lazy val movementReferenceNumber = None
+  lazy val lrn                     = Some(movementLRN)
+  lazy val messageSender           = Some(movementMessageSender)
+
 }

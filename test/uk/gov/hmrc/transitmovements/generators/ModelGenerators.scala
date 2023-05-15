@@ -23,8 +23,10 @@ import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.Movement
@@ -82,6 +84,16 @@ trait ModelGenerators extends BaseGenerators {
       } yield MovementReferenceNumber(year ++ country.mkString ++ serial.mkString)
     }
 
+  implicit lazy val arbitraryLRN: Arbitrary[LocalReferenceNumber] =
+    Arbitrary {
+      Gen.alphaNumStr.map(LocalReferenceNumber(_))
+    }
+
+  implicit lazy val arbitraryMessageSender: Arbitrary[MessageSender] =
+    Arbitrary {
+      Gen.alphaNumStr.map(MessageSender(_))
+    }
+
   // Restricts the date times to the range of positive long numbers to avoid overflows.
   implicit lazy val arbitraryOffsetDateTime: Arbitrary[OffsetDateTime] =
     Arbitrary {
@@ -115,7 +127,9 @@ trait ModelGenerators extends BaseGenerators {
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
         messages                <- arbitrary[Vector[Message]]
-      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, created, updated, messages)
+        lrn                     <- arbitrary[Option[LocalReferenceNumber]]
+        messageSender           <- arbitrary[Option[MessageSender]]
+      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, lrn, messageSender, created, updated, messages)
     }
 
   implicit lazy val arbitraryMessageResponse: Arbitrary[MessageResponse] =

@@ -28,7 +28,9 @@ import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
@@ -55,10 +57,24 @@ class MovementFactoryImplSpec
   "createDeparture" - {
     val sut = new MovementFactoryImpl(clock, random)
 
-    "will create a departure with a message" in forAll(arbitrary[EORINumber], arbitrary[EORINumber], arbitrary[Message]) {
-      (enrollmentEori, movementEori, message) =>
+    "will create a departure with a message" in forAll(
+      arbitrary[EORINumber],
+      arbitrary[EORINumber],
+      arbitrary[Message],
+      arbitrary[LocalReferenceNumber],
+      arbitrary[MessageSender]
+    ) {
+      (enrollmentEori, movementEori, message, lrn, messageSender) =>
         val departure =
-          sut.createDeparture(movementId, enrollmentEori, MovementType.Departure, DeclarationData(Some(movementEori), instant), message, instant, instant)
+          sut.createDeparture(
+            movementId,
+            enrollmentEori,
+            MovementType.Departure,
+            DeclarationData(Some(movementEori), instant, lrn, messageSender),
+            message,
+            instant,
+            instant
+          )
 
         departure.messages.length mustBe 1
         departure.movementReferenceNumber mustBe None

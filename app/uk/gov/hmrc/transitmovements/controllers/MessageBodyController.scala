@@ -32,11 +32,13 @@ import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.ExtractedData
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
+import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
@@ -47,6 +49,7 @@ import uk.gov.hmrc.transitmovements.services.MessageService
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 import uk.gov.hmrc.transitmovements.services.ObjectStoreService
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -94,7 +97,22 @@ class MessageBodyController @Inject() (
           messageType   <- extract(request.headers).asPresentation
           messageData   <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
           extractedData <- movementsXmlParsingService.extractData(messageType, request.body).asPresentation
-          bodyStorage   <- messageService.storeIfLarge(movementId, messageId, size, request.body).asPresentation
+          _ <- messageType match {
+            case MessageType.DeclarationData =>
+              val declarationData = DeclarationData(
+                extractedData.flatMap(_.movementEoriNumber),
+                messageData.generationDate,
+                extractedData.flatMap(_.lrn).get,
+                extractedData.flatMap(_.messageSender).get
+              )
+              repo
+                .checkDuplicateLRNWithMessageSender(
+                  declarationData
+                )
+                .asPresentation
+            case _ => EitherT.rightT[Future, MongoError]((): Unit).asPresentation
+          }
+          bodyStorage <- messageService.storeIfLarge(movementId, messageId, size, request.body).asPresentation
           _ <- repo
             .updateMessage(
               movementId,
@@ -150,6 +168,8 @@ class MessageBodyController @Inject() (
         movementId,
         extractedData.flatMap(_.movementEoriNumber),
         extractedData.flatMap(_.movementReferenceNumber).orElse(messageData.mrn),
+        extractedData.flatMap(_.lrn),
+        extractedData.flatMap(_.messageSender),
         received
       )
       .asPresentation

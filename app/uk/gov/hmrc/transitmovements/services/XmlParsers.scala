@@ -21,6 +21,8 @@ import akka.stream.alpakka.xml.ParseEvent
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.scaladsl.Flow
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
@@ -57,5 +59,21 @@ object XmlParsers extends XmlParsingServiceHelpers {
       case element if element.getTextContent.nonEmpty => MovementReferenceNumber(element.getTextContent)
     }
     .single("MRN")
+
+  def movementLRNExtractor(rootNode: String): Flow[ParseEvent, ParseResult[LocalReferenceNumber], NotUsed] =
+    XmlParsing
+      .subtree(rootNode :: "TransitOperation" :: "LRN" :: Nil)
+      .collect {
+        case element if element.getTextContent.nonEmpty => LocalReferenceNumber(element.getTextContent)
+      }
+      .single("LRN")
+
+  def movementMessageSenderExtractor(rootNode: String): Flow[ParseEvent, ParseResult[MessageSender], NotUsed] =
+    XmlParsing
+      .subtree(rootNode :: "messageSender" :: Nil)
+      .collect {
+        case element if element.getTextContent.nonEmpty => MessageSender(element.getTextContent)
+      }
+      .single("messageSender")
 
 }

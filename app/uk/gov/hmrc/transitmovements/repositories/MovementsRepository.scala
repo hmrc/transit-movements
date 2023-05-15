@@ -34,9 +34,12 @@ import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
+import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
@@ -99,6 +102,8 @@ trait MovementsRepository {
     movementId: MovementId,
     movementEORI: Option[EORINumber],
     mrn: Option[MovementReferenceNumber],
+    lrn: Option[LocalReferenceNumber],
+    messageSender: Option[MessageSender],
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
@@ -115,6 +120,8 @@ trait MovementsRepository {
     message: UpdateMessageData,
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
+
+  def checkDuplicateLRNWithMessageSender(declarationData: DeclarationData): EitherT[Future, MongoError, Unit]
 
 }
 
@@ -143,7 +150,9 @@ class MovementsRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.movementIdFormat),
         Codecs.playFormatCodec(MongoFormats.mrnFormat),
         Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
-        Codecs.playFormatCodec(MongoFormats.eoriNumberFormat)
+        Codecs.playFormatCodec(MongoFormats.eoriNumberFormat),
+        Codecs.playFormatCodec(MongoFormats.lrnFormat),
+        Codecs.playFormatCodec(MongoFormats.messageSenderFormat)
       )
     )
     with MovementsRepository
@@ -380,6 +389,8 @@ class MovementsRepositoryImpl @Inject() (
     movementId: MovementId,
     movementEORI: Option[EORINumber],
     mrn: Option[MovementReferenceNumber],
+    lrn: Option[LocalReferenceNumber],
+    messageSender: Option[MessageSender],
     updated: OffsetDateTime
   ): EitherT[Future, MongoError, Unit] = {
     val filter: Bson = mEq(movementId.value)
@@ -393,6 +404,16 @@ class MovementsRepositoryImpl @Inject() (
         mrn
           .map(
             e => Seq(mSet("movementReferenceNumber", e.value))
+          )
+          .getOrElse(Seq.empty[Bson]) ++
+        lrn
+          .map(
+            e => Seq(mSet("movementLRN", e.value))
+          )
+          .getOrElse(Seq.empty[Bson]) ++
+        messageSender
+          .map(
+            e => Seq(mSet("movementMessageSender", e.value))
           )
           .getOrElse(Seq.empty[Bson])
 
@@ -421,4 +442,31 @@ class MovementsRepositoryImpl @Inject() (
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
+
+  def checkDuplicateLRNWithMessageSender(declarationData: DeclarationData): EitherT[Future, MongoError, Unit] = {
+    val selector = mAnd(
+      mEq("movementLRN", declarationData.movementLRN.value),
+      mEq("movementMessageSender", declarationData.movementMessageSender.value)
+    )
+
+    val projection = MovementWithoutMessages.projection
+
+    val aggregates = Seq(
+      Aggregates.filter(selector),
+      Aggregates.sort(descending("updated")),
+      Aggregates.project(projection)
+    )
+
+    mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
+      case Success(obs) =>
+        obs.headOption().map {
+          case None =>
+            Right()
+          case Some(opt) =>
+            Left(ConflictError("(\"CC015C\" :: \"TransitOperation\" :: \"LRN\" :: Nil)"))
+        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+  }
 }

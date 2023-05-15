@@ -24,6 +24,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import play.api.Logging
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.BadRequest
+import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.Conflict
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.InternalServerError
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.NotFound
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
@@ -85,6 +86,13 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
           _.left.toOption.get.code mustBe InternalServerError
         }
       }
+
+    "Conflict should result in Conflict status" in {
+      val input = Left[MongoError, Unit](ConflictError("test")).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _.left.toOption.get.code mustBe Conflict
+      }
+    }
 
     "DocumentNotFound should result in NotFound status" in {
       val input = Left[MongoError, Unit](DocumentNotFound("test")).toEitherT[Future]

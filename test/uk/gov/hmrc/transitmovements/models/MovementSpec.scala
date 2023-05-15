@@ -35,6 +35,8 @@ class MovementSpec extends AnyFlatSpec with Matchers with PresentationFormats {
       EORINumber("222"),
       Some(EORINumber("223")),
       Some(MovementReferenceNumber("333")),
+      Some(LocalReferenceNumber("12klio")),
+      Some(MessageSender("token")),
       OffsetDateTime.now(),
       OffsetDateTime.now(),
       Vector(
