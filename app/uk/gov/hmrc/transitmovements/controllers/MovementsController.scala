@@ -47,6 +47,7 @@ import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.utils.StreamWithFile
 
 import java.time.Clock
@@ -353,6 +354,22 @@ class MovementsController @Inject() (
           for {
             extractedData        <- movementsXmlParsingService.extractData(messageType, fileSource).asPresentation
             extractedMessageData <- messagesXmlParsingService.extractMessageData(fileSource, messageType).asPresentation
+            _ <- messageType match {
+              case MessageType.DeclarationData =>
+                val declarationData = DeclarationData(
+                  extractedData.flatMap(_.movementEoriNumber),
+                  extractedMessageData.generationDate,
+                  extractedData.flatMap(_.lrn).get,
+                  extractedData.flatMap(_.messageSender).get
+                )
+                repo
+                  .checkDuplicateLRNWithMessageSender(
+                    declarationData
+                  )
+                  .asPresentation
+              case _ =>
+                EitherT.rightT[Future, MongoError]((): Unit).asPresentation
+            }
             _ <- repo
               .updateMovement(
                 movementId,
@@ -362,8 +379,8 @@ class MovementsController @Inject() (
                   )
                   .flatMap(_.movementEoriNumber),
                 extractedData.flatMap(_.movementReferenceNumber),
-                None,
-                None,
+                extractedData.flatMap(_.lrn),
+                extractedData.flatMap(_.messageSender),
                 received
               )
               .asPresentation

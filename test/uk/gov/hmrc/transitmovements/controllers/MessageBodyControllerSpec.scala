@@ -784,6 +784,86 @@ class MessageBodyControllerSpec
         status(result) mustBe CREATED
     }
 
+    "must return Conflict when duplicate entry of LRN + MessageSender" in forAll(
+      arbitrary[EORINumber],
+      arbitrary[EORINumber],
+      arbitrary[MovementId],
+      arbitrary[MessageId],
+      arbitraryLRN.arbitrary,
+      Gen.stringOfN(15, Gen.alphaNumChar)
+    ) {
+      (eori, movementEori, movementId, messageId, lrn, string) =>
+        val messageType  = MessageType.DeclarationData
+        val movementType = MovementType.Departure
+
+        val ControllerAndMocks(sut, movementsRepository, _, messagesXmlParsingService, movementsXmlParsingService, messageService) = createController()
+
+        when(
+          movementsRepository.getSingleMessage(
+            EORINumber(eqTo(eori.value)),
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(messageId.value)),
+            eqTo(movementType)
+          )
+        )
+          .thenReturn(
+            EitherT.rightT(
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
+              )
+            )
+          )
+
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.rightT(MessageData(now, None)))
+
+        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
+          .thenReturn(
+            EitherT.rightT(
+              Some(DeclarationData(Some(movementEori), now, lrn, MessageSender(string)))
+            )
+          )
+
+        when(movementsRepository.checkDuplicateLRNWithMessageSender(DeclarationData(Some(movementEori), now, lrn, MessageSender(string))))
+          .thenReturn(EitherT.leftT(MongoError.ConflictError("\"(\\\"CC015C\\\" :: \\\"TransitOperation\\\" :: \\\"LRN\\\" :: Nil)\"")))
+
+        when(
+          messageService
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+        ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
+
+        when(
+          movementsRepository.updateMessage(
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(messageId.value)),
+            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
+            eqTo(now)
+          )
+        ).thenReturn(EitherT.rightT((): Unit))
+
+        when(
+          movementsRepository.updateMovement(
+            MovementId(eqTo(movementId.value)),
+            eqTo(Some(movementEori)),
+            eqTo(None),
+            eqTo(Some(lrn)),
+            eqTo(Some(MessageSender(string))),
+            eqTo(now)
+          )
+        )
+          .thenReturn(EitherT.rightT((): Unit))
+
+        val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
+        val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe CONFLICT
+    }
+
     "must return Not Found if the message doesn't exist" in forAll(
       arbitrary[EORINumber],
       arbitrary[MovementId],
