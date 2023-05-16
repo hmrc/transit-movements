@@ -669,7 +669,7 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(movementsRepository.checkDuplicateLRNWithMessageSender(DeclarationData(Some(movementEori), now, lrn, MessageSender(string))))
+        when(movementsRepository.restrictLRNWithMessageSender(DeclarationData(Some(movementEori), now, lrn, MessageSender(string))))
           .thenReturn(EitherT.rightT((): Unit))
 
         when(
@@ -749,7 +749,7 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(movementsRepository.checkDuplicateLRNWithMessageSender(DeclarationData(Some(movementEori), now, lrn, MessageSender(string))))
+        when(movementsRepository.restrictLRNWithMessageSender(DeclarationData(Some(movementEori), now, lrn, MessageSender(string))))
           .thenReturn(EitherT.rightT((): Unit))
 
         when(
@@ -829,7 +829,7 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(movementsRepository.checkDuplicateLRNWithMessageSender(DeclarationData(Some(movementEori), now, lrn, MessageSender(string))))
+        when(movementsRepository.restrictLRNWithMessageSender(DeclarationData(Some(movementEori), now, lrn, MessageSender(string))))
           .thenReturn(EitherT.leftT(MongoError.ConflictError("\"(\\\"CC015C\\\" :: \\\"TransitOperation\\\" :: \\\"LRN\\\" :: Nil)\"")))
 
         when(

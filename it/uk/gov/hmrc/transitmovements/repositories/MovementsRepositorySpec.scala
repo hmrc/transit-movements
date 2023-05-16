@@ -868,7 +868,7 @@ class MovementsRepositorySpec
     )
 
     val alreadyExistResult = await(
-      repository.checkDuplicateLRNWithMessageSender(declarationData).value
+      repository.restrictLRNWithMessageSender(declarationData).value
     )
 
     alreadyExistResult should be(Left(MongoError.ConflictError("(\"CC015C\" :: \"TransitOperation\" :: \"LRN\" :: Nil)")))
@@ -881,7 +881,7 @@ class MovementsRepositorySpec
     )
 
     val notExistResult = await(
-      repository.checkDuplicateLRNWithMessageSender(data).value
+      repository.restrictLRNWithMessageSender(data).value
     )
 
     notExistResult should be(Right(()))

@@ -244,7 +244,7 @@ class MovementsControllerSpec
       when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockRepository.checkDuplicateLRNWithMessageSender(eqTo(declarationData))).thenReturn(EitherT.rightT(Right(())))
+      when(mockRepository.restrictLRNWithMessageSender(eqTo(declarationData))).thenReturn(EitherT.rightT(Right(())))
 
       when(
         mockMovementFactory.createDeparture(
@@ -433,7 +433,7 @@ class MovementsControllerSpec
       when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockRepository.checkDuplicateLRNWithMessageSender(eqTo(declarationData)))
+      when(mockRepository.restrictLRNWithMessageSender(eqTo(declarationData)))
         .thenReturn(EitherT.leftT(MongoError.ConflictError("\"(\\\"CC015C\\\" :: \\\"TransitOperation\\\" :: \\\"LRN\\\" :: Nil)\"")))
 
       val request: Request[Source[ByteString, _]] = fakeRequest[Source[ByteString, _]](POST, validXmlStream, Some(MessageType.DeclarationData.code))
@@ -1376,7 +1376,7 @@ class MovementsControllerSpec
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
-            when(mockRepository.checkDuplicateLRNWithMessageSender(eqTo(DeclarationData(Some(eori), generatedTime, lrn, messageSender))))
+            when(mockRepository.restrictLRNWithMessageSender(eqTo(DeclarationData(Some(eori), generatedTime, lrn, messageSender))))
               .thenReturn(EitherT.rightT(Right(())))
 
             when(
@@ -1597,7 +1597,7 @@ class MovementsControllerSpec
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
-            when(mockRepository.checkDuplicateLRNWithMessageSender(eqTo(DeclarationData(Some(eori), generatedTime, lrn, messageSender))))
+            when(mockRepository.restrictLRNWithMessageSender(eqTo(DeclarationData(Some(eori), generatedTime, lrn, messageSender))))
               .thenReturn(EitherT.rightT((): Unit))
 
             when(
@@ -1690,7 +1690,7 @@ class MovementsControllerSpec
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
-            when(mockRepository.checkDuplicateLRNWithMessageSender(eqTo(DeclarationData(Some(eori), generatedTime, lrn, messageSender))))
+            when(mockRepository.restrictLRNWithMessageSender(eqTo(DeclarationData(Some(eori), generatedTime, lrn, messageSender))))
               .thenReturn(EitherT.leftT(MongoError.ConflictError("\"(\\\"CC015C\\\" :: \\\"TransitOperation\\\" :: \\\"LRN\\\" :: Nil)\"")))
 
             when(

@@ -106,7 +106,7 @@ class MessageBodyController @Inject() (
                 extractedData.flatMap(_.messageSender).get
               )
               repo
-                .checkDuplicateLRNWithMessageSender(
+                .restrictLRNWithMessageSender(
                   declarationData
                 )
                 .asPresentation

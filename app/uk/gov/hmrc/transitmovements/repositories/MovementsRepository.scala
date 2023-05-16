@@ -121,7 +121,7 @@ trait MovementsRepository {
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
-  def checkDuplicateLRNWithMessageSender(declarationData: DeclarationData): EitherT[Future, MongoError, Unit]
+  def restrictLRNWithMessageSender(declarationData: DeclarationData): EitherT[Future, MongoError, Unit]
 
 }
 
@@ -443,7 +443,7 @@ class MovementsRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def checkDuplicateLRNWithMessageSender(declarationData: DeclarationData): EitherT[Future, MongoError, Unit] = {
+  def restrictLRNWithMessageSender(declarationData: DeclarationData): EitherT[Future, MongoError, Unit] = {
     val selector = mAnd(
       mEq("movementLRN", declarationData.movementLRN.value),
       mEq("movementMessageSender", declarationData.movementMessageSender.value)
