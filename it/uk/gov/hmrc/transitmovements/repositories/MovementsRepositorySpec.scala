@@ -858,7 +858,7 @@ class MovementsRepositorySpec
         messages = Vector(message1)
       )
 
-    val result = await(repository.insert(departureXi2).value)
+    await(repository.insert(departureXi2).value)
 
     val declarationData = DeclarationData(
       movementEoriNumber = Some(movementEORI),
@@ -871,7 +871,7 @@ class MovementsRepositorySpec
       repository.restrictLRNWithMessageSender(declarationData).value
     )
 
-    alreadyExistResult should be(Left(MongoError.ConflictError("(\"CC015C\" :: \"TransitOperation\" :: \"LRN\" :: Nil)")))
+    alreadyExistResult should be(Left(MongoError.ConflictError(s"LRN ${declarationData.movementLRN.value} has previously been used and cannot be reused")))
 
     val data = DeclarationData(
       movementEoriNumber = Some(movementEORI),

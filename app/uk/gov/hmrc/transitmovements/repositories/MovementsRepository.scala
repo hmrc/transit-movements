@@ -463,7 +463,7 @@ class MovementsRepositoryImpl @Inject() (
           case None =>
             Right()
           case Some(opt) =>
-            Left(ConflictError("(\"CC015C\" :: \"TransitOperation\" :: \"LRN\" :: Nil)"))
+            Left(ConflictError(s"LRN ${declarationData.movementLRN.value} has previously been used and cannot be reused"))
         }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
