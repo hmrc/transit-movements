@@ -59,6 +59,7 @@ import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.BodyStorage
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.ExtractedData
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -500,6 +501,26 @@ class MessageBodyControllerSpec
     ) {
       (eori, movementId, messageId, messageType, movementType, string) =>
         val ControllerAndMocks(sut, movementsRepository, _, messagesXmlParsingService, movementsXmlParsingService, messageService) = createController()
+        //val messageType                                                                                                            = MessageType.DeclarationData
+        val extractDataEither: EitherT[Future, ParseError, Option[ExtractedData]] = {
+          if (messageType == MessageType.DeclarationData)
+            EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), LocalReferenceNumber(string), MessageSender(string))))
+          else EitherT.rightT(None)
+        }
+        val lrnOption: Option[LocalReferenceNumber] = {
+          if (messageType == MessageType.DeclarationData) Some(LocalReferenceNumber(string))
+          else None
+        }
+
+        val messageSenderOption: Option[MessageSender] = {
+          if (messageType == MessageType.DeclarationData) Some(MessageSender(string))
+          else None
+        }
+
+        val eoriOption: Option[EORINumber] = {
+          if (messageType == MessageType.DeclarationData) Some(eori)
+          else None
+        }
 
         when(
           movementsRepository.getSingleMessage(
@@ -526,7 +547,10 @@ class MessageBodyControllerSpec
           .thenReturn(EitherT.rightT(MessageData(now, None)))
 
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(None))
+          .thenReturn(extractDataEither)
+
+        when(movementsRepository.restrictLRNWithMessageSender(DeclarationData(Some(eori), now, LocalReferenceNumber(string), MessageSender(string))))
+          .thenReturn(EitherT.rightT((): Unit))
 
         when(
           messageService
@@ -542,7 +566,16 @@ class MessageBodyControllerSpec
           )
         ).thenReturn(EitherT.rightT((): Unit))
 
-        when(movementsRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(None), eqTo(None), eqTo(None), eqTo(None), eqTo(now)))
+        when(
+          movementsRepository.updateMovement(
+            MovementId(eqTo(movementId.value)),
+            eqTo(eoriOption),
+            eqTo(None),
+            eqTo(lrnOption),
+            eqTo(messageSenderOption),
+            eqTo(now)
+          )
+        )
           .thenReturn(EitherT.rightT((): Unit))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
