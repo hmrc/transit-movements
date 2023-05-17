@@ -102,11 +102,10 @@ class MessageBodyController @Inject() (
               val declarationData = DeclarationData(
                 extractedData.flatMap(_.movementEoriNumber),
                 messageData.generationDate,
-                extractedData.flatMap(_.lrn).get,
-                extractedData.flatMap(_.messageSender).get
+                extractedData.flatMap(_.localReferenceNumber).get
               )
               repo
-                .restrictLRNWithMessageSender(
+                .restrictDuplicateLRN(
                   declarationData
                 )
                 .asPresentation
@@ -168,8 +167,7 @@ class MessageBodyController @Inject() (
         movementId,
         extractedData.flatMap(_.movementEoriNumber),
         extractedData.flatMap(_.movementReferenceNumber).orElse(messageData.mrn),
-        extractedData.flatMap(_.lrn),
-        extractedData.flatMap(_.messageSender),
+        extractedData.flatMap(_.localReferenceNumber),
         received
       )
       .asPresentation

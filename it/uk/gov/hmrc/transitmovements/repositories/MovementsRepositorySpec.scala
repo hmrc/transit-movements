@@ -378,12 +378,11 @@ class MovementsRepositorySpec
 
   object GetMovementsSetup {
 
-    val eoriGB        = arbitrary[EORINumber].sample.value
-    val eoriXI        = arbitrary[EORINumber].sample.value
-    val movementEORI  = arbitrary[EORINumber].sample.value
-    val message       = arbitrary[Message].sample.value
-    val lrn           = arbitrary[LocalReferenceNumber].sample.value
-    val messageSender = arbitrary[MessageSender].sample.value
+    val eoriGB       = arbitrary[EORINumber].sample.value
+    val eoriXI       = arbitrary[EORINumber].sample.value
+    val movementEORI = arbitrary[EORINumber].sample.value
+    val message      = arbitrary[Message].sample.value
+    val lrn          = arbitrary[LocalReferenceNumber].sample.value
 
     val departureGB1 =
       arbitrary[Movement].sample.value.copy(
@@ -393,8 +392,7 @@ class MovementsRepositorySpec
         created = instant,
         updated = instant,
         messages = Vector(message),
-        movementLRN = Some(lrn),
-        movementMessageSender = Some(messageSender)
+        localReferenceNumber = Some(lrn)
       )
 
     val arrivalGB1 =
@@ -423,8 +421,7 @@ class MovementsRepositorySpec
         movementEORINumber = Some(movementEORI),
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample,
-        movementLRN = Some(lrn),
-        movementMessageSender = Some(messageSender)
+        localReferenceNumber = Some(lrn)
       )
 
     val departureGB2 =
@@ -434,8 +431,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample,
-        movementLRN = Some(lrn),
-        movementMessageSender = Some(messageSender)
+        localReferenceNumber = Some(lrn)
       )
 
     val departureGB3 =
@@ -445,8 +441,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample,
-        movementLRN = Some(lrn),
-        movementMessageSender = Some(messageSender)
+        localReferenceNumber = Some(lrn)
       )
 
     val departureGB4 =
@@ -456,8 +451,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample,
-        movementLRN = Some(lrn),
-        movementMessageSender = Some(messageSender)
+        localReferenceNumber = Some(lrn)
       )
 
     val arrivalGB2 =
@@ -467,8 +461,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Arrival,
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample,
-        movementLRN = None,
-        movementMessageSender = None
+        localReferenceNumber = None
       )
 
     val arrivalGB3 =
@@ -478,8 +471,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample,
-        movementLRN = None,
-        movementMessageSender = None
+        localReferenceNumber = None
       )
 
     val arrivalGB4 =
@@ -489,8 +481,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample,
-        movementLRN = None,
-        movementMessageSender = None
+        localReferenceNumber = None
       )
 
     def setup() = {
@@ -830,7 +821,7 @@ class MovementsRepositorySpec
   ) {
     (movementId, eori, mrn) =>
       val result = await(
-        repository.updateMovement(movementId, Some(eori), Some(mrn), None, None, instant).value
+        repository.updateMovement(movementId, Some(eori), Some(mrn), None, instant).value
       )
 
       result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
@@ -838,11 +829,10 @@ class MovementsRepositorySpec
 
   "checkDuplicate" should "check the duplicate LRN with messageSender" in {
 
-    val eoriXI        = arbitrary[EORINumber].sample.value
-    val movementEORI  = arbitrary[EORINumber].sample.value
-    val lrn           = arbitrary[LocalReferenceNumber].sample
-    val messageSender = arbitrary[MessageSender].sample
-    val mrnGen        = arbitrary[MovementReferenceNumber]
+    val eoriXI       = arbitrary[EORINumber].sample.value
+    val movementEORI = arbitrary[EORINumber].sample.value
+    val lrn          = arbitrary[LocalReferenceNumber].sample
+    val mrnGen       = arbitrary[MovementReferenceNumber]
 
     val message1 =
       arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
@@ -853,8 +843,7 @@ class MovementsRepositorySpec
         movementEORINumber = Some(movementEORI),
         updated = instant,
         movementReferenceNumber = mrnGen.sample,
-        movementLRN = lrn,
-        movementMessageSender = messageSender,
+        localReferenceNumber = lrn,
         messages = Vector(message1)
       )
 
@@ -863,27 +852,25 @@ class MovementsRepositorySpec
     val declarationData = DeclarationData(
       movementEoriNumber = Some(movementEORI),
       generationDate = instant,
-      movementLRN = lrn.value,
-      movementMessageSender = messageSender.value
+      lrn = lrn.value
     )
 
     val alreadyExistResult = await(
-      repository.restrictLRNWithMessageSender(declarationData).value
+      repository.restrictDuplicateLRN(declarationData).value
     )
 
     alreadyExistResult should be(
-      Left(MongoError.ConflictError(s"LRN ${declarationData.movementLRN.value} has previously been used and cannot be reused", declarationData.movementLRN))
+      Left(MongoError.ConflictError(s"LRN ${declarationData.lrn.value} has previously been used and cannot be reused", declarationData.lrn))
     )
 
     val data = DeclarationData(
       movementEoriNumber = Some(movementEORI),
       generationDate = instant,
-      movementLRN = LocalReferenceNumber("1234"),
-      movementMessageSender = messageSender.value
+      lrn = LocalReferenceNumber("1234")
     )
 
     val notExistResult = await(
-      repository.restrictLRNWithMessageSender(data).value
+      repository.restrictDuplicateLRN(data).value
     )
 
     notExistResult should be(Right(()))
@@ -907,7 +894,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, None, None, receivedInstant).value
+      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -939,7 +926,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, None, Some(mrn), None, None, receivedInstant).value
+      repository.updateMovement(departureMovement._id, None, Some(mrn), None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -963,12 +950,10 @@ class MovementsRepositorySpec
           movementType = MovementType.Departure,
           movementEORINumber = None,
           movementReferenceNumber = None,
-          movementLRN = None,
-          movementMessageSender = None
+          localReferenceNumber = None
         )
 
-    val lrn           = arbitrary[LocalReferenceNumber].sample.get
-    val messageSender = arbitrary[MessageSender].sample.get
+    val lrn = arbitrary[LocalReferenceNumber].sample.get
 
     await(
       repository.insert(departureMovement).value
@@ -976,7 +961,7 @@ class MovementsRepositorySpec
 
     val result = await(
       repository
-        .updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, Some(lrn), Some(messageSender), receivedInstant)
+        .updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, Some(lrn), receivedInstant)
         .value
     )
 
@@ -988,8 +973,7 @@ class MovementsRepositorySpec
 
     movement.updated shouldEqual receivedInstant
     movement.movementEORINumber shouldEqual Some(movement.enrollmentEORINumber)
-    movement.movementLRN shouldEqual Some(lrn)
-    movement.movementMessageSender shouldEqual Some(messageSender)
+    movement.localReferenceNumber shouldEqual Some(lrn)
   }
 
   it should "update the EORI and MRN if they are both supplied" in {
@@ -1011,7 +995,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), Some(mrn), None, None, receivedInstant).value
+      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), Some(mrn), None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -1035,8 +1019,7 @@ class MovementsRepositorySpec
           movementType = MovementType.Arrival,
           movementEORINumber = None,
           movementReferenceNumber = None,
-          movementLRN = None,
-          movementMessageSender = None
+          localReferenceNumber = None
         )
 
     await(
@@ -1044,7 +1027,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, None, None, None, None, receivedInstant).value
+      repository.updateMovement(departureMovement._id, None, None, None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -1056,8 +1039,7 @@ class MovementsRepositorySpec
     movement.updated shouldEqual instant
     movement.movementEORINumber shouldEqual None
     movement.movementReferenceNumber shouldEqual None
-    movement.movementLRN shouldEqual None
-    movement.movementMessageSender shouldEqual None
+    movement.localReferenceNumber shouldEqual None
   }
 
 }

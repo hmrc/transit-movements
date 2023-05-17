@@ -103,7 +103,6 @@ trait MovementsRepository {
     movementEORI: Option[EORINumber],
     mrn: Option[MovementReferenceNumber],
     lrn: Option[LocalReferenceNumber],
-    messageSender: Option[MessageSender],
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
@@ -121,7 +120,7 @@ trait MovementsRepository {
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
-  def restrictLRNWithMessageSender(declarationData: DeclarationData): EitherT[Future, MongoError, Unit]
+  def restrictDuplicateLRN(declarationData: DeclarationData): EitherT[Future, MongoError, Unit]
 
 }
 
@@ -151,8 +150,7 @@ class MovementsRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.mrnFormat),
         Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
         Codecs.playFormatCodec(MongoFormats.eoriNumberFormat),
-        Codecs.playFormatCodec(MongoFormats.lrnFormat),
-        Codecs.playFormatCodec(MongoFormats.messageSenderFormat)
+        Codecs.playFormatCodec(MongoFormats.lrnFormat)
       )
     )
     with MovementsRepository
@@ -390,7 +388,6 @@ class MovementsRepositoryImpl @Inject() (
     movementEORI: Option[EORINumber],
     mrn: Option[MovementReferenceNumber],
     lrn: Option[LocalReferenceNumber],
-    messageSender: Option[MessageSender],
     updated: OffsetDateTime
   ): EitherT[Future, MongoError, Unit] = {
     val filter: Bson = mEq(movementId.value)
@@ -408,12 +405,7 @@ class MovementsRepositoryImpl @Inject() (
           .getOrElse(Seq.empty[Bson]) ++
         lrn
           .map(
-            e => Seq(mSet("movementLRN", e.value))
-          )
-          .getOrElse(Seq.empty[Bson]) ++
-        messageSender
-          .map(
-            e => Seq(mSet("movementMessageSender", e.value))
+            e => Seq(mSet("localReferenceNumber", e.value))
           )
           .getOrElse(Seq.empty[Bson])
 
@@ -443,11 +435,8 @@ class MovementsRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def restrictLRNWithMessageSender(declarationData: DeclarationData): EitherT[Future, MongoError, Unit] = {
-    val selector = mAnd(
-      mEq("movementLRN", declarationData.movementLRN.value),
-      mEq("movementMessageSender", declarationData.movementMessageSender.value)
-    )
+  def restrictDuplicateLRN(declarationData: DeclarationData): EitherT[Future, MongoError, Unit] = {
+    val selector = mEq("localReferenceNumber", declarationData.lrn.value)
 
     val projection = MovementWithoutMessages.projection
 
@@ -463,7 +452,7 @@ class MovementsRepositoryImpl @Inject() (
           case None =>
             Right()
           case Some(opt) =>
-            Left(ConflictError(s"LRN ${declarationData.movementLRN.value} has previously been used and cannot be reused", declarationData.movementLRN))
+            Left(ConflictError(s"LRN ${declarationData.lrn.value} has previously been used and cannot be reused", declarationData.lrn))
         }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
