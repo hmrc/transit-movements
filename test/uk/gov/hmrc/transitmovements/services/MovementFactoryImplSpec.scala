@@ -30,7 +30,6 @@ import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
@@ -61,16 +60,15 @@ class MovementFactoryImplSpec
       arbitrary[EORINumber],
       arbitrary[EORINumber],
       arbitrary[Message],
-      arbitrary[LocalReferenceNumber],
-      arbitrary[MessageSender]
+      arbitrary[LocalReferenceNumber]
     ) {
-      (enrollmentEori, movementEori, message, lrn, messageSender) =>
+      (enrollmentEori, movementEori, message, lrn) =>
         val departure =
           sut.createDeparture(
             movementId,
             enrollmentEori,
             MovementType.Departure,
-            DeclarationData(Some(movementEori), instant, lrn, messageSender),
+            DeclarationData(Some(movementEori), instant, lrn),
             message,
             instant,
             instant
@@ -78,6 +76,7 @@ class MovementFactoryImplSpec
 
         departure.messages.length mustBe 1
         departure.movementReferenceNumber mustBe None
+        departure.localReferenceNumber mustBe Some(lrn)
         departure.enrollmentEORINumber mustBe enrollmentEori
         departure.movementEORINumber mustBe Some(movementEori)
         departure.messages.head mustBe message
@@ -97,6 +96,7 @@ class MovementFactoryImplSpec
         arrival.enrollmentEORINumber mustBe enrollmentEori
         arrival.movementEORINumber mustBe Some(movementEori)
         arrival.messages.head mustBe message
+        arrival.localReferenceNumber mustBe None
     }
   }
 
@@ -117,6 +117,7 @@ class MovementFactoryImplSpec
         movement.movementReferenceNumber mustBe None
         movement.enrollmentEORINumber mustBe enrollmentEori
         movement.movementEORINumber mustBe None
+        movement.localReferenceNumber mustBe None
     }
   }
 }

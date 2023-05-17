@@ -24,8 +24,7 @@ case class Movement(
   enrollmentEORINumber: EORINumber,
   movementEORINumber: Option[EORINumber],
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
-  movementLRN: Option[LocalReferenceNumber],
-  movementMessageSender: Option[MessageSender],
+  localReferenceNumber: Option[LocalReferenceNumber],
   created: OffsetDateTime,
   updated: OffsetDateTime,
   messages: Vector[Message]

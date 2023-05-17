@@ -63,7 +63,6 @@ import uk.gov.hmrc.transitmovements.models.ExtractedData
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
@@ -501,19 +500,13 @@ class MessageBodyControllerSpec
     ) {
       (eori, movementId, messageId, messageType, movementType, string) =>
         val ControllerAndMocks(sut, movementsRepository, _, messagesXmlParsingService, movementsXmlParsingService, messageService) = createController()
-        //val messageType                                                                                                            = MessageType.DeclarationData
         val extractDataEither: EitherT[Future, ParseError, Option[ExtractedData]] = {
           if (messageType == MessageType.DeclarationData)
-            EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), LocalReferenceNumber(string), MessageSender(string))))
+            EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), LocalReferenceNumber(string))))
           else EitherT.rightT(None)
         }
         val lrnOption: Option[LocalReferenceNumber] = {
           if (messageType == MessageType.DeclarationData) Some(LocalReferenceNumber(string))
-          else None
-        }
-
-        val messageSenderOption: Option[MessageSender] = {
-          if (messageType == MessageType.DeclarationData) Some(MessageSender(string))
           else None
         }
 
@@ -549,7 +542,7 @@ class MessageBodyControllerSpec
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(extractDataEither)
 
-        when(movementsRepository.restrictLRNWithMessageSender(DeclarationData(Some(eori), now, LocalReferenceNumber(string), MessageSender(string))))
+        when(movementsRepository.restrictDuplicateLRN(DeclarationData(Some(eori), now, LocalReferenceNumber(string))))
           .thenReturn(EitherT.rightT((): Unit))
 
         when(
@@ -572,7 +565,6 @@ class MessageBodyControllerSpec
             eqTo(eoriOption),
             eqTo(None),
             eqTo(lrnOption),
-            eqTo(messageSenderOption),
             eqTo(now)
           )
         )
@@ -645,7 +637,6 @@ class MessageBodyControllerSpec
             eqTo(Some(movementEori)),
             eqTo(Some(movementReferenceNumber)),
             eqTo(None),
-            eqTo(None),
             eqTo(now)
           )
         )
@@ -698,11 +689,11 @@ class MessageBodyControllerSpec
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(
             EitherT.rightT(
-              Some(DeclarationData(Some(movementEori), now, lrn, MessageSender(string)))
+              Some(DeclarationData(Some(movementEori), now, lrn))
             )
           )
 
-        when(movementsRepository.restrictLRNWithMessageSender(DeclarationData(Some(movementEori), now, lrn, MessageSender(string))))
+        when(movementsRepository.restrictDuplicateLRN(DeclarationData(Some(movementEori), now, lrn)))
           .thenReturn(EitherT.rightT((): Unit))
 
         when(
@@ -725,7 +716,6 @@ class MessageBodyControllerSpec
             eqTo(Some(movementEori)),
             eqTo(None),
             eqTo(Some(lrn)),
-            eqTo(Some(MessageSender(string))),
             eqTo(now)
           )
         )
@@ -778,11 +768,11 @@ class MessageBodyControllerSpec
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(
             EitherT.rightT(
-              Some(DeclarationData(Some(movementEori), now, lrn, MessageSender(string)))
+              Some(DeclarationData(Some(movementEori), now, lrn))
             )
           )
 
-        when(movementsRepository.restrictLRNWithMessageSender(DeclarationData(Some(movementEori), now, lrn, MessageSender(string))))
+        when(movementsRepository.restrictDuplicateLRN(DeclarationData(Some(movementEori), now, lrn)))
           .thenReturn(EitherT.rightT((): Unit))
 
         when(
@@ -805,7 +795,6 @@ class MessageBodyControllerSpec
             eqTo(Some(movementEori)),
             eqTo(None),
             eqTo(Some(lrn)),
-            eqTo(Some(MessageSender(string))),
             eqTo(now)
           )
         )
@@ -817,7 +806,7 @@ class MessageBodyControllerSpec
         status(result) mustBe CREATED
     }
 
-    "must return Conflict when duplicate entry of LRN + MessageSender" in forAll(
+    "must return Conflict when duplicate entry of LRN" in forAll(
       arbitrary[EORINumber],
       arbitrary[EORINumber],
       arbitrary[MovementId],
@@ -858,11 +847,11 @@ class MessageBodyControllerSpec
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(
             EitherT.rightT(
-              Some(DeclarationData(Some(movementEori), now, lrn, MessageSender(string)))
+              Some(DeclarationData(Some(movementEori), now, lrn))
             )
           )
 
-        when(movementsRepository.restrictLRNWithMessageSender(DeclarationData(Some(movementEori), now, lrn, MessageSender(string))))
+        when(movementsRepository.restrictDuplicateLRN(DeclarationData(Some(movementEori), now, lrn)))
           .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", lrn)))
 
         when(
@@ -885,7 +874,6 @@ class MessageBodyControllerSpec
             eqTo(Some(movementEori)),
             eqTo(None),
             eqTo(Some(lrn)),
-            eqTo(Some(MessageSender(string))),
             eqTo(now)
           )
         )
@@ -1209,7 +1197,7 @@ class MessageBodyControllerSpec
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(
             EitherT.rightT(
-              Some(DeclarationData(Some(movementEori), nowMinusOne, LocalReferenceNumber(string), MessageSender(string)))
+              Some(DeclarationData(Some(movementEori), nowMinusOne, LocalReferenceNumber(string)))
             )
           )
 
@@ -1265,7 +1253,7 @@ class MessageBodyControllerSpec
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(
             EitherT.rightT(
-              Some(DeclarationData(Some(movementEori), nowMinusOne, LocalReferenceNumber(string), MessageSender(string)))
+              Some(DeclarationData(Some(movementEori), nowMinusOne, LocalReferenceNumber(string)))
             )
           )
 
@@ -1288,7 +1276,6 @@ class MessageBodyControllerSpec
             MovementId(eqTo(movementId.value)),
             eqTo(Some(movementEori)),
             eqTo(Some(movementReferenceNumber)),
-            eqTo(None),
             eqTo(None),
             eqTo(now)
           )
@@ -1353,7 +1340,7 @@ class MessageBodyControllerSpec
           )
         ).thenReturn(EitherT.rightT((): Unit))
 
-        when(movementsRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(None), eqTo(None), eqTo(None), eqTo(None), eqTo(nowMinusOne)))
+        when(movementsRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(None), eqTo(None), eqTo(None), eqTo(nowMinusOne)))
           .thenReturn(EitherT.leftT(MongoError.UpdateNotAcknowledged("bleh")))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
