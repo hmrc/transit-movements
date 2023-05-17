@@ -426,7 +426,7 @@ class MovementsControllerSpec
       }
     }
 
-    "must return CONFLICT error" - {
+    "must return CONFLICT error" in {
       val tempFile = SingletonTemporaryFileCreator.create()
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -434,7 +434,7 @@ class MovementsControllerSpec
         .thenReturn(departureDataEither)
 
       when(mockRepository.restrictLRNWithMessageSender(eqTo(declarationData)))
-        .thenReturn(EitherT.leftT(MongoError.ConflictError("\"(\\\"CC015C\\\" :: \\\"TransitOperation\\\" :: \\\"LRN\\\" :: Nil)\"")))
+        .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", LocalReferenceNumber("123"))))
 
       val request: Request[Source[ByteString, _]] = fakeRequest[Source[ByteString, _]](POST, validXmlStream, Some(MessageType.DeclarationData.code))
 
@@ -444,7 +444,8 @@ class MovementsControllerSpec
       status(result) mustBe CONFLICT
       contentAsJson(result) mustBe Json.obj(
         "code"    -> "CONFLICT",
-        "message" -> "\"(\\\"CC015C\\\" :: \\\"TransitOperation\\\" :: \\\"LRN\\\" :: Nil)\""
+        "message" -> "LRN has previously been used and cannot be reused",
+        "lrn"     -> "123"
       )
     }
   }
@@ -1691,7 +1692,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
             when(mockRepository.restrictLRNWithMessageSender(eqTo(DeclarationData(Some(eori), generatedTime, lrn, messageSender))))
-              .thenReturn(EitherT.leftT(MongoError.ConflictError("\"(\\\"CC015C\\\" :: \\\"TransitOperation\\\" :: \\\"LRN\\\" :: Nil)\"")))
+              .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", lrn)))
 
             when(
               mockRepository.updateMessage(
