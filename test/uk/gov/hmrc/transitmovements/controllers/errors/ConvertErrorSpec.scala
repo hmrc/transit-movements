@@ -29,6 +29,7 @@ import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.InternalServerE
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.NotFound
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.NoHeaderFound
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 
 import java.time.format.DateTimeParseException
 import scala.concurrent.ExecutionContext
@@ -88,9 +89,9 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       }
 
     "Conflict should result in Conflict status" in {
-      val input = Left[MongoError, Unit](ConflictError("test")).toEitherT[Future]
+      val input = Left[MongoError, Unit](ConflictError("test", LocalReferenceNumber("1234"))).toEitherT[Future]
       whenReady(input.asPresentation.value) {
-        _.left.toOption.get.code mustBe Conflict
+        _ mustBe Left(DuplicateLRNError("test", Conflict, LocalReferenceNumber("1234")))
       }
     }
 

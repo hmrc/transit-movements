@@ -863,7 +863,7 @@ class MessageBodyControllerSpec
           )
 
         when(movementsRepository.restrictLRNWithMessageSender(DeclarationData(Some(movementEori), now, lrn, MessageSender(string))))
-          .thenReturn(EitherT.leftT(MongoError.ConflictError("\"(\\\"CC015C\\\" :: \\\"TransitOperation\\\" :: \\\"LRN\\\" :: Nil)\"")))
+          .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", lrn)))
 
         when(
           messageService

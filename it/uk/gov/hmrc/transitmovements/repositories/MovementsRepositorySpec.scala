@@ -871,7 +871,9 @@ class MovementsRepositorySpec
       repository.restrictLRNWithMessageSender(declarationData).value
     )
 
-    alreadyExistResult should be(Left(MongoError.ConflictError(s"LRN ${declarationData.movementLRN.value} has previously been used and cannot be reused")))
+    alreadyExistResult should be(
+      Left(MongoError.ConflictError(s"LRN ${declarationData.movementLRN.value} has previously been used and cannot be reused", declarationData.movementLRN))
+    )
 
     val data = DeclarationData(
       movementEoriNumber = Some(movementEORI),

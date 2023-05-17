@@ -21,6 +21,8 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.Conflict
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 
 class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar {
 
@@ -74,6 +76,14 @@ class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar 
 
       // then we should get an expected output
       json mustBe Json.obj("code" -> "INTERNAL_SERVER_ERROR", "message" -> "Internal server error")
+    }
+
+    "for an duplicate lrn error" in {
+      val sut = DuplicateLRNError("error", Conflict, LocalReferenceNumber("123"))
+
+      val json = Json.toJson(sut)
+
+      json mustBe Json.obj("code" -> "CONFLICT", "message" -> "error", "lrn" -> "123")
     }
   }
 
