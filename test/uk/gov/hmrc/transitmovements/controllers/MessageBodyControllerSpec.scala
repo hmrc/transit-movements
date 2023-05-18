@@ -542,7 +542,7 @@ class MessageBodyControllerSpec
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(extractDataEither)
 
-        when(movementsRepository.restrictDuplicateLRN(DeclarationData(Some(eori), now, LocalReferenceNumber(string))))
+        when(movementsRepository.restrictDuplicateLRN(LocalReferenceNumber(string)))
           .thenReturn(EitherT.rightT((): Unit))
 
         when(
@@ -693,7 +693,7 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(movementsRepository.restrictDuplicateLRN(DeclarationData(Some(movementEori), now, lrn)))
+        when(movementsRepository.restrictDuplicateLRN(lrn))
           .thenReturn(EitherT.rightT((): Unit))
 
         when(
@@ -772,7 +772,7 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(movementsRepository.restrictDuplicateLRN(DeclarationData(Some(movementEori), now, lrn)))
+        when(movementsRepository.restrictDuplicateLRN(lrn))
           .thenReturn(EitherT.rightT((): Unit))
 
         when(
@@ -851,7 +851,7 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(movementsRepository.restrictDuplicateLRN(DeclarationData(Some(movementEori), now, lrn)))
+        when(movementsRepository.restrictDuplicateLRN(lrn))
           .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", lrn)))
 
         when(

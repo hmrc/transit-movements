@@ -242,7 +242,7 @@ class MovementsControllerSpec
       when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockRepository.restrictDuplicateLRN(eqTo(declarationData))).thenReturn(EitherT.rightT(Right(())))
+      when(mockRepository.restrictDuplicateLRN(eqTo(lrn))).thenReturn(EitherT.rightT(Right(())))
 
       when(
         mockMovementFactory.createDeparture(
@@ -431,7 +431,7 @@ class MovementsControllerSpec
       when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockRepository.restrictDuplicateLRN(eqTo(declarationData)))
+      when(mockRepository.restrictDuplicateLRN(eqTo(lrn)))
         .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", LocalReferenceNumber("123"))))
 
       val request: Request[Source[ByteString, _]] = fakeRequest[Source[ByteString, _]](POST, validXmlStream, Some(MessageType.DeclarationData.code))
@@ -1369,7 +1369,7 @@ class MovementsControllerSpec
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
-            when(mockRepository.restrictDuplicateLRN(eqTo(DeclarationData(Some(eori), generatedTime, lrn))))
+            when(mockRepository.restrictDuplicateLRN(eqTo(lrn)))
               .thenReturn(EitherT.rightT(Right(())))
 
             when(
@@ -1586,7 +1586,7 @@ class MovementsControllerSpec
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
-            when(mockRepository.restrictDuplicateLRN(eqTo(DeclarationData(Some(eori), generatedTime, lrn))))
+            when(mockRepository.restrictDuplicateLRN(eqTo(lrn)))
               .thenReturn(EitherT.rightT((): Unit))
 
             when(
@@ -1676,7 +1676,7 @@ class MovementsControllerSpec
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
-            when(mockRepository.restrictDuplicateLRN(eqTo(DeclarationData(Some(eori), generatedTime, lrn))))
+            when(mockRepository.restrictDuplicateLRN(eqTo(lrn)))
               .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", lrn)))
 
             when(
