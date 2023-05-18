@@ -849,28 +849,18 @@ class MovementsRepositorySpec
 
     await(repository.insert(departureXi2).value)
 
-    val declarationData = DeclarationData(
-      movementEoriNumber = Some(movementEORI),
-      generationDate = instant,
-      lrn = lrn.value
-    )
-
     val alreadyExistResult = await(
-      repository.restrictDuplicateLRN(declarationData).value
+      repository.restrictDuplicateLRN(lrn.value).value
     )
 
     alreadyExistResult should be(
-      Left(MongoError.ConflictError(s"LRN ${declarationData.lrn.value} has previously been used and cannot be reused", declarationData.lrn))
+      Left(MongoError.ConflictError(s"LRN ${lrn.value.value} has previously been used and cannot be reused", lrn.value))
     )
 
-    val data = DeclarationData(
-      movementEoriNumber = Some(movementEORI),
-      generationDate = instant,
-      lrn = LocalReferenceNumber("1234")
-    )
+    val notExistLRN = LocalReferenceNumber("1234")
 
     val notExistResult = await(
-      repository.restrictDuplicateLRN(data).value
+      repository.restrictDuplicateLRN(notExistLRN).value
     )
 
     notExistResult should be(Right(()))

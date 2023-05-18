@@ -32,7 +32,6 @@ import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.ExtractedData
 import uk.gov.hmrc.transitmovements.models.MessageData
@@ -99,14 +98,9 @@ class MessageBodyController @Inject() (
           extractedData <- movementsXmlParsingService.extractData(messageType, request.body).asPresentation
           _ <- messageType match {
             case MessageType.DeclarationData =>
-              val declarationData = DeclarationData(
-                extractedData.flatMap(_.movementEoriNumber),
-                messageData.generationDate,
-                extractedData.flatMap(_.localReferenceNumber).get
-              )
               repo
                 .restrictDuplicateLRN(
-                  declarationData
+                  extractedData.flatMap(_.localReferenceNumber).get
                 )
                 .asPresentation
             case _ => EitherT.rightT[Future, MongoError]((): Unit).asPresentation

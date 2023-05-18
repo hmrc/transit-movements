@@ -34,7 +34,6 @@ import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
@@ -119,7 +118,7 @@ trait MovementsRepository {
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
-  def restrictDuplicateLRN(declarationData: DeclarationData): EitherT[Future, MongoError, Unit]
+  def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber): EitherT[Future, MongoError, Unit]
 
 }
 
@@ -434,8 +433,8 @@ class MovementsRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def restrictDuplicateLRN(declarationData: DeclarationData): EitherT[Future, MongoError, Unit] = {
-    val selector = mEq("localReferenceNumber", declarationData.lrn.value)
+  def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber): EitherT[Future, MongoError, Unit] = {
+    val selector = mEq("localReferenceNumber", localReferenceNumber.value)
 
     val projection = MovementWithoutMessages.projection
 
@@ -451,7 +450,7 @@ class MovementsRepositoryImpl @Inject() (
           case None =>
             Right()
           case Some(opt) =>
-            Left(ConflictError(s"LRN ${declarationData.lrn.value} has previously been used and cannot be reused", declarationData.lrn))
+            Left(ConflictError(s"LRN ${localReferenceNumber.value} has previously been used and cannot be reused", localReferenceNumber))
         }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
