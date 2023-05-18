@@ -27,7 +27,6 @@ import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
-import org.mockito.MockitoSugar.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
@@ -743,7 +742,7 @@ class MovementsControllerSpec
     s"when the movement type equals ${movementType.value}" - {
 
       "getMovementWithoutMessages" - {
-        HERE
+
         val request = FakeRequest("GET", routes.MovementsController.getMovementWithoutMessages(eoriNumber, movementType, movementId).url)
 
         "must return OK if departure found" in {
