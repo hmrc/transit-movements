@@ -93,7 +93,8 @@ trait MovementsRepository {
     eoriNumber: EORINumber,
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime],
-    movementEORI: Option[EORINumber]
+    movementEORI: Option[EORINumber],
+    movementReferenceNumber: Option[MovementReferenceNumber]
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]]
 
   def updateMovement(
@@ -280,13 +281,15 @@ class MovementsRepositoryImpl @Inject() (
     eoriNumber: EORINumber,
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime],
-    movementEORI: Option[EORINumber]
+    movementEORI: Option[EORINumber],
+    movementReferenceNumber: Option[MovementReferenceNumber]
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]] = {
     val selector: Bson = mAnd(
       mEq("enrollmentEORINumber", eoriNumber.value),
       mEq("movementType", movementType.value),
       mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
-      movementEORIFilter(movementEORI)
+      movementEORIFilter(movementEORI),
+      movementMRNFilter(movementReferenceNumber)
     )
 
     val projection = MovementWithoutMessages.projection
@@ -315,6 +318,12 @@ class MovementsRepositoryImpl @Inject() (
     movementEORI match {
       case Some(movementEORI) => mAnd(mEq("movementEORINumber", movementEORI.value))
       case _                  => empty()
+    }
+
+  private def movementMRNFilter(movementReferenceNumber: Option[MovementReferenceNumber]): Bson =
+    movementReferenceNumber match {
+      case Some(movementReferenceNumber) => mAnd(mEq("movementReferenceNumber", movementReferenceNumber.value))
+      case _                             => empty()
     }
 
   def attachMessage(
