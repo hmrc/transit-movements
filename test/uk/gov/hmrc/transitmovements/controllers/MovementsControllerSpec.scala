@@ -837,7 +837,7 @@ class MovementsControllerSpec
         "must return OK if departures were found" in {
           val response = MovementWithoutMessages.fromMovement(movement)
 
-          when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(None), eqTo(None)))
+          when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None)))
             .thenReturn(EitherT.rightT(Vector(response)))
 
           val result = controller.getMovementsForEori(eoriNumber, movementType)(request)
@@ -845,17 +845,18 @@ class MovementsControllerSpec
           contentAsJson(result) mustBe Json.toJson(Vector(response))
         }
 
-        "must return OK if departures were found and it match the updatedSince or movementEORI or both filter" in forAll(
+        "must return OK if departures were found and it match the updatedSince or movementEORI or movementReferenceNumber or all these filters" in forAll(
           Gen.option(arbitrary[OffsetDateTime]),
-          Gen.option(arbitrary[EORINumber])
+          Gen.option(arbitrary[EORINumber]),
+          Gen.option(arbitrary[MovementReferenceNumber])
         ) {
-          (updatedSince, movementEORI) =>
+          (updatedSince, movementEORI, movementReferenceNumber) =>
             val response = MovementWithoutMessages.fromMovement(movement)
 
-            when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(updatedSince), eqTo(movementEORI)))
+            when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(updatedSince), eqTo(movementEORI), eqTo(movementReferenceNumber)))
               .thenReturn(EitherT.rightT(Vector(response)))
 
-            val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI)(request)
+            val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber)(request)
 
             status(result) mustBe OK
             contentAsJson(result) mustBe Json.toJson(Vector(response))
@@ -863,7 +864,7 @@ class MovementsControllerSpec
 
         "must return NOT_FOUND if no ids were found" in forAll(Gen.option(arbitrary[OffsetDateTime]), Gen.option(arbitrary[EORINumber])) {
           (updatedSince, movementEORI) =>
-            when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(updatedSince), eqTo(movementEORI)))
+            when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(updatedSince), eqTo(movementEORI), eqTo(None)))
               .thenReturn(EitherT.rightT(Vector.empty[MovementWithoutMessages]))
 
             val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI)(request)
@@ -876,7 +877,7 @@ class MovementsControllerSpec
           Gen.option(arbitrary[EORINumber])
         ) {
           (updatedSince, movementEORI) =>
-            when(mockRepository.getMovements(EORINumber(any()), any(), eqTo(updatedSince), eqTo(movementEORI)))
+            when(mockRepository.getMovements(EORINumber(any()), any(), eqTo(updatedSince), eqTo(movementEORI), eqTo(None)))
               .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
             val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI)(request)
