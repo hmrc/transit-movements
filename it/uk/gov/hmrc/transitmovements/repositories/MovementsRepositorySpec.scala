@@ -84,6 +84,14 @@ class MovementsRepositorySpec
     repository.domainFormat shouldEqual MongoFormats.movementFormat
   }
 
+  "DepartureMovementRepository" should "have the index for localReferenceNumber" in {
+    repository.indexes
+      .map(
+        item => item.getKeys
+      )
+      .contains(Indexes.ascending("localReferenceNumber")) shouldBe true
+  }
+
   "insert" should "add the given movement to the database" in {
 
     val departure = arbitrary[Movement].sample.value.copy(_id = MovementId("2"))
@@ -827,7 +835,7 @@ class MovementsRepositorySpec
       result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
   }
 
-  "checkDuplicate" should "check the duplicate LRN with messageSender" in {
+  "checkDuplicate" should "check the duplicate LRN" in {
 
     val eoriXI       = arbitrary[EORINumber].sample.value
     val movementEORI = arbitrary[EORINumber].sample.value
@@ -930,7 +938,7 @@ class MovementsRepositorySpec
     movement.movementReferenceNumber shouldEqual Some(mrn)
   }
 
-  it should "update the EORI, LRN and MessageSender if they are supplied" in {
+  it should "update the EORI and LRN if they are supplied" in {
     val departureMovement =
       arbitrary[Movement].sample.value
         .copy(
@@ -999,7 +1007,7 @@ class MovementsRepositorySpec
     movement.movementReferenceNumber shouldEqual Some(mrn)
   }
 
-  it should "not update anything if the EORI, MRN, LRN and MessageSender are not supplied" in {
+  it should "not update anything if the EORI, MRN and LRN are not supplied" in {
     val departureMovement =
       arbitrary[Movement].sample.value
         .copy(
