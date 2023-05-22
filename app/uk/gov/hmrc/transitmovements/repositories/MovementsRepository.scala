@@ -448,7 +448,7 @@ class MovementsRepositoryImpl @Inject() (
       case Success(obs) =>
         obs.headOption().map {
           case None =>
-            Right()
+            Right((): Unit)
           case Some(opt) =>
             Left(ConflictError(s"LRN ${localReferenceNumber.value} has previously been used and cannot be reused", localReferenceNumber))
         }
