@@ -298,7 +298,6 @@ class MovementsRepositorySpec
   }
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed MRN" in {
-    GetMovementsSetup.setup()
     await(repository.insert(GetMovementsSetup.departureGB4).value)
     val result =
       await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, GetMovementsSetup.departureGB4.movementReferenceNumber).value)
@@ -306,6 +305,20 @@ class MovementsRepositorySpec
     result.toOption.get should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB4)
+      )
+    )
+  }
+
+  it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with partial match MRN" in {
+    await(repository.insert(GetMovementsSetup.departureGB5).value)
+    await(repository.insert(GetMovementsSetup.departureGB6).value)
+    val result =
+      await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, Some(MovementReferenceNumber("27WF9"))).value)
+
+    result.toOption.get should be(
+      Vector(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB6),
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB5)
       )
     )
   }
@@ -386,7 +399,6 @@ class MovementsRepositorySpec
   }
 
   it should "return a list of arrival movement responses for the supplied EORI if there are movements that matched with passed MRN" in {
-    GetMovementsSetup.setup()
     await(repository.insert(GetMovementsSetup.arrivalGB3).value)
     val result =
       await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None, GetMovementsSetup.arrivalGB3.movementReferenceNumber).value)
@@ -394,6 +406,20 @@ class MovementsRepositorySpec
     result.toOption.get should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB3)
+      )
+    )
+  }
+
+  it should "return a list of arrival movement responses for the supplied EORI if there are movements that matched with partial match MRN" in {
+    await(repository.insert(GetMovementsSetup.arrivalGB5).value)
+    await(repository.insert(GetMovementsSetup.arrivalGB6).value)
+    val result =
+      await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None, Some(MovementReferenceNumber("27WF9"))).value)
+
+    result.toOption.get should be(
+      Vector(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB6),
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB5)
       )
     )
   }
@@ -490,6 +516,24 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
+    val departureGB5 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = Some(EORINumber("1234AB")),
+        movementType = MovementType.Departure,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5"))
+      )
+
+    val departureGB6 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = Some(EORINumber("1234AB")),
+        movementType = MovementType.Departure,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM3"))
+      )
+
     val arrivalGB2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
@@ -515,6 +559,24 @@ class MovementsRepositorySpec
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample
+      )
+
+    val arrivalGB5 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = Some(movementEORI),
+        movementType = MovementType.Arrival,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5"))
+      )
+
+    val arrivalGB6 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = Some(movementEORI),
+        movementType = MovementType.Arrival,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM6"))
       )
 
     def setup() = {

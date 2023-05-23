@@ -21,6 +21,7 @@ import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
+import com.mongodb.client.model.Filters.{regex => mRegex}
 import com.mongodb.client.model.Filters.{gte => mGte}
 import com.mongodb.client.model.Filters.empty
 import com.mongodb.client.model.Updates.{push => mPush}
@@ -282,8 +283,8 @@ class MovementsRepositoryImpl @Inject() (
       mEq("enrollmentEORINumber", eoriNumber.value),
       mEq("movementType", movementType.value),
       mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
-      movementEORIFilter(movementEORI),
-      movementMRNFilter(movementReferenceNumber)
+      movementEORIFilter(movementEORI)
+      // movementMRNFilter(movementReferenceNumber)
     )
 
     val projection = MovementWithoutMessages.projection
@@ -298,15 +299,30 @@ class MovementsRepositoryImpl @Inject() (
       case Success(obs) =>
         obs
           .toFuture()
-          .map(
-            response => Right(response.toVector)
-          )
+          .map {
+            response =>
+              movementReferenceNumber match {
+                case Some(movementReferenceNumber) =>
+                  Right(
+                    response
+                      .filter(
+                        movement => partialMrnMatch(movementReferenceNumber, movement)
+                      )
+                      .toVector
+                  )
+                case _ => Right(response.toVector)
+              }
+          }
 
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
   }
+
+  private def partialMrnMatch(movementReferenceNumber: MovementReferenceNumber, movement: MovementWithoutMessages) =
+    movement.movementReferenceNumber.isDefined &&
+      movement.movementReferenceNumber.get.value.toUpperCase.matches(s".*[${movementReferenceNumber.value.toUpperCase}].*")
 
   private def movementEORIFilter(movementEORI: Option[EORINumber]): Bson =
     movementEORI match {
@@ -316,7 +332,7 @@ class MovementsRepositoryImpl @Inject() (
 
   private def movementMRNFilter(movementReferenceNumber: Option[MovementReferenceNumber]): Bson =
     movementReferenceNumber match {
-      case Some(movementReferenceNumber) => mAnd(mEq("movementReferenceNumber", movementReferenceNumber.value))
+      case Some(movementReferenceNumber) => mAnd(mRegex("movementReferenceNumber", s".*[${movementReferenceNumber.value}].*"))
       case _                             => empty()
     }
 
