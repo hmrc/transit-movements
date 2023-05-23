@@ -21,6 +21,7 @@ import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
+import com.mongodb.client.model.Filters.{regex => mRegex}
 import com.mongodb.client.model.Filters.{gte => mGte}
 import com.mongodb.client.model.Filters.empty
 import com.mongodb.client.model.Updates.{push => mPush}
@@ -288,7 +289,8 @@ class MovementsRepositoryImpl @Inject() (
       mEq("enrollmentEORINumber", eoriNumber.value),
       mEq("movementType", movementType.value),
       mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
-      movementEORIFilter(movementEORI)
+      movementEORIFilter(movementEORI),
+      movementMRNFilter(movementReferenceNumber)
     )
 
     val projection = MovementWithoutMessages.projection
@@ -303,20 +305,9 @@ class MovementsRepositoryImpl @Inject() (
       case Success(obs) =>
         obs
           .toFuture()
-          .map {
-            response =>
-              movementReferenceNumber match {
-                case Some(movementReferenceNumber) =>
-                  Right(
-                    response
-                      .filter(
-                        movement => partialMrnMatch(movementReferenceNumber, movement)
-                      )
-                      .toVector
-                  )
-                case _ => Right(response.toVector)
-              }
-          }
+          .map(
+            response => Right(response.toVector)
+          )
 
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
@@ -332,6 +323,12 @@ class MovementsRepositoryImpl @Inject() (
     movementEORI match {
       case Some(movementEORI) => mAnd(mEq("movementEORINumber", movementEORI.value))
       case _                  => empty()
+    }
+
+  private def movementMRNFilter(movementReferenceNumber: Option[MovementReferenceNumber]): Bson =
+    movementReferenceNumber match {
+      case Some(movementReferenceNumber) => mAnd(mRegex("movementReferenceNumber", s"\\Q${movementReferenceNumber.value}\\E", "i"))
+      case _                             => empty()
     }
 
   def attachMessage(
