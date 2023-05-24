@@ -185,22 +185,6 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
         }
 
     }
-
-    "creating a message with a pre-existing object store URI returns an appropriate message" in forAll(
-      arbitrary[MovementId],
-      Gen.option(arbitrary[MessageId]),
-      arbitrary[MessageType],
-      arbitrary[MessageStatus]
-    ) {
-      (movementId, triggerId, messageType, messageStatus) =>
-        beforeTest()
-
-        val os     = testObjectStoreURI(movementId, messageId, instant)
-        val result = sut.create(movementId, messageType, instant, instant, triggerId, os, messageStatus)
-
-        result mustBe Message(messageId, instant, Some(instant), Some(messageType), triggerId, Some(new URI(os.value)), None, None, Some(messageStatus))
-
-    }
   }
 
   "createEmptyMessage" - {

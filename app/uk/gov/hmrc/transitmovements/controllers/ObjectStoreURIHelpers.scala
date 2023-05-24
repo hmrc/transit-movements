@@ -18,7 +18,6 @@ package uk.gov.hmrc.transitmovements.controllers
 
 import cats.data.EitherT
 import play.api.mvc.BaseController
-import play.api.mvc.Headers
 import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
@@ -28,13 +27,6 @@ import scala.concurrent.Future
 
 trait ObjectStoreURIHelpers {
   self: BaseController =>
-
-  def extractObjectStoreURI(headers: Headers): EitherT[Future, PresentationError, ObjectStoreURI] =
-    EitherT {
-      Future.successful(
-        headers.get(Constants.ObjectStoreURI).map(ObjectStoreURI.apply).toRight(PresentationError.badRequestError("Missing X-Object-Store-Uri header value"))
-      )
-    }
 
   def extractResourceLocation(objectStoreURI: ObjectStoreURI): EitherT[Future, PresentationError, ObjectStoreResourceLocation] =
     EitherT {

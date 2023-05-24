@@ -17,8 +17,6 @@
 package uk.gov.hmrc.transitmovements.repositories
 
 import org.mongodb.scala.model.Filters
-import org.mongodb.scala.model.IndexModel
-import org.mongodb.scala.model.IndexOptions
 import org.mongodb.scala.model.Indexes
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.OptionValues
