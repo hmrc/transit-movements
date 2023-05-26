@@ -316,10 +316,6 @@ class MovementsRepositoryImpl @Inject() (
 
   }
 
-  private def partialMrnMatch(movementReferenceNumber: MovementReferenceNumber, movement: MovementWithoutMessages) =
-    movement.movementReferenceNumber.isDefined &&
-      movement.movementReferenceNumber.get.value.toUpperCase.matches(s".*[${movementReferenceNumber.value.toUpperCase}].*")
-
   private def movementEORIFilter(movementEORI: Option[EORINumber]): Bson =
     movementEORI match {
       case Some(movementEORI) => mAnd(mEq("movementEORINumber", movementEORI.value))
