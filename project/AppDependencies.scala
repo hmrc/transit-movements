@@ -5,9 +5,10 @@ object AppDependencies {
 
   private val catsVersion = "2.7.0"
   val hmrcMongoVersion    = "0.73.0"
+  val boostrapPlayVersion = "7.12.0"
 
   val compile = Seq(
-    "uk.gov.hmrc"             %% "bootstrap-backend-play-28"   % "7.12.0",
+    "uk.gov.hmrc"             %% "bootstrap-backend-play-28"   % boostrapPlayVersion,
     "uk.gov.hmrc.mongo"       %% "hmrc-mongo-play-28"          % hmrcMongoVersion,
     "uk.gov.hmrc.objectstore" %% "object-store-client-play-28" % "1.0.0",
     "org.typelevel"           %% "cats-core"                   % catsVersion,
@@ -18,6 +19,7 @@ object AppDependencies {
   )
 
   val test = Seq(
+    "uk.gov.hmrc"            %% "bootstrap-test-play-28"  % boostrapPlayVersion,
     "uk.gov.hmrc.mongo"      %% "hmrc-mongo-test-play-28" % hmrcMongoVersion,
     "org.mockito"             % "mockito-core"            % "4.5.1",
     "org.scalatest"          %% "scalatest"               % "3.2.12",
