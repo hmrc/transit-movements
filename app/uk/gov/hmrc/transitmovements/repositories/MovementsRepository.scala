@@ -21,6 +21,7 @@ import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
+import com.mongodb.client.model.Filters.{regex => mRegex}
 import com.mongodb.client.model.Filters.{gte => mGte}
 import com.mongodb.client.model.Filters.empty
 import com.mongodb.client.model.Updates.{push => mPush}
@@ -92,7 +93,8 @@ trait MovementsRepository {
     eoriNumber: EORINumber,
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime],
-    movementEORI: Option[EORINumber]
+    movementEORI: Option[EORINumber],
+    movementReferenceNumber: Option[MovementReferenceNumber]
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]]
 
   def updateMovement(
@@ -133,7 +135,8 @@ class MovementsRepositoryImpl @Inject() (
       collectionName = "movements",
       domainFormat = MongoFormats.movementFormat,
       indexes = Seq(
-        IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS))
+        IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS)),
+        IndexModel(Indexes.ascending("movementReferenceNumber"), IndexOptions().background(true))
       ),
       extraCodecs = Seq(
         Codecs.playFormatCodec(MongoFormats.movementFormat),
@@ -274,13 +277,15 @@ class MovementsRepositoryImpl @Inject() (
     eoriNumber: EORINumber,
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime],
-    movementEORI: Option[EORINumber]
+    movementEORI: Option[EORINumber],
+    movementReferenceNumber: Option[MovementReferenceNumber]
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]] = {
     val selector: Bson = mAnd(
       mEq("enrollmentEORINumber", eoriNumber.value),
       mEq("movementType", movementType.value),
       mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
-      movementEORIFilter(movementEORI)
+      movementEORIFilter(movementEORI),
+      movementMRNFilter(movementReferenceNumber)
     )
 
     val projection = MovementWithoutMessages.projection
@@ -309,6 +314,12 @@ class MovementsRepositoryImpl @Inject() (
     movementEORI match {
       case Some(movementEORI) => mAnd(mEq("movementEORINumber", movementEORI.value))
       case _                  => empty()
+    }
+
+  private def movementMRNFilter(movementReferenceNumber: Option[MovementReferenceNumber]): Bson =
+    movementReferenceNumber match {
+      case Some(movementReferenceNumber) => mAnd(mRegex("movementReferenceNumber", s"\\Q${movementReferenceNumber.value}\\E", "i"))
+      case _                             => empty()
     }
 
   def attachMessage(
