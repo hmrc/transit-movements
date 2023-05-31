@@ -140,7 +140,8 @@ class MovementsRepositoryImpl @Inject() (
       domainFormat = MongoFormats.movementFormat,
       indexes = Seq(
         IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS)),
-        IndexModel(Indexes.ascending(fieldNames = "localReferenceNumber"))
+        IndexModel(Indexes.ascending(fieldNames = "localReferenceNumber")),
+        IndexModel(Indexes.ascending("movementReferenceNumber"), IndexOptions().background(true))
       ),
       extraCodecs = Seq(
         Codecs.playFormatCodec(MongoFormats.movementFormat),
