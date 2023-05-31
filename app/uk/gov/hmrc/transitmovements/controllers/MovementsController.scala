@@ -295,10 +295,11 @@ class MovementsController @Inject() (
     eoriNumber: EORINumber,
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime] = None,
-    movementEORI: Option[EORINumber] = None
+    movementEORI: Option[EORINumber] = None,
+    movementReferenceNumber: Option[MovementReferenceNumber] = None
   ): Action[AnyContent] = Action.async {
     repo
-      .getMovements(eoriNumber, movementType, updatedSince, movementEORI)
+      .getMovements(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
