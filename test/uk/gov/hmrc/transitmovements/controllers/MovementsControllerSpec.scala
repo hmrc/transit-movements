@@ -812,13 +812,14 @@ class MovementsControllerSpec
           contentAsJson(result) mustBe Json.toJson(messageResponseList)
         }
 
-        "must return NOT_FOUND if no departure found" in {
+        "must return empty list if no departure found" in {
           when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None)))
             .thenReturn(EitherT.rightT(Vector.empty[MessageResponse]))
 
           val result = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
 
-          status(result) mustBe NOT_FOUND
+          status(result) mustBe OK
+          contentAsJson(result) mustBe Json.toJson(Vector.empty[MessageResponse])
         }
 
         "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
@@ -862,14 +863,15 @@ class MovementsControllerSpec
             contentAsJson(result) mustBe Json.toJson(Vector(response))
         }
 
-        "must return NOT_FOUND if no ids were found" in forAll(Gen.option(arbitrary[OffsetDateTime]), Gen.option(arbitrary[EORINumber])) {
+        "must return empty list if no ids were found" in forAll(Gen.option(arbitrary[OffsetDateTime]), Gen.option(arbitrary[EORINumber])) {
           (updatedSince, movementEORI) =>
             when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(updatedSince), eqTo(movementEORI), eqTo(None)))
               .thenReturn(EitherT.rightT(Vector.empty[MovementWithoutMessages]))
 
             val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI)(request)
 
-            status(result) mustBe NOT_FOUND
+            status(result) mustBe OK
+            contentAsJson(result) mustBe Json.toJson(Vector.empty[MovementWithoutMessages])
         }
 
         "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in forAll(
