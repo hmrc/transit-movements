@@ -5,9 +5,10 @@ object AppDependencies {
 
   private val catsVersion = "2.7.0"
   val hmrcMongoVersion    = "0.73.0"
+  private val bootstrapPlayVersion = "7.12.0"
 
   val compile = Seq(
-    "uk.gov.hmrc"             %% "bootstrap-backend-play-28"   % "7.12.0",
+    "uk.gov.hmrc"             %% "bootstrap-backend-play-28"   % bootstrapPlayVersion,
     "uk.gov.hmrc.mongo"       %% "hmrc-mongo-play-28"          % hmrcMongoVersion,
     "uk.gov.hmrc.objectstore" %% "object-store-client-play-28" % "1.0.0",
     "org.typelevel"           %% "cats-core"                   % catsVersion,
@@ -31,6 +32,7 @@ object AppDependencies {
     "org.scalacheck"         %% "scalacheck"              % "1.16.0",
     "com.github.tomakehurst"  % "wiremock-standalone"     % "2.27.2",
     "org.typelevel"          %% "discipline-scalatest"    % "2.1.5",
-    "com.vladsch.flexmark"    % "flexmark-all"            % "0.62.2"
+    "com.vladsch.flexmark"    % "flexmark-all"            % "0.62.2",
+    "uk.gov.hmrc"            %% "bootstrap-test-play-28" % bootstrapPlayVersion
   ).map(_ % "test, it")
 }
