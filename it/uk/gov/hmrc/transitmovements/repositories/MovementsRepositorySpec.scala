@@ -548,6 +548,24 @@ class MovementsRepositorySpec
         movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM3"))
       )
 
+    val departureGB5 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = Some(EORINumber("1234AB")),
+        movementType = MovementType.Departure,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5"))
+      )
+
+    val departureGB6 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = Some(EORINumber("1234AB")),
+        movementType = MovementType.Departure,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM3"))
+      )
+
     val arrivalGB2 =
       arbitrary[Movement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
@@ -576,6 +594,24 @@ class MovementsRepositorySpec
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample,
         localReferenceNumber = None
+      )
+
+    val arrivalGB5 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = Some(movementEORI),
+        movementType = MovementType.Arrival,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5"))
+      )
+
+    val arrivalGB6 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = Some(movementEORI),
+        movementType = MovementType.Arrival,
+        updated = instant.minusMinutes(3),
+        movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM6"))
       )
 
     val arrivalGB5 =
