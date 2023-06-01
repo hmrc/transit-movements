@@ -27,7 +27,6 @@ import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
-import org.mockito.MockitoSugar.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
@@ -62,15 +61,14 @@ import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
-import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
-import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
@@ -83,11 +81,10 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
 import java.util.UUID.randomUUID
 import scala.annotation.nowarn
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.control.NonFatal
 import scala.xml.NodeSeq
 
 // this warning is a false one due to how the mock matchers work
@@ -802,8 +799,11 @@ class MovementsControllerSpec
           val messageResponses = MessageResponse.fromMessageWithoutBody(movement.messages.head)
 
           lazy val messageResponseList = Vector(messageResponses)
-
-          when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None)))
+          when(
+            mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
+          )
+            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+          when(mockRepository.getMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType), eqTo(None)))
             .thenReturn(EitherT.rightT(Vector(messageResponses)))
 
           val result = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
@@ -812,8 +812,13 @@ class MovementsControllerSpec
           contentAsJson(result) mustBe Json.toJson(messageResponseList)
         }
 
-        "must return empty list if no departure found" in {
-          when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None)))
+        "must return empty list if no messages found for given movement" in {
+
+          when(
+            mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
+          )
+            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+          when(mockRepository.getMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType), eqTo(None)))
             .thenReturn(EitherT.rightT(Vector.empty[MessageResponse]))
 
           val result = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
@@ -822,8 +827,22 @@ class MovementsControllerSpec
           contentAsJson(result) mustBe Json.toJson(Vector.empty[MessageResponse])
         }
 
+        "must return NOT_FOUND if no departure found" in {
+          when(mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType)))
+            .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
+
+          val result = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
+
+          status(result) mustBe NOT_FOUND
+        }
+
         "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
-          when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None)))
+          when(
+            mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
+          )
+            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+
+          when(mockRepository.getMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType), eqTo(None)))
             .thenReturn(EitherT.leftT(UnexpectedError(None)))
 
           val result = controller.getMessages(eoriNumber, movementType, movementId, None)(request)

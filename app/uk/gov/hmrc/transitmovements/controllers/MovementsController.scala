@@ -329,13 +329,16 @@ class MovementsController @Inject() (
     receivedSince: Option[OffsetDateTime] = None
   ) =
     Action.async {
-      repo
-        .getMessages(eoriNumber, movementId, movementType, receivedSince)
-        .asPresentation
-        .fold[Result](
-          baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-          messages => Ok(Json.toJson(messages))
-        )
+      (for {
+        _ <- repo.getMovementWithoutMessages(eoriNumber, movementId, movementType).asPresentation
+        messages <- repo
+          .getMessages(eoriNumber, movementId, movementType, receivedSince)
+          .asPresentation
+      } yield messages).fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        messages => Ok(Json.toJson(messages))
+      )
+
     }
 
   // Large Messages: Only perform this step if we haven't updated the movement EORI and we have an Object Store reference
