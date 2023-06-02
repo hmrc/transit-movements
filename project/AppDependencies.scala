@@ -33,7 +33,6 @@ object AppDependencies {
     "org.scalacheck"         %% "scalacheck"              % "1.16.0",
     "com.github.tomakehurst"  % "wiremock-standalone"     % "2.27.2",
     "org.typelevel"          %% "discipline-scalatest"    % "2.1.5",
-    "com.vladsch.flexmark"    % "flexmark-all"            % "0.62.2",
-    "uk.gov.hmrc"            %% "bootstrap-test-play-28"  % bootstrapPlayVersion
+    "com.vladsch.flexmark"    % "flexmark-all"            % "0.62.2"
   ).map(_ % "test, it")
 }
