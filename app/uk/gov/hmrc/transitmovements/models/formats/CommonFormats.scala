@@ -26,6 +26,7 @@ import play.api.libs.json.JsSuccess
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
@@ -49,6 +50,7 @@ trait CommonFormats {
   implicit val movementTypeFormat: Format[MovementType]   = enumFormat(MovementType.movementTypes)(_.value)
   implicit val messageIdFormat: Format[MessageId]         = Json.valueFormat[MessageId]
   implicit val movementIdFormat: Format[MovementId]       = Json.valueFormat[MovementId]
+  implicit val lrnFormat: Format[LocalReferenceNumber]    = Json.valueFormat[LocalReferenceNumber]
 
   implicit val messageTypeFormat: Format[MessageType] = enumFormat(MessageType.values)(_.code)
 

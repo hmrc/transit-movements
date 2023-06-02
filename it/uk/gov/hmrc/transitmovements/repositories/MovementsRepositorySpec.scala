@@ -84,6 +84,14 @@ class MovementsRepositorySpec
     repository.domainFormat shouldEqual MongoFormats.movementFormat
   }
 
+  "DepartureMovementRepository" should "have the index for localReferenceNumber" in {
+    repository.indexes
+      .map(
+        item => item.getKeys
+      )
+      .contains(Indexes.ascending("localReferenceNumber")) shouldBe true
+  }
+
   "insert" should "add the given movement to the database" in {
 
     val departure = arbitrary[Movement].sample.value.copy(_id = MovementId("2"))
@@ -450,6 +458,7 @@ class MovementsRepositorySpec
     val eoriXI       = arbitrary[EORINumber].sample.value
     val movementEORI = arbitrary[EORINumber].sample.value
     val message      = arbitrary[Message].sample.value
+    val lrn          = arbitrary[LocalReferenceNumber].sample.value
 
     val departureGB1 =
       arbitrary[Movement].sample.value.copy(
@@ -458,7 +467,8 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         created = instant,
         updated = instant,
-        messages = Vector(message)
+        messages = Vector(message),
+        localReferenceNumber = Some(lrn)
       )
 
     val arrivalGB1 =
@@ -486,7 +496,8 @@ class MovementsRepositorySpec
         enrollmentEORINumber = eoriXI,
         movementEORINumber = Some(movementEORI),
         updated = instant.minusMinutes(3),
-        movementReferenceNumber = mrnGen.sample
+        movementReferenceNumber = mrnGen.sample,
+        localReferenceNumber = Some(lrn)
       )
 
     val departureGB2 =
@@ -495,7 +506,8 @@ class MovementsRepositorySpec
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(1),
-        movementReferenceNumber = mrnGen.sample
+        movementReferenceNumber = mrnGen.sample,
+        localReferenceNumber = Some(lrn)
       )
 
     val departureGB3 =
@@ -504,7 +516,8 @@ class MovementsRepositorySpec
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
-        movementReferenceNumber = mrnGen.sample
+        movementReferenceNumber = mrnGen.sample,
+        localReferenceNumber = Some(lrn)
       )
 
     val departureGB4 =
@@ -513,7 +526,8 @@ class MovementsRepositorySpec
         movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
-        movementReferenceNumber = mrnGen.sample
+        movementReferenceNumber = mrnGen.sample,
+        localReferenceNumber = Some(lrn)
       )
 
     val departureGB5 =
@@ -540,7 +554,8 @@ class MovementsRepositorySpec
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
         updated = instant.plusMinutes(1),
-        movementReferenceNumber = mrnGen.sample
+        movementReferenceNumber = mrnGen.sample,
+        localReferenceNumber = None
       )
 
     val arrivalGB3 =
@@ -549,7 +564,8 @@ class MovementsRepositorySpec
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
-        movementReferenceNumber = mrnGen.sample
+        movementReferenceNumber = mrnGen.sample,
+        localReferenceNumber = None
       )
 
     val arrivalGB4 =
@@ -558,7 +574,8 @@ class MovementsRepositorySpec
         movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
-        movementReferenceNumber = mrnGen.sample
+        movementReferenceNumber = mrnGen.sample,
+        localReferenceNumber = None
       )
 
     val arrivalGB5 =
@@ -916,10 +933,50 @@ class MovementsRepositorySpec
   ) {
     (movementId, eori, mrn) =>
       val result = await(
-        repository.updateMovement(movementId, Some(eori), Some(mrn), instant).value
+        repository.updateMovement(movementId, Some(eori), Some(mrn), None, instant).value
       )
 
       result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
+  }
+
+  "checkDuplicate" should "check the duplicate LRN" in {
+
+    val eoriXI       = arbitrary[EORINumber].sample.value
+    val movementEORI = arbitrary[EORINumber].sample.value
+    val lrn          = arbitrary[LocalReferenceNumber].sample
+    val mrnGen       = arbitrary[MovementReferenceNumber]
+
+    val message1 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
+
+    val departureXi2 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriXI,
+        movementEORINumber = Some(movementEORI),
+        updated = instant,
+        movementReferenceNumber = mrnGen.sample,
+        localReferenceNumber = lrn,
+        messages = Vector(message1)
+      )
+
+    await(repository.insert(departureXi2).value)
+
+    val alreadyExistResult = await(
+      repository.restrictDuplicateLRN(lrn.value).value
+    )
+
+    alreadyExistResult should be(
+      Left(MongoError.ConflictError(s"LRN ${lrn.value.value} has previously been used and cannot be reused", lrn.value))
+    )
+
+    val notExistLRN = LocalReferenceNumber("1234")
+
+    val notExistResult = await(
+      repository.restrictDuplicateLRN(notExistLRN).value
+    )
+
+    notExistResult should be(Right(()))
+
   }
 
   it should "update the EORI if it is provided" in {
@@ -939,7 +996,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, receivedInstant).value
+      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -971,7 +1028,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, None, Some(mrn), receivedInstant).value
+      repository.updateMovement(departureMovement._id, None, Some(mrn), None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -983,6 +1040,42 @@ class MovementsRepositorySpec
     movement.updated shouldEqual receivedInstant
     movement.movementEORINumber shouldEqual None
     movement.movementReferenceNumber shouldEqual Some(mrn)
+  }
+
+  it should "update the EORI and LRN if they are supplied" in {
+    val departureMovement =
+      arbitrary[Movement].sample.value
+        .copy(
+          created = instant,
+          updated = instant,
+          messages = Vector(),
+          movementType = MovementType.Departure,
+          movementEORINumber = None,
+          movementReferenceNumber = None,
+          localReferenceNumber = None
+        )
+
+    val lrn = arbitrary[LocalReferenceNumber].sample.get
+
+    await(
+      repository.insert(departureMovement).value
+    )
+
+    val result = await(
+      repository
+        .updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, Some(lrn), receivedInstant)
+        .value
+    )
+
+    result should be(Right(()))
+
+    val movement = await {
+      repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
+    }
+
+    movement.updated shouldEqual receivedInstant
+    movement.movementEORINumber shouldEqual Some(movement.enrollmentEORINumber)
+    movement.localReferenceNumber shouldEqual Some(lrn)
   }
 
   it should "update the EORI and MRN if they are both supplied" in {
@@ -1004,7 +1097,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), Some(mrn), receivedInstant).value
+      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), Some(mrn), None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -1018,7 +1111,7 @@ class MovementsRepositorySpec
     movement.movementReferenceNumber shouldEqual Some(mrn)
   }
 
-  it should "not update anything if the EORI and MRN are not supplied" in {
+  it should "not update anything if the EORI, MRN and LRN are not supplied" in {
     val departureMovement =
       arbitrary[Movement].sample.value
         .copy(
@@ -1027,7 +1120,8 @@ class MovementsRepositorySpec
           messages = Vector(),
           movementType = MovementType.Arrival,
           movementEORINumber = None,
-          movementReferenceNumber = None
+          movementReferenceNumber = None,
+          localReferenceNumber = None
         )
 
     await(
@@ -1035,7 +1129,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, None, None, receivedInstant).value
+      repository.updateMovement(departureMovement._id, None, None, None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -1047,6 +1141,7 @@ class MovementsRepositorySpec
     movement.updated shouldEqual instant
     movement.movementEORINumber shouldEqual None
     movement.movementReferenceNumber shouldEqual None
+    movement.localReferenceNumber shouldEqual None
   }
 
 }

@@ -24,10 +24,12 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import play.api.Logging
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.BadRequest
+import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.Conflict
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.InternalServerError
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.NotFound
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.NoHeaderFound
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 
 import java.time.format.DateTimeParseException
 import scala.concurrent.ExecutionContext
@@ -85,6 +87,13 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
           _.left.toOption.get.code mustBe InternalServerError
         }
       }
+
+    "Conflict should result in Conflict status" in {
+      val input = Left[MongoError, Unit](ConflictError("test", LocalReferenceNumber("1234"))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(DuplicateLRNError("test", Conflict, LocalReferenceNumber("1234")))
+      }
+    }
 
     "DocumentNotFound should result in NotFound status" in {
       val input = Left[MongoError, Unit](DocumentNotFound("test")).toEitherT[Future]

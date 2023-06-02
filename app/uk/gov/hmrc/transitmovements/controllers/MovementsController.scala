@@ -47,6 +47,7 @@ import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.utils.StreamWithFile
 
 import java.time.Clock
@@ -112,6 +113,7 @@ class MovementsController @Inject() (
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         for {
           declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
+          _               <- repo.restrictDuplicateLRN(declarationData.lrn).asPresentation
           received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
           movementId = movementFactory.generateId()
           message <- messageService
@@ -353,6 +355,16 @@ class MovementsController @Inject() (
           for {
             extractedData        <- movementsXmlParsingService.extractData(messageType, fileSource).asPresentation
             extractedMessageData <- messagesXmlParsingService.extractMessageData(fileSource, messageType).asPresentation
+            _ <- messageType match {
+              case MessageType.DeclarationData =>
+                repo
+                  .restrictDuplicateLRN(
+                    extractedData.flatMap(_.localReferenceNumber).get
+                  )
+                  .asPresentation
+              case _ =>
+                EitherT.rightT[Future, MongoError]((): Unit).asPresentation
+            }
             _ <- repo
               .updateMovement(
                 movementId,
@@ -362,6 +374,7 @@ class MovementsController @Inject() (
                   )
                   .flatMap(_.movementEoriNumber),
                 extractedData.flatMap(_.movementReferenceNumber),
+                extractedData.flatMap(_.localReferenceNumber),
                 received
               )
               .asPresentation
