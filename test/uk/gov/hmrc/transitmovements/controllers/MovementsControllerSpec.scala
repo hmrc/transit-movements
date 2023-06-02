@@ -829,7 +829,7 @@ class MovementsControllerSpec
           when(
             mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
-            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
           when(mockRepository.getMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType), eqTo(None)))
             .thenReturn(EitherT.rightT(Vector(messageResponses)))
 
@@ -844,7 +844,7 @@ class MovementsControllerSpec
           when(
             mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
-            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
           when(mockRepository.getMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType), eqTo(None)))
             .thenReturn(EitherT.rightT(Vector.empty[MessageResponse]))
 
@@ -867,7 +867,7 @@ class MovementsControllerSpec
           when(
             mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
-            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
           when(mockRepository.getMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType), eqTo(None)))
             .thenReturn(EitherT.leftT(UnexpectedError(None)))
