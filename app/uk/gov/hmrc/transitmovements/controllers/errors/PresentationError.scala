@@ -19,10 +19,12 @@ package uk.gov.hmrc.transitmovements.controllers.errors
 import play.api.Logging
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.functional.syntax.unlift
+import play.api.libs.json.OFormat
 import play.api.libs.json.OWrites
 import play.api.libs.json.Reads
 import play.api.libs.json.__
 import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 
 object PresentationError extends CommonFormats with Logging {
@@ -47,6 +49,9 @@ object PresentationError extends CommonFormats with Logging {
   def conflictError(message: String): PresentationError =
     StandardError(message, ErrorCode.Conflict)
 
+  def duplicateLRNError(message: String, lrn: LocalReferenceNumber): PresentationError =
+    DuplicateLRNError(message, ErrorCode.Conflict, lrn)
+
   def upstreamServiceError(
     message: String = "Internal server error",
     code: ErrorCode = ErrorCode.InternalServerError,
@@ -63,7 +68,7 @@ object PresentationError extends CommonFormats with Logging {
 
   def unapply(error: PresentationError): Option[(String, ErrorCode)] = Some((error.message, error.code))
 
-  implicit val baseErrorWrites: OWrites[PresentationError] =
+  private val baseErrorWrites0: OWrites[PresentationError] =
     (
       (__ \ MessageFieldName).write[String] and
         (__ \ CodeFieldName).write[ErrorCode]
@@ -75,6 +80,18 @@ object PresentationError extends CommonFormats with Logging {
         (__ \ CodeFieldName).read[ErrorCode]
     )(StandardError.apply _)
 
+  implicit val duplicateLRNErrorFormat: OFormat[DuplicateLRNError] =
+    (
+      (__ \ MessageFieldName).format[String] and
+        (__ \ CodeFieldName).format[ErrorCode] and
+        (__ \ "lrn").format[LocalReferenceNumber]
+    )(DuplicateLRNError.apply, unlift(DuplicateLRNError.unapply))
+
+  implicit val baseErrorWrites: OWrites[PresentationError] = OWrites {
+    case duplicateLRNError: DuplicateLRNError => duplicateLRNErrorFormat.writes(duplicateLRNError)
+    case baseError                            => baseErrorWrites0.writes(baseError)
+  }
+
 }
 
 sealed abstract class PresentationError extends Product with Serializable {
@@ -83,6 +100,8 @@ sealed abstract class PresentationError extends Product with Serializable {
 }
 
 case class StandardError(message: String, code: ErrorCode) extends PresentationError
+
+case class DuplicateLRNError(message: String, code: ErrorCode, lrn: LocalReferenceNumber) extends PresentationError
 
 case class UpstreamServiceError(
   message: String = "Internal server error",

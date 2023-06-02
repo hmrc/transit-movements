@@ -85,6 +85,7 @@ class MovementFactoryImpl @Inject() (
       movementType = movementType,
       movementEORINumber = declarationData.movementEoriNumber,
       movementReferenceNumber = None,
+      localReferenceNumber = Some(declarationData.lrn),
       created = created,
       updated = updated,
       messages = Vector(message)
@@ -105,6 +106,7 @@ class MovementFactoryImpl @Inject() (
       movementType = movementType,
       movementEORINumber = arrivalData.movementEoriNumber,
       movementReferenceNumber = Some(arrivalData.mrn),
+      localReferenceNumber = None,
       created = created,
       updated = updated,
       messages = Vector(message)
@@ -117,6 +119,7 @@ class MovementFactoryImpl @Inject() (
       movementType = movementType,
       movementEORINumber = None,
       movementReferenceNumber = None,
+      localReferenceNumber = None,
       created = created,
       updated = updated,
       messages = Vector(message)

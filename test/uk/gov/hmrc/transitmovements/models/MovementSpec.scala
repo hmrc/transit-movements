@@ -35,6 +35,7 @@ class MovementSpec extends AnyFlatSpec with Matchers with PresentationFormats {
       EORINumber("222"),
       Some(EORINumber("223")),
       Some(MovementReferenceNumber("333")),
+      Some(LocalReferenceNumber("12klio")),
       OffsetDateTime.now(),
       OffsetDateTime.now(),
       Vector(
@@ -58,5 +59,6 @@ class MovementSpec extends AnyFlatSpec with Matchers with PresentationFormats {
     (result \ "movementEORINumber").get should be(JsString("223"))
     (result \ "movementEORINumber").get should be(JsString("223"))
     (result \ "messages" \\ "id").head should be(JsString("999"))
+    (result \ "localReferenceNumber").get should be(JsString("12klio"))
   }
 }

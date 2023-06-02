@@ -24,6 +24,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
@@ -200,4 +201,53 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
 
   }
 
+  "LRN parser" - {
+
+    val withEntry: NodeSeq =
+      <CC015C>
+        <TransitOperation>
+          <LRN>89Tio9</LRN>
+        </TransitOperation>
+      </CC015C>
+
+    val withNoEntry: NodeSeq =
+      <CC015C>
+      </CC015C>
+
+    val withTwoEntries: NodeSeq =
+      <CC015C>
+        <TransitOperation>
+          <LRN>89Tio9</LRN>
+          <LRN>ca91klp</LRN>
+        </TransitOperation>
+      </CC015C>
+
+    "when provided with a valid entry" in {
+      val stream       = createParsingEventStream(withEntry)
+      val parsedResult = stream.via(XmlParsers.movementLRNExtractor("CC015C")).runWith(Sink.head)
+
+      whenReady(parsedResult) {
+        _ mustBe Right(LocalReferenceNumber("89Tio9"))
+      }
+    }
+
+    "when provided with no entry" in {
+      val stream       = createParsingEventStream(withNoEntry)
+      val parsedResult = stream.via(XmlParsers.movementLRNExtractor("CC015C")).runWith(Sink.head)
+
+      whenReady(parsedResult) {
+        _ mustBe Left(ParseError.NoElementFound("LRN"))
+      }
+    }
+
+    "when provided with two entries" in {
+      val stream       = createParsingEventStream(withTwoEntries)
+      val parsedResult = stream.via(XmlParsers.movementLRNExtractor("CC015C")).runWith(Sink.head)
+
+      whenReady(parsedResult) {
+        _ mustBe Left(ParseError.TooManyElementsFound("LRN"))
+      }
+    }
+
+  }
 }

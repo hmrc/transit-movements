@@ -26,6 +26,7 @@ case class MovementWithoutMessages(
   enrollmentEORINumber: EORINumber,
   movementEORINumber: Option[EORINumber],
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
+  localReferenceNumber: Option[LocalReferenceNumber],
   created: OffsetDateTime,
   updated: OffsetDateTime
 )
@@ -38,6 +39,7 @@ object MovementWithoutMessages {
       "enrollmentEORINumber"    -> 1,
       "movementEORINumber"      -> 1,
       "movementReferenceNumber" -> 1,
+      "localReferenceNumber"    -> 1,
       "created"                 -> 1,
       "updated"                 -> 1
     )
@@ -48,6 +50,7 @@ object MovementWithoutMessages {
       movement.enrollmentEORINumber,
       movement.movementEORINumber,
       movement.movementReferenceNumber,
+      movement.localReferenceNumber,
       movement.created,
       movement.updated
     )

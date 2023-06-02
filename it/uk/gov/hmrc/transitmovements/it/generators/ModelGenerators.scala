@@ -20,6 +20,7 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.Arbitrary.arbitrary
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
@@ -79,6 +80,11 @@ trait ModelGenerators extends BaseGenerators {
       } yield MovementReferenceNumber(year ++ country.mkString ++ serial.mkString)
     }
 
+  implicit lazy val arbitraryLRN: Arbitrary[LocalReferenceNumber] =
+    Arbitrary {
+      Gen.alphaNumStr.map(LocalReferenceNumber(_))
+    }
+
   // Restricts the date times to the range of positive long numbers to avoid overflows.
   implicit lazy val arbitraryOffsetDateTime: Arbitrary[OffsetDateTime] =
     Arbitrary {
@@ -109,9 +115,10 @@ trait ModelGenerators extends BaseGenerators {
         movementType            <- arbitrary[MovementType]
         eori                    <- arbitrary[EORINumber]
         movementReferenceNumber <- arbitrary[Option[MovementReferenceNumber]]
+        movementLRN             <- arbitrary[Option[LocalReferenceNumber]]
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
         messages                <- arbitrary[Vector[Message]]
-      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, created, updated, messages)
+      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, movementLRN, created, updated, messages)
     }
 }

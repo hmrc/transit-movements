@@ -59,6 +59,8 @@ import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.BodyStorage
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.ExtractedData
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
@@ -498,6 +500,20 @@ class MessageBodyControllerSpec
     ) {
       (eori, movementId, messageId, messageType, movementType, string) =>
         val ControllerAndMocks(sut, movementsRepository, _, messagesXmlParsingService, movementsXmlParsingService, messageService) = createController()
+        val extractDataEither: EitherT[Future, ParseError, Option[ExtractedData]] = {
+          if (messageType == MessageType.DeclarationData)
+            EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), LocalReferenceNumber(string))))
+          else EitherT.rightT(None)
+        }
+        val lrnOption: Option[LocalReferenceNumber] = {
+          if (messageType == MessageType.DeclarationData) Some(LocalReferenceNumber(string))
+          else None
+        }
+
+        val eoriOption: Option[EORINumber] = {
+          if (messageType == MessageType.DeclarationData) Some(eori)
+          else None
+        }
 
         when(
           movementsRepository.getSingleMessage(
@@ -524,7 +540,10 @@ class MessageBodyControllerSpec
           .thenReturn(EitherT.rightT(MessageData(now, None)))
 
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(None))
+          .thenReturn(extractDataEither)
+
+        when(movementsRepository.restrictDuplicateLRN(LocalReferenceNumber(string)))
+          .thenReturn(EitherT.rightT((): Unit))
 
         when(
           messageService
@@ -540,7 +559,16 @@ class MessageBodyControllerSpec
           )
         ).thenReturn(EitherT.rightT((): Unit))
 
-        when(movementsRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(None), eqTo(None), eqTo(now))).thenReturn(EitherT.rightT((): Unit))
+        when(
+          movementsRepository.updateMovement(
+            MovementId(eqTo(movementId.value)),
+            eqTo(eoriOption),
+            eqTo(None),
+            eqTo(lrnOption),
+            eqTo(now)
+          )
+        )
+          .thenReturn(EitherT.rightT((): Unit))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -603,7 +631,15 @@ class MessageBodyControllerSpec
           )
         ).thenReturn(EitherT.rightT((): Unit))
 
-        when(movementsRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(movementEori)), eqTo(Some(movementReferenceNumber)), eqTo(now)))
+        when(
+          movementsRepository.updateMovement(
+            MovementId(eqTo(movementId.value)),
+            eqTo(Some(movementEori)),
+            eqTo(Some(movementReferenceNumber)),
+            eqTo(None),
+            eqTo(now)
+          )
+        )
           .thenReturn(EitherT.rightT((): Unit))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
@@ -617,9 +653,10 @@ class MessageBodyControllerSpec
       arbitrary[EORINumber],
       arbitrary[MovementId],
       arbitrary[MessageId],
+      arbitraryLRN.arbitrary,
       Gen.stringOfN(15, Gen.alphaNumChar)
     ) {
-      (eori, movementEori, movementId, messageId, string) =>
+      (eori, movementEori, movementId, messageId, lrn, string) =>
         val messageType  = MessageType.DeclarationData
         val movementType = MovementType.Departure
 
@@ -650,7 +687,14 @@ class MessageBodyControllerSpec
           .thenReturn(EitherT.rightT(MessageData(now, None)))
 
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(Some(DeclarationData(Some(movementEori), nowMinusOne))))
+          .thenReturn(
+            EitherT.rightT(
+              Some(DeclarationData(Some(movementEori), now, lrn))
+            )
+          )
+
+        when(movementsRepository.restrictDuplicateLRN(lrn))
+          .thenReturn(EitherT.rightT((): Unit))
 
         when(
           messageService
@@ -666,7 +710,15 @@ class MessageBodyControllerSpec
           )
         ).thenReturn(EitherT.rightT((): Unit))
 
-        when(movementsRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(movementEori)), eqTo(None), eqTo(now)))
+        when(
+          movementsRepository.updateMovement(
+            MovementId(eqTo(movementId.value)),
+            eqTo(Some(movementEori)),
+            eqTo(None),
+            eqTo(Some(lrn)),
+            eqTo(now)
+          )
+        )
           .thenReturn(EitherT.rightT((): Unit))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
@@ -678,12 +730,12 @@ class MessageBodyControllerSpec
     "must return Created when the body has been created and is added to Mongo with extra message data" in forAll(
       arbitrary[EORINumber],
       arbitrary[EORINumber],
-      arbitrary[MovementReferenceNumber],
       arbitrary[MovementId],
       arbitrary[MessageId],
+      arbitraryLRN.arbitrary,
       Gen.stringOfN(15, Gen.alphaNumChar)
     ) {
-      (eori, movementEori, movementReferenceNumber, movementId, messageId, string) =>
+      (eori, movementEori, movementId, messageId, lrn, string) =>
         val messageType  = MessageType.DeclarationData
         val movementType = MovementType.Departure
 
@@ -711,10 +763,17 @@ class MessageBodyControllerSpec
           )
 
         when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
-          .thenReturn(EitherT.rightT(MessageData(now, Some(movementReferenceNumber))))
+          .thenReturn(EitherT.rightT(MessageData(now, None)))
 
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(Some(DeclarationData(Some(movementEori), nowMinusOne))))
+          .thenReturn(
+            EitherT.rightT(
+              Some(DeclarationData(Some(movementEori), now, lrn))
+            )
+          )
+
+        when(movementsRepository.restrictDuplicateLRN(lrn))
+          .thenReturn(EitherT.rightT((): Unit))
 
         when(
           messageService
@@ -730,13 +789,100 @@ class MessageBodyControllerSpec
           )
         ).thenReturn(EitherT.rightT((): Unit))
 
-        when(movementsRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(movementEori)), eqTo(Some(movementReferenceNumber)), eqTo(now)))
+        when(
+          movementsRepository.updateMovement(
+            MovementId(eqTo(movementId.value)),
+            eqTo(Some(movementEori)),
+            eqTo(None),
+            eqTo(Some(lrn)),
+            eqTo(now)
+          )
+        )
           .thenReturn(EitherT.rightT((): Unit))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
 
         status(result) mustBe CREATED
+    }
+
+    "must return Conflict when duplicate entry of LRN" in forAll(
+      arbitrary[EORINumber],
+      arbitrary[EORINumber],
+      arbitrary[MovementId],
+      arbitrary[MessageId],
+      arbitraryLRN.arbitrary,
+      Gen.stringOfN(15, Gen.alphaNumChar)
+    ) {
+      (eori, movementEori, movementId, messageId, lrn, string) =>
+        val messageType  = MessageType.DeclarationData
+        val movementType = MovementType.Departure
+
+        val ControllerAndMocks(sut, movementsRepository, _, messagesXmlParsingService, movementsXmlParsingService, messageService) = createController()
+
+        when(
+          movementsRepository.getSingleMessage(
+            EORINumber(eqTo(eori.value)),
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(messageId.value)),
+            eqTo(movementType)
+          )
+        )
+          .thenReturn(
+            EitherT.rightT(
+              MessageResponse(
+                messageId,
+                now,
+                None,
+                None,
+                Some(MessageStatus.Pending),
+                None
+              )
+            )
+          )
+
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.rightT(MessageData(now, None)))
+
+        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
+          .thenReturn(
+            EitherT.rightT(
+              Some(DeclarationData(Some(movementEori), now, lrn))
+            )
+          )
+
+        when(movementsRepository.restrictDuplicateLRN(lrn))
+          .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", lrn)))
+
+        when(
+          messageService
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+        ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
+
+        when(
+          movementsRepository.updateMessage(
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(messageId.value)),
+            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
+            eqTo(now)
+          )
+        ).thenReturn(EitherT.rightT((): Unit))
+
+        when(
+          movementsRepository.updateMovement(
+            MovementId(eqTo(movementId.value)),
+            eqTo(Some(movementEori)),
+            eqTo(None),
+            eqTo(Some(lrn)),
+            eqTo(now)
+          )
+        )
+          .thenReturn(EitherT.rightT((): Unit))
+
+        val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
+        val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe CONFLICT
     }
 
     "must return Not Found if the message doesn't exist" in forAll(
@@ -1049,7 +1195,11 @@ class MessageBodyControllerSpec
           .thenReturn(EitherT.rightT(MessageData(now, Some(movementReferenceNumber))))
 
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(Some(DeclarationData(Some(movementEori), nowMinusOne))))
+          .thenReturn(
+            EitherT.rightT(
+              Some(DeclarationData(Some(movementEori), nowMinusOne, LocalReferenceNumber(string)))
+            )
+          )
 
         when(
           messageService
@@ -1101,7 +1251,11 @@ class MessageBodyControllerSpec
           .thenReturn(EitherT.rightT(MessageData(now, Some(movementReferenceNumber))))
 
         when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(Some(DeclarationData(Some(movementEori), nowMinusOne))))
+          .thenReturn(
+            EitherT.rightT(
+              Some(DeclarationData(Some(movementEori), nowMinusOne, LocalReferenceNumber(string)))
+            )
+          )
 
         when(
           messageService
@@ -1117,7 +1271,15 @@ class MessageBodyControllerSpec
           )
         ).thenReturn(EitherT.leftT(MongoError.UnexpectedError(None)))
 
-        when(movementsRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(movementEori)), eqTo(Some(movementReferenceNumber)), eqTo(now)))
+        when(
+          movementsRepository.updateMovement(
+            MovementId(eqTo(movementId.value)),
+            eqTo(Some(movementEori)),
+            eqTo(Some(movementReferenceNumber)),
+            eqTo(None),
+            eqTo(now)
+          )
+        )
           .thenReturn(EitherT.rightT((): Unit))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
@@ -1178,7 +1340,7 @@ class MessageBodyControllerSpec
           )
         ).thenReturn(EitherT.rightT((): Unit))
 
-        when(movementsRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(None), eqTo(None), eqTo(nowMinusOne)))
+        when(movementsRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(None), eqTo(None), eqTo(None), eqTo(nowMinusOne)))
           .thenReturn(EitherT.leftT(MongoError.UpdateNotAcknowledged("bleh")))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))

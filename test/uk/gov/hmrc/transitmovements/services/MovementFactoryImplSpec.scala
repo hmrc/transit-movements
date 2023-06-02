@@ -28,6 +28,7 @@ import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
@@ -55,13 +56,27 @@ class MovementFactoryImplSpec
   "createDeparture" - {
     val sut = new MovementFactoryImpl(clock, random)
 
-    "will create a departure with a message" in forAll(arbitrary[EORINumber], arbitrary[EORINumber], arbitrary[Message]) {
-      (enrollmentEori, movementEori, message) =>
+    "will create a departure with a message" in forAll(
+      arbitrary[EORINumber],
+      arbitrary[EORINumber],
+      arbitrary[Message],
+      arbitrary[LocalReferenceNumber]
+    ) {
+      (enrollmentEori, movementEori, message, lrn) =>
         val departure =
-          sut.createDeparture(movementId, enrollmentEori, MovementType.Departure, DeclarationData(Some(movementEori), instant), message, instant, instant)
+          sut.createDeparture(
+            movementId,
+            enrollmentEori,
+            MovementType.Departure,
+            DeclarationData(Some(movementEori), instant, lrn),
+            message,
+            instant,
+            instant
+          )
 
         departure.messages.length mustBe 1
         departure.movementReferenceNumber mustBe None
+        departure.localReferenceNumber mustBe Some(lrn)
         departure.enrollmentEORINumber mustBe enrollmentEori
         departure.movementEORINumber mustBe Some(movementEori)
         departure.messages.head mustBe message
@@ -81,6 +96,7 @@ class MovementFactoryImplSpec
         arrival.enrollmentEORINumber mustBe enrollmentEori
         arrival.movementEORINumber mustBe Some(movementEori)
         arrival.messages.head mustBe message
+        arrival.localReferenceNumber mustBe None
     }
   }
 
@@ -101,6 +117,7 @@ class MovementFactoryImplSpec
         movement.movementReferenceNumber mustBe None
         movement.enrollmentEORINumber mustBe enrollmentEori
         movement.movementEORINumber mustBe None
+        movement.localReferenceNumber mustBe None
     }
   }
 }
