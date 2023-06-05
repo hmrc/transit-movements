@@ -864,7 +864,7 @@ class MovementsControllerSpec
         "must return OK if departures were found" in {
           val response = MovementWithoutMessages.fromMovement(movement)
 
-          when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None)))
+          when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
             .thenReturn(EitherT.rightT(Vector(response)))
 
           val result = controller.getMovementsForEori(eoriNumber, movementType)(request)
@@ -872,42 +872,80 @@ class MovementsControllerSpec
           contentAsJson(result) mustBe Json.toJson(Vector(response))
         }
 
-        "must return OK if departures were found and it match the updatedSince or movementEORI or movementReferenceNumber or all these filters" in forAll(
+        "must return OK if departures were found and it match the updatedSince or movementEORI or movementReferenceNumber or localReferenceNumber or all these filters" in forAll(
           Gen.option(arbitrary[OffsetDateTime]),
           Gen.option(arbitrary[EORINumber]),
-          Gen.option(arbitrary[MovementReferenceNumber])
+          Gen.option(arbitrary[MovementReferenceNumber]),
+          Gen.option(arbitrary[LocalReferenceNumber])
         ) {
-          (updatedSince, movementEORI, movementReferenceNumber) =>
+          (updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber) =>
             val response = MovementWithoutMessages.fromMovement(movement)
 
-            when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(updatedSince), eqTo(movementEORI), eqTo(movementReferenceNumber)))
+            when(
+              mockRepository.getMovements(
+                EORINumber(any()),
+                eqTo(movementType),
+                eqTo(updatedSince),
+                eqTo(movementEORI),
+                eqTo(movementReferenceNumber),
+                eqTo(localReferenceNumber)
+              )
+            )
               .thenReturn(EitherT.rightT(Vector(response)))
 
-            val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber)(request)
+            val result =
+              controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber)(request)
 
             status(result) mustBe OK
             contentAsJson(result) mustBe Json.toJson(Vector(response))
         }
 
-        "must return NOT_FOUND if no ids were found" in forAll(Gen.option(arbitrary[OffsetDateTime]), Gen.option(arbitrary[EORINumber])) {
-          (updatedSince, movementEORI) =>
-            when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(updatedSince), eqTo(movementEORI), eqTo(None)))
+        "must return NOT_FOUND if no ids were found" in forAll(
+          Gen.option(arbitrary[OffsetDateTime]),
+          Gen.option(arbitrary[EORINumber]),
+          Gen.option(arbitrary[MovementReferenceNumber]),
+          Gen.option(arbitrary[LocalReferenceNumber])
+        ) {
+          (updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber) =>
+            when(
+              mockRepository.getMovements(
+                EORINumber(any()),
+                eqTo(movementType),
+                eqTo(updatedSince),
+                eqTo(movementEORI),
+                eqTo(movementReferenceNumber),
+                eqTo(localReferenceNumber)
+              )
+            )
               .thenReturn(EitherT.rightT(Vector.empty[MovementWithoutMessages]))
 
-            val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI)(request)
+            val result =
+              controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber)(request)
 
             status(result) mustBe NOT_FOUND
         }
 
         "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in forAll(
           Gen.option(arbitrary[OffsetDateTime]),
-          Gen.option(arbitrary[EORINumber])
+          Gen.option(arbitrary[EORINumber]),
+          Gen.option(arbitrary[MovementReferenceNumber]),
+          Gen.option(arbitrary[LocalReferenceNumber])
         ) {
-          (updatedSince, movementEORI) =>
-            when(mockRepository.getMovements(EORINumber(any()), any(), eqTo(updatedSince), eqTo(movementEORI), eqTo(None)))
+          (updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber) =>
+            when(
+              mockRepository.getMovements(
+                EORINumber(any()),
+                any(),
+                eqTo(updatedSince),
+                eqTo(movementEORI),
+                eqTo(movementReferenceNumber),
+                eqTo(localReferenceNumber)
+              )
+            )
               .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
-            val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI)(request)
+            val result =
+              controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber)(request)
 
             status(result) mustBe INTERNAL_SERVER_ERROR
         }
