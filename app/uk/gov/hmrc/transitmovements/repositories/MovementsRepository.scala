@@ -96,7 +96,7 @@ trait MovementsRepository {
     updatedSince: Option[OffsetDateTime],
     movementEORI: Option[EORINumber],
     movementReferenceNumber: Option[MovementReferenceNumber],
-    lrn: Option[LocalReferenceNumber]
+    localReferenceNumber: Option[LocalReferenceNumber]
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]]
 
   def updateMovement(
@@ -286,7 +286,7 @@ class MovementsRepositoryImpl @Inject() (
     updatedSince: Option[OffsetDateTime],
     movementEORI: Option[EORINumber],
     movementReferenceNumber: Option[MovementReferenceNumber],
-    lrn: Option[LocalReferenceNumber]
+    localReferenceNumber: Option[LocalReferenceNumber]
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]] = {
     val selector: Bson = mAnd(
       mEq("enrollmentEORINumber", eoriNumber.value),
@@ -294,7 +294,7 @@ class MovementsRepositoryImpl @Inject() (
       mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
       movementEORIFilter(movementEORI),
       movementMRNFilter(movementReferenceNumber),
-      movementLRNFilter(lrn)
+      movementLRNFilter(localReferenceNumber)
     )
 
     val projection = MovementWithoutMessages.projection
@@ -331,10 +331,10 @@ class MovementsRepositoryImpl @Inject() (
       case _                             => empty()
     }
 
-  private def movementLRNFilter(lrn: Option[LocalReferenceNumber]): Bson =
-    lrn match {
-      case Some(lrn) => mAnd(mRegex("localReferenceNumber", s"\\Q${lrn.value}\\E", "i"))
-      case _         => empty()
+  private def movementLRNFilter(localReferenceNumber: Option[LocalReferenceNumber]): Bson =
+    localReferenceNumber match {
+      case Some(localReferenceNumber) => mAnd(mRegex("localReferenceNumber", s"\\Q${localReferenceNumber.value}\\E", "i"))
+      case _                          => empty()
     }
 
   def attachMessage(
