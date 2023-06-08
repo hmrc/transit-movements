@@ -23,6 +23,7 @@ import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.ItemCount
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -33,6 +34,7 @@ import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
+import uk.gov.hmrc.transitmovements.models.PageNumber
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
@@ -178,4 +180,16 @@ trait ModelGenerators extends BaseGenerators {
         dateTime   <- arbitrary[OffsetDateTime]
       } yield testObjectStoreURI(movementId, messageId, dateTime)
     }
+
+  implicit lazy val arbitraryPageNumber: Arbitrary[PageNumber] = Arbitrary {
+    Gen.long.map(
+      l => PageNumber(Math.abs(l % Int.MaxValue - 1).toInt) // require a positive integer
+    )
+  }
+
+  implicit lazy val arbitraryItemCount: Arbitrary[ItemCount] = Arbitrary {
+    Gen.long.map(
+      l => ItemCount(Math.abs(l % (Int.MaxValue - 1)).toInt) // // require a positive integer
+    )
+  }
 }

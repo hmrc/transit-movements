@@ -880,7 +880,12 @@ class MovementsControllerSpec
       }
 
       "getMovementsForEori" - {
-        val request = FakeRequest("GET", routes.MovementsController.getMovementsForEori(eoriNumber, movementType).url)
+        val request = FakeRequest(
+          "GET",
+          routes.MovementsController
+            .getMovementsForEori(eoriNumber, movementType, None, Some(EORINumber("GB1234")), None, Some(PageNumber(0)), Some(ItemCount(15)))
+            .url
+        )
 
         "must return OK if departures were found" in {
           val response = MovementWithoutMessages.fromMovement(movement)
@@ -890,15 +895,18 @@ class MovementsControllerSpec
 
           val result = controller.getMovementsForEori(eoriNumber, movementType)(request)
           status(result) mustBe OK
+
           contentAsJson(result) mustBe Json.toJson(Vector(response))
         }
 
         "must return OK if departures were found and it match the updatedSince or movementEORI or movementReferenceNumber or all these filters" in forAll(
           Gen.option(arbitrary[OffsetDateTime]),
           Gen.option(arbitrary[EORINumber]),
-          Gen.option(arbitrary[MovementReferenceNumber])
+          Gen.option(arbitrary[MovementReferenceNumber]),
+          Gen.option(arbitrary[PageNumber]),
+          Gen.option(arbitrary[ItemCount])
         ) {
-          (updatedSince, movementEORI, movementReferenceNumber) =>
+          (updatedSince, movementEORI, movementReferenceNumber, pageNumber, itemCount) =>
             val response = MovementWithoutMessages.fromMovement(movement)
 
             when(
@@ -908,16 +916,18 @@ class MovementsControllerSpec
                 eqTo(updatedSince),
                 eqTo(movementEORI),
                 eqTo(movementReferenceNumber),
-                eqTo(None),
-                eqTo(None),
+                eqTo(pageNumber),
+                eqTo(itemCount),
                 eqTo(None)
               )
             )
               .thenReturn(EitherT.rightT(Vector(response)))
 
-            val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber)(request)
+            val result =
+              controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, pageNumber, itemCount)(request)
 
             status(result) mustBe OK
+
             contentAsJson(result) mustBe Json.toJson(Vector(response))
         }
 
