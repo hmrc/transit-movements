@@ -2,11 +2,11 @@
 
 POST       /traders/:EORI/movements/:movementType                                      uk.gov.hmrc.transitmovements.controllers.MovementsController.createMovement(EORI: EORINumber, movementType: MovementType)
 
-GET        /traders/:EORI/movements/:movementType                                 uk.gov.hmrc.transitmovements.controllers.MovementsController.getMovementsForEori(EORI: EORINumber, movementType: MovementType, updatedSince: Option[OffsetDateTime] ?= None, movementEORI: Option[EORINumber] ?= None, movementReferenceNumber: Option[MovementReferenceNumber] ?= None)
+GET        /traders/:EORI/movements/:movementType                                 uk.gov.hmrc.transitmovements.controllers.MovementsController.getMovementsForEori(EORI: EORINumber, movementType: MovementType, updatedSince: Option[OffsetDateTime] ?= None, movementEORI: Option[EORINumber] ?= None, movementReferenceNumber: Option[MovementReferenceNumber] ?= None, pageNumber: Option[PageNumber] ?= None, itemCount: Option[ItemCount] ?= None, receivedUntil: Option[OffsetDateTime] ?= None)
 
 GET        /traders/:EORI/movements/:movementType/:movementId                         uk.gov.hmrc.transitmovements.controllers.MovementsController.getMovementWithoutMessages(EORI: EORINumber, movementType: MovementType, movementId: MovementId)
 
-GET        /traders/:EORI/movements/:movementType/:movementId/messages                uk.gov.hmrc.transitmovements.controllers.MovementsController.getMessages(EORI: EORINumber, movementType: MovementType, movementId: MovementId, receivedSince: Option[OffsetDateTime] ?= None)
+GET        /traders/:EORI/movements/:movementType/:movementId/messages                uk.gov.hmrc.transitmovements.controllers.MovementsController.getMessages(EORI: EORINumber, movementType: MovementType, movementId: MovementId, receivedSince: Option[OffsetDateTime] ?= None, pageNumber: Option[PageNumber] ?= None, itemCount: Option[ItemCount] ?= None, receivedUntil: Option[OffsetDateTime] ?= None)
 
 GET        /traders/:EORI/movements/:movementType/:movementId/messages/:messageId     uk.gov.hmrc.transitmovements.controllers.MovementsController.getMessage(EORI: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId)
 

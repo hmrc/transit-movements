@@ -296,10 +296,13 @@ class MovementsController @Inject() (
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime] = None,
     movementEORI: Option[EORINumber] = None,
-    movementReferenceNumber: Option[MovementReferenceNumber] = None
+    movementReferenceNumber: Option[MovementReferenceNumber] = None,
+    pageNumber: Option[PageNumber] = None,
+    itemCount: Option[ItemCount] = None,
+    receivedUntil: Option[OffsetDateTime] = None
   ): Action[AnyContent] = Action.async {
     repo
-      .getMovements(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber)
+      .getMovements(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, pageNumber, itemCount, receivedUntil)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
@@ -328,7 +331,10 @@ class MovementsController @Inject() (
     eoriNumber: EORINumber,
     movementType: MovementType,
     movementId: MovementId,
-    receivedSince: Option[OffsetDateTime] = None
+    receivedSince: Option[OffsetDateTime] = None,
+    pageNumber: Option[PageNumber] = None,
+    itemCount: Option[ItemCount] = None,
+    receivedUntil: Option[OffsetDateTime] = None
   ) =
     Action.async {
       (for {
