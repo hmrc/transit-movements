@@ -27,6 +27,7 @@ import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
+import org.mockito.MockitoSugar.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
@@ -68,8 +69,8 @@ import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
-import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
@@ -82,8 +83,8 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
 import java.util.UUID.randomUUID
 import scala.annotation.nowarn
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.xml.NodeSeq
@@ -830,10 +831,10 @@ class MovementsControllerSpec
             mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
             .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
-          when(mockRepository.getMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType), eqTo(None)))
-            .thenReturn(EitherT.rightT(Vector(messageResponses)))
 
-          val result = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
+          when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
+            .thenReturn(EitherT.rightT(Vector(messageResponses)))
+          val result = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
 
           status(result) mustBe OK
           contentAsJson(result) mustBe Json.toJson(messageResponseList)
@@ -855,10 +856,10 @@ class MovementsControllerSpec
         }
 
         "must return NOT_FOUND if no departure found" in {
-          when(mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType)))
-            .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
+          when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
+            .thenReturn(EitherT.rightT(Vector.empty[MessageResponse]))
 
-          val result = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
+          val result = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
 
           status(result) mustBe NOT_FOUND
         }
@@ -869,10 +870,10 @@ class MovementsControllerSpec
           )
             .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
-          when(mockRepository.getMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType), eqTo(None)))
+          when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
             .thenReturn(EitherT.leftT(UnexpectedError(None)))
 
-          val result = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
+          val result = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
 
           status(result) mustBe INTERNAL_SERVER_ERROR
         }
@@ -884,7 +885,7 @@ class MovementsControllerSpec
         "must return OK if departures were found" in {
           val response = MovementWithoutMessages.fromMovement(movement)
 
-          when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None)))
+          when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
             .thenReturn(EitherT.rightT(Vector(response)))
 
           val result = controller.getMovementsForEori(eoriNumber, movementType)(request)
@@ -900,7 +901,18 @@ class MovementsControllerSpec
           (updatedSince, movementEORI, movementReferenceNumber) =>
             val response = MovementWithoutMessages.fromMovement(movement)
 
-            when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(updatedSince), eqTo(movementEORI), eqTo(movementReferenceNumber)))
+            when(
+              mockRepository.getMovements(
+                EORINumber(any()),
+                eqTo(movementType),
+                eqTo(updatedSince),
+                eqTo(movementEORI),
+                eqTo(movementReferenceNumber),
+                eqTo(None),
+                eqTo(None),
+                eqTo(None)
+              )
+            )
               .thenReturn(EitherT.rightT(Vector(response)))
 
             val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber)(request)
@@ -911,7 +923,18 @@ class MovementsControllerSpec
 
         "must return empty list if no ids were found" in forAll(Gen.option(arbitrary[OffsetDateTime]), Gen.option(arbitrary[EORINumber])) {
           (updatedSince, movementEORI) =>
-            when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(updatedSince), eqTo(movementEORI), eqTo(None)))
+            when(
+              mockRepository.getMovements(
+                EORINumber(any()),
+                eqTo(movementType),
+                eqTo(updatedSince),
+                eqTo(movementEORI),
+                eqTo(None),
+                eqTo(None),
+                eqTo(None),
+                eqTo(None)
+              )
+            )
               .thenReturn(EitherT.rightT(Vector.empty[MovementWithoutMessages]))
 
             val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI)(request)
@@ -925,7 +948,7 @@ class MovementsControllerSpec
           Gen.option(arbitrary[EORINumber])
         ) {
           (updatedSince, movementEORI) =>
-            when(mockRepository.getMovements(EORINumber(any()), any(), eqTo(updatedSince), eqTo(movementEORI), eqTo(None)))
+            when(mockRepository.getMovements(EORINumber(any()), any(), eqTo(updatedSince), eqTo(movementEORI), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
               .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
             val result = controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI)(request)
