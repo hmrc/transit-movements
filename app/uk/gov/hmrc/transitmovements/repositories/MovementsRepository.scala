@@ -23,6 +23,7 @@ import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
 import com.mongodb.client.model.Filters.{regex => mRegex}
 import com.mongodb.client.model.Filters.{gte => mGte}
+import com.mongodb.client.model.Filters.{lte => mLte}
 import com.mongodb.client.model.Filters.empty
 import com.mongodb.client.model.Updates.{push => mPush}
 import com.mongodb.client.model.Updates.{set => mSet}
@@ -36,6 +37,7 @@ import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.ItemCount
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -44,6 +46,7 @@ import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
+import uk.gov.hmrc.transitmovements.models.PageNumber
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
@@ -87,7 +90,10 @@ trait MovementsRepository {
     eoriNumber: EORINumber,
     movementId: MovementId,
     movementType: MovementType,
-    received: Option[OffsetDateTime]
+    received: Option[OffsetDateTime],
+    pageNumber: Option[PageNumber] = None,
+    itemCount: Option[ItemCount] = None,
+    receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, Vector[MessageResponse]]
 
   def getMovements(
@@ -95,7 +101,10 @@ trait MovementsRepository {
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime],
     movementEORI: Option[EORINumber],
-    movementReferenceNumber: Option[MovementReferenceNumber]
+    movementReferenceNumber: Option[MovementReferenceNumber],
+    pageNumber: Option[PageNumber] = None,
+    itemCount: Option[ItemCount] = None,
+    receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]]
 
   def updateMovement(
@@ -205,11 +214,14 @@ class MovementsRepositoryImpl @Inject() (
     })
   }
 
-  def getMessages(
+  override def getMessages(
     eoriNumber: EORINumber,
     movementId: MovementId,
     movementType: MovementType,
-    receivedSince: Option[OffsetDateTime]
+    receivedSince: Option[OffsetDateTime],
+    pageNumber: Option[PageNumber] = None,
+    itemCount: Option[ItemCount] = None,
+    receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, Vector[MessageResponse]] = {
 
     val projection = MessageResponse.projection
@@ -217,14 +229,20 @@ class MovementsRepositoryImpl @Inject() (
     val selector = mAnd(
       mEq("_id", movementId.value),
       mEq("enrollmentEORINumber", eoriNumber.value),
-      mEq("movementType", movementType.value),
-      mGte("messages.received", receivedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME))
+      mEq("movementType", movementType.value)
     )
+
+    val dateTimeSelector: Bson = (receivedSince, receivedUntil) match {
+      case (Some(since), None) => mGte("messages.received", since.toLocalDateTime)
+      case (None, Some(until)) => mLte("messages.received", until.toLocalDateTime)
+      case (_, _)              => mGte("messages.received", EPOCH_TIME)
+    }
 
     val aggregates =
       Seq(
         Aggregates.filter(selector),
         Aggregates.unwind("$messages"),
+        Aggregates.filter(dateTimeSelector),
         Aggregates.replaceRoot("$messages"),
         Aggregates.sort(descending("received")),
         Aggregates.project(projection)
@@ -279,17 +297,26 @@ class MovementsRepositoryImpl @Inject() (
       )
     }
 
-  def getMovements(
+  override def getMovements(
     eoriNumber: EORINumber,
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime],
     movementEORI: Option[EORINumber],
-    movementReferenceNumber: Option[MovementReferenceNumber]
+    movementReferenceNumber: Option[MovementReferenceNumber],
+    pageNumber: Option[PageNumber] = None,
+    itemCount: Option[ItemCount] = None,
+    receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]] = {
+
+    val timeFilter: Bson = (updatedSince, receivedUntil) match {
+      case (Some(since), None) => mGte("updated", since.toLocalDateTime)
+      case (None, Some(until)) => mLte("updated", until.toLocalDateTime)
+      case (_, _)              => mGte("updated", EPOCH_TIME)
+    }
     val selector: Bson = mAnd(
       mEq("enrollmentEORINumber", eoriNumber.value),
       mEq("movementType", movementType.value),
-      mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
+      timeFilter,
       movementEORIFilter(movementEORI),
       movementMRNFilter(movementReferenceNumber)
     )
@@ -306,14 +333,32 @@ class MovementsRepositoryImpl @Inject() (
       case Success(obs) =>
         obs
           .toFuture()
-          .map(
-            response => Right(response.toVector)
-          )
+          .map {
+            response =>
+              val (start, end) = indices(pageNumber, itemCount, response.length)
+              Right(response.toVector.slice(start, end))
+          }
 
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
+  }
+
+  private def indices(pageNumber: Option[PageNumber], itemCount: Option[ItemCount], length: Int): (Int, Int) = {
+    val startIndex = pageNumber.flatMap(
+      page =>
+        itemCount.map(
+          count => page.value * count.value
+        )
+    )
+    val endIndex = pageNumber.flatMap(
+      page =>
+        itemCount.map(
+          count => (page.value + 1) * count.value
+        )
+    )
+    (startIndex.getOrElse(0), endIndex.getOrElse(length))
   }
 
   private def movementEORIFilter(movementEORI: Option[EORINumber]): Bson =
