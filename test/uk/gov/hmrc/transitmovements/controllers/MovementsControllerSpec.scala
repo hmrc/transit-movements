@@ -846,20 +846,30 @@ class MovementsControllerSpec
             mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
             .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
-          when(mockRepository.getMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType), eqTo(None)))
+          when(
+            mockRepository.getMessages(
+              EORINumber(eqTo(eoriNumber.value)),
+              MovementId(eqTo(movementId.value)),
+              eqTo(movementType),
+              eqTo(None),
+              eqTo(None),
+              eqTo(None),
+              eqTo(None)
+            )
+          )
             .thenReturn(EitherT.rightT(Vector.empty[MessageResponse]))
 
-          val result = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
+          val result = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
 
           status(result) mustBe OK
           contentAsJson(result) mustBe Json.toJson(Vector.empty[MessageResponse])
         }
 
         "must return NOT_FOUND if no departure found" in {
-          when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
-            .thenReturn(EitherT.rightT(Vector.empty[MessageResponse]))
+          when(mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType)))
+            .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
-          val result = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
+          val result = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
 
           status(result) mustBe NOT_FOUND
         }

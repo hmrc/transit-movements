@@ -338,10 +338,8 @@ class MovementsController @Inject() (
   ) =
     Action.async {
       (for {
-        _ <- repo.getMovementWithoutMessages(eoriNumber, movementId, movementType).asPresentation
-        messages <- repo
-          .getMessages(eoriNumber, movementId, movementType, receivedSince, pageNumber, itemCount, receivedUntil)
-          .asPresentation
+        _        <- repo.getMovementWithoutMessages(eoriNumber, movementId, movementType).asPresentation
+        messages <- repo.getMessages(eoriNumber, movementId, movementType, receivedSince, pageNumber, itemCount, receivedUntil).asPresentation
       } yield messages).fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         messages => Ok(Json.toJson(messages))
