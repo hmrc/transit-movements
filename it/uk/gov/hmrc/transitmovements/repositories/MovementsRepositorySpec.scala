@@ -201,14 +201,12 @@ class MovementsRepositorySpec
   }
 
   "getMessages" should "return message responses if there are messages" in {
-    val messages =
-      Vector(
-        arbitraryMessage.arbitrary.sample.value.copy(uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(uri = None)
-      )
-        .sortBy(_.received)
-        .reverse
+
+    val dateTime = instant // mongo doesn't (generally) like arbitrary datetime values
+    val messages = GetMovementsSetup
+      .setupMessages(dateTime)
+      .sortBy(_.received)
+      .reverse
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
@@ -223,14 +221,9 @@ class MovementsRepositorySpec
   }
 
   "getMessages" should "return message responses if there are messages that were received since the given time" in {
-    val dateTime = arbitrary[OffsetDateTime].sample.value
+    val dateTime = instant // mongo doesn't (generally) like arbitrary datetime values
 
-    val messages =
-      Vector(
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None)
-      )
+    val messages = GetMovementsSetup.setupMessages(dateTime)
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
@@ -239,7 +232,7 @@ class MovementsRepositorySpec
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, Some(dateTime)).value)
     result.toOption.get should be(
       departure.messages
-        .slice(0, 2)
+        .slice(0, 4)
         .map(
           message => MessageResponse.fromMessageWithoutBody(message)
         )
@@ -249,12 +242,7 @@ class MovementsRepositorySpec
   "getMessages" should "return message responses if there are messages that were received up until the given time" in {
     val dateTime = instant
 
-    val messages =
-      Vector(
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None)
-      )
+    val messages = GetMovementsSetup.setupMessages(dateTime)
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
@@ -263,36 +251,69 @@ class MovementsRepositorySpec
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, None, None, Some(dateTime)).value)
     result.toOption.get should be(
       departure.messages
-        .slice(1, 3)
+        .slice(3, 7)
         .map(
           message => MessageResponse.fromMessageWithoutBody(message)
         )
     )
   }
 
-  "getMessages" should "return all message responses if both received since and received until are supplied" in {
+  "getMessages" should "return all message responses between received since and received until, if they are both supplied" in {
     val dateTime = instant
 
-    val messages =
-      Vector(
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None)
-      )
+    val messages = GetMovementsSetup.setupMessages(dateTime)
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
     val result =
-      await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, Some(dateTime), None, None, Some(dateTime)).value)
+      await(
+        repository
+          .getMessages(
+            departure.enrollmentEORINumber,
+            departure._id,
+            departure.movementType,
+            Some(dateTime.minusMinutes(2)),
+            None,
+            None,
+            Some(dateTime.plusMinutes(2))
+          )
+          .value
+      )
     result.toOption.get should be(
       departure.messages
-        .slice(0, 3)
+        .slice(1, 6)
         .map(
           message => MessageResponse.fromMessageWithoutBody(message)
         )
     )
+  }
+
+  "getMessages" should "return no message responses if received since is after received until" in {
+    val dateTime = instant
+
+    val messages = GetMovementsSetup.setupMessages(dateTime)
+
+    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+
+    await(repository.insert(departure).value)
+
+    val result =
+      await(
+        repository
+          .getMessages(
+            departure.enrollmentEORINumber,
+            departure._id,
+            departure.movementType,
+            Some(dateTime.plusMinutes(2)),
+            None,
+            None,
+            Some(dateTime.minusMinutes(2))
+          )
+          .value
+      )
+    result.toOption.get should be(Vector.empty)
   }
 
   "getMessages" should "return none if the movement doesn't exist" in {
@@ -324,6 +345,63 @@ class MovementsRepositorySpec
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
       )
+    )
+  }
+
+  it should "return a list of departure movement responses for the supplied EORI if there are movements that were received up until the given time" in {
+    val dateTime = instant
+    GetMovementsSetup.setup()
+    await(repository.insert(GetMovementsSetup.departureGB3).value)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, None, None, Some(dateTime)).value)
+
+    result.toOption.get should be(
+      Vector(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1),
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB3)
+      )
+    )
+  }
+
+  it should "return a list of departure movement responses for the supplied EORI if there are movements between the updated since and the received until times" in {
+    val dateTime = instant
+    GetMovementsSetup.setup()
+    await(repository.insert(GetMovementsSetup.departureGB3).value)
+    await(repository.insert(GetMovementsSetup.departureGB7).value)
+    await(repository.insert(GetMovementsSetup.departureGB10).value)
+    await(repository.insert(GetMovementsSetup.departureGB11).value)
+
+    val result = await(
+      repository
+        .getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime.minusMinutes(5)), None, None, None, None, Some(dateTime.plusMinutes(10)))
+        .value
+    )
+
+    result.toOption.get should be(
+      Vector(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB10),
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1),
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB3)
+      )
+    )
+  }
+
+  it should "return no movement responses for the supplied EORI, if updated since is after received until" in {
+    val dateTime = instant
+    GetMovementsSetup.setup()
+    await(repository.insert(GetMovementsSetup.departureGB3).value)
+    await(repository.insert(GetMovementsSetup.departureGB7).value)
+    await(repository.insert(GetMovementsSetup.departureGB10).value)
+    await(repository.insert(GetMovementsSetup.departureGB11).value)
+
+    val result = await(
+      repository
+        .getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime.plusMinutes(1)), None, None, None, None, Some(dateTime.minusMinutes(1)))
+        .value
+    )
+
+    result.toOption.get should be(
+      Vector.empty
     )
   }
 
@@ -523,12 +601,12 @@ class MovementsRepositorySpec
           .getMovements(
             GetMovementsSetup.eoriGB,
             MovementType.Departure,
-            Some(dateTime),
+            Some(dateTime.minusMinutes(5)),
             Some(GetMovementsSetup.movementEORI),
             None,
             None,
             None,
-            Some(dateTime)
+            Some(dateTime.plusMinutes(11))
           )
           .value
       )
@@ -783,6 +861,15 @@ class MovementsRepositorySpec
         movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
+        movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM3"))
+      )
+
+    val departureGB7 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriGB,
+        movementEORINumber = Some(EORINumber("1234AB")),
+        movementType = MovementType.Departure,
+        updated = instant.minusMinutes(7),
         movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM3"))
       )
 
@@ -1067,8 +1154,19 @@ class MovementsRepositorySpec
       await(repository.insert(arrivalGB1).value)
     }
 
+    def setupMessages(dateTime: OffsetDateTime) =
+      Vector(
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None)
+      )
+
     def setupPagination() = {
-      // for GBXX the XX represents both the id and the plus minutes so expected order can be determined in tests.
+      // for each GBXX, the XX represents both the id and the plus minutes, so expected order can be determined in tests.
       // add various non-departure and non-GB movements; populate db in non-time order
 
       await(repository.insert(GetMovementsSetup.departureGB19).value)

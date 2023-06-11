@@ -232,12 +232,10 @@ class MovementsRepositoryImpl @Inject() (
       mEq("movementType", movementType.value)
     )
 
-    val dateTimeSelector: Bson = (receivedSince, receivedUntil) match {
-      case (Some(since), None) => mGte("messages.received", since.toLocalDateTime)
-      case (None, Some(until)) => mLte("messages.received", until.toLocalDateTime)
-      case (_, _)              => mGte("messages.received", EPOCH_TIME)
-    }
-
+    val dateTimeSelector: Bson = mAnd(
+      mGte("messages.received", receivedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
+      mLte("messages.received", receivedUntil.map(_.toLocalDateTime).getOrElse(OffsetDateTime.now()))
+    )
     val aggregates =
       Seq(
         Aggregates.filter(selector),
@@ -308,15 +306,14 @@ class MovementsRepositoryImpl @Inject() (
     receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]] = {
 
-    val timeFilter: Bson = (updatedSince, receivedUntil) match {
-      case (Some(since), None) => mGte("updated", since.toLocalDateTime)
-      case (None, Some(until)) => mLte("updated", until.toLocalDateTime)
-      case (_, _)              => mGte("updated", EPOCH_TIME)
-    }
+    val dateTimeFilter: Bson = mAnd(
+      mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
+      mLte("updated", receivedUntil.map(_.toLocalDateTime).getOrElse(OffsetDateTime.now()))
+    )
     val selector: Bson = mAnd(
       mEq("enrollmentEORINumber", eoriNumber.value),
       mEq("movementType", movementType.value),
-      timeFilter,
+      dateTimeFilter,
       movementEORIFilter(movementEORI),
       movementMRNFilter(movementReferenceNumber)
     )
