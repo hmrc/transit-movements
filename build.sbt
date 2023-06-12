@@ -20,7 +20,6 @@ lazy val microservice = Project(appName, file("."))
       "java.time.OffsetDateTime"
     )
   )
-  .settings(publishingSettings: _*)
   .configs(IntegrationTest)
   .settings(scoverageSettings)
   .settings(scalacSettings)
