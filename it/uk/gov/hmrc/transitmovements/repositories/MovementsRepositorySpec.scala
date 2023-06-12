@@ -258,6 +258,106 @@ class MovementsRepositorySpec
     )
   }
 
+  "getMessages" should "return a list of message responses for the first page" in {
+    val dateTime = instant
+
+    val messages = GetMovementsSetup.setupMessages(dateTime)
+
+    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+
+    await(repository.insert(departure).value)
+
+    val result = await(
+      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, None, Some(ItemCount(2)), None).value
+    )
+    result.toOption.get should be(
+      departure.messages
+        .slice(0, 2)
+        .map(
+          message => MessageResponse.fromMessageWithoutBody(message)
+        )
+    )
+  }
+
+  "getMessages" should "return a list of message responses for the second page" in {
+    val dateTime = instant
+
+    val messages = GetMovementsSetup.setupMessages(dateTime)
+
+    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+
+    await(repository.insert(departure).value)
+
+    val result = await(
+      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(1)), Some(ItemCount(2)), None).value
+    )
+    result.toOption.get should be(
+      departure.messages
+        .slice(2, 4)
+        .map(
+          message => MessageResponse.fromMessageWithoutBody(message)
+        )
+    )
+  }
+
+  "getMessages" should "return a list of message responses for the third page" in {
+    val dateTime = instant
+
+    val messages = GetMovementsSetup.setupMessages(dateTime)
+
+    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+
+    await(repository.insert(departure).value)
+
+    val result = await(
+      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(2)), Some(ItemCount(2)), None).value
+    )
+    result.toOption.get should be(
+      departure.messages
+        .slice(4, 6)
+        .map(
+          message => MessageResponse.fromMessageWithoutBody(message)
+        )
+    )
+  }
+
+  "getMessages" should "return a list of message responses for the last page" in {
+    val dateTime = instant
+
+    val messages = GetMovementsSetup.setupMessages(dateTime)
+
+    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+
+    await(repository.insert(departure).value)
+
+    val result = await(
+      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(3)), Some(ItemCount(2)), None).value
+    )
+    result.toOption.get should be(
+      departure.messages
+        .slice(6, 8)
+        .map(
+          message => MessageResponse.fromMessageWithoutBody(message)
+        )
+    )
+  }
+
+  "getMessages" should "return an emptly list for an out of range page" in {
+    val dateTime = instant
+
+    val messages = GetMovementsSetup.setupMessages(dateTime)
+
+    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+
+    await(repository.insert(departure).value)
+
+    val result = await(
+      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(4)), Some(ItemCount(2)), None).value
+    )
+    result.toOption.get should be(Vector.empty)
+
+  }
+
   "getMessages" should "return all message responses between received since and received until, if they are both supplied" in {
     val dateTime = instant
 

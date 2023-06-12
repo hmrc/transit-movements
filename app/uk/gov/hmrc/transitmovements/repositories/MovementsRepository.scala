@@ -236,6 +236,9 @@ class MovementsRepositoryImpl @Inject() (
       mGte("messages.received", receivedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
       mLte("messages.received", receivedUntil.map(_.toLocalDateTime).getOrElse(OffsetDateTime.now()))
     )
+
+    val (from, count) = indices(pageNumber, itemCount)
+
     val aggregates =
       Seq(
         Aggregates.filter(selector),
@@ -243,7 +246,9 @@ class MovementsRepositoryImpl @Inject() (
         Aggregates.filter(dateTimeSelector),
         Aggregates.replaceRoot("$messages"),
         Aggregates.sort(descending("received")),
-        Aggregates.project(projection)
+        Aggregates.project(projection),
+        Aggregates.skip(from),
+        Aggregates.limit(count)
       )
 
     mongoRetry(Try(collection.aggregate[MessageResponse](aggregates)) match {
