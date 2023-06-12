@@ -320,10 +320,14 @@ class MovementsRepositoryImpl @Inject() (
 
     val projection = MovementWithoutMessages.projection
 
+    val (from, count) = indices(pageNumber, itemCount)
+
     val aggregates = Seq(
       Aggregates.filter(selector),
       Aggregates.sort(descending("updated")),
-      Aggregates.project(projection)
+      Aggregates.project(projection),
+      Aggregates.skip(from),
+      Aggregates.limit(count)
     )
 
     mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
@@ -332,8 +336,7 @@ class MovementsRepositoryImpl @Inject() (
           .toFuture()
           .map {
             response =>
-              val (start, end) = indices(pageNumber, itemCount, response.length)
-              Right(response.toVector.slice(start, end))
+              Right(response.toVector)
           }
 
       case Failure(NonFatal(ex)) =>
@@ -342,20 +345,16 @@ class MovementsRepositoryImpl @Inject() (
 
   }
 
-  private def indices(pageNumber: Option[PageNumber], itemCount: Option[ItemCount], length: Int): (Int, Int) = {
+  private def indices(pageNumber: Option[PageNumber], itemCount: Option[ItemCount]): (Int, Int) = {
     val startIndex = pageNumber.flatMap(
       page =>
         itemCount.map(
           count => page.value * count.value
         )
     )
-    val endIndex = pageNumber.flatMap(
-      page =>
-        itemCount.map(
-          count => (page.value + 1) * count.value
-        )
-    )
-    (startIndex.getOrElse(0), endIndex.getOrElse(length))
+    val count = itemCount.fold(Int.MaxValue - 1)(_.value)
+
+    (startIndex.getOrElse(0), count)
   }
 
   private def movementEORIFilter(movementEORI: Option[EORINumber]): Bson =
