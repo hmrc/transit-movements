@@ -91,8 +91,8 @@ trait MovementsRepository {
     movementId: MovementId,
     movementType: MovementType,
     received: Option[OffsetDateTime],
-    pageNumber: Option[PageNumber] = None,
-    itemCount: Option[ItemCount] = None,
+    page: Option[PageNumber] = None,
+    count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, Vector[MessageResponse]]
 
@@ -102,8 +102,8 @@ trait MovementsRepository {
     updatedSince: Option[OffsetDateTime],
     movementEORI: Option[EORINumber],
     movementReferenceNumber: Option[MovementReferenceNumber],
-    pageNumber: Option[PageNumber] = None,
-    itemCount: Option[ItemCount] = None,
+    page: Option[PageNumber] = None,
+    count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]]
 
@@ -219,8 +219,8 @@ class MovementsRepositoryImpl @Inject() (
     movementId: MovementId,
     movementType: MovementType,
     receivedSince: Option[OffsetDateTime],
-    pageNumber: Option[PageNumber] = None,
-    itemCount: Option[ItemCount] = None,
+    page: Option[PageNumber] = None,
+    count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, Vector[MessageResponse]] = {
 
@@ -237,7 +237,7 @@ class MovementsRepositoryImpl @Inject() (
       mLte("messages.received", receivedUntil.map(_.toLocalDateTime).getOrElse(OffsetDateTime.now()))
     )
 
-    val (from, count) = indices(pageNumber, itemCount)
+    val (from, countNumber) = indices(page, count)
 
     val aggregates =
       Seq(
@@ -248,7 +248,7 @@ class MovementsRepositoryImpl @Inject() (
         Aggregates.sort(descending("received")),
         Aggregates.project(projection),
         Aggregates.skip(from),
-        Aggregates.limit(count)
+        Aggregates.limit(countNumber)
       )
 
     mongoRetry(Try(collection.aggregate[MessageResponse](aggregates)) match {
@@ -306,8 +306,8 @@ class MovementsRepositoryImpl @Inject() (
     updatedSince: Option[OffsetDateTime],
     movementEORI: Option[EORINumber],
     movementReferenceNumber: Option[MovementReferenceNumber],
-    pageNumber: Option[PageNumber] = None,
-    itemCount: Option[ItemCount] = None,
+    page: Option[PageNumber] = None,
+    count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]] = {
 
@@ -325,14 +325,14 @@ class MovementsRepositoryImpl @Inject() (
 
     val projection = MovementWithoutMessages.projection
 
-    val (from, count) = indices(pageNumber, itemCount)
+    val (from, itemCount) = indices(page, count)
 
     val aggregates = Seq(
       Aggregates.filter(selector),
       Aggregates.sort(descending("updated")),
       Aggregates.project(projection),
       Aggregates.skip(from),
-      Aggregates.limit(count)
+      Aggregates.limit(itemCount)
     )
 
     mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {

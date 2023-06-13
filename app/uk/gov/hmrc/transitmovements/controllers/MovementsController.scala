@@ -297,12 +297,12 @@ class MovementsController @Inject() (
     updatedSince: Option[OffsetDateTime] = None,
     movementEORI: Option[EORINumber] = None,
     movementReferenceNumber: Option[MovementReferenceNumber] = None,
-    pageNumber: Option[PageNumber] = None,
-    itemCount: Option[ItemCount] = None,
+    page: Option[PageNumber] = None,
+    count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
   ): Action[AnyContent] = Action.async {
     repo
-      .getMovements(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, pageNumber, itemCount, receivedUntil)
+      .getMovements(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, page, count, receivedUntil)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
@@ -332,14 +332,14 @@ class MovementsController @Inject() (
     movementType: MovementType,
     movementId: MovementId,
     receivedSince: Option[OffsetDateTime] = None,
-    pageNumber: Option[PageNumber] = None,
-    itemCount: Option[ItemCount] = None,
+    page: Option[PageNumber] = None,
+    count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
   ) =
     Action.async {
       (for {
         _        <- repo.getMovementWithoutMessages(eoriNumber, movementId, movementType).asPresentation
-        messages <- repo.getMessages(eoriNumber, movementId, movementType, receivedSince, pageNumber, itemCount, receivedUntil).asPresentation
+        messages <- repo.getMessages(eoriNumber, movementId, movementType, receivedSince, page, count, receivedUntil).asPresentation
       } yield messages).fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         messages => Ok(Json.toJson(messages))
