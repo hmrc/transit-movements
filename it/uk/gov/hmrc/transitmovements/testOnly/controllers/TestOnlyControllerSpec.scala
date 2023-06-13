@@ -48,14 +48,14 @@ class TestOnlyControllerSpec
 
   override lazy val repository: MovementsRepositoryImpl = app.injector.instanceOf[MovementsRepositoryImpl]
 
-  private def documentCount: Long = await(repository.collection.countDocuments().toFuture())
+  private def documentCount: Long = await(count())
 
   "dropCollection" should "drop the movements collection and return OK" in forAll(arbitrary[Movement]) {
     movement =>
-      await(repository.insert(movement).value)
+      await(insert(movement))
       documentCount shouldBe 1
 
-      val result = route(app, FakeRequest(DELETE, s"/transit-movements/test-only/movements")).value
+      val result = route(app, FakeRequest(DELETE, "/transit-movements/test-only/movements")).value
       status(result) shouldBe OK
 
       documentCount shouldBe 0
