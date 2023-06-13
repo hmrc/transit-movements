@@ -354,7 +354,7 @@ class MovementsRepositoryImpl @Inject() (
     val startIndex = pageNumber.flatMap(
       page =>
         itemCount.map(
-          count => page.value * count.value
+          count => (page.value - 1) * count.value
         )
     )
     val count = itemCount.fold(Int.MaxValue - 1)(_.value)

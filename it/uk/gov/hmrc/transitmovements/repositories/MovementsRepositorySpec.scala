@@ -289,7 +289,7 @@ class MovementsRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(
-      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(1)), Some(ItemCount(2)), None).value
+      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(2)), Some(ItemCount(2)), None).value
     )
     result.toOption.get should be(
       departure.messages
@@ -310,7 +310,7 @@ class MovementsRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(
-      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(2)), Some(ItemCount(2)), None).value
+      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(3)), Some(ItemCount(2)), None).value
     )
     result.toOption.get should be(
       departure.messages
@@ -331,7 +331,7 @@ class MovementsRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(
-      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(3)), Some(ItemCount(2)), None).value
+      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(4)), Some(ItemCount(2)), None).value
     )
     result.toOption.get should be(
       departure.messages
@@ -342,7 +342,7 @@ class MovementsRepositorySpec
     )
   }
 
-  "getMessages" should "return an emptly list for an out of range page" in {
+  "getMessages" should "return an empty list for an out of range page" in {
     val dateTime = instant
 
     val messages = GetMovementsSetup.setupMessages(dateTime)
@@ -352,7 +352,7 @@ class MovementsRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(
-      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(4)), Some(ItemCount(2)), None).value
+      repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(5)), Some(ItemCount(2)), None).value
     )
     result.toOption.get should be(Vector.empty)
 
@@ -530,7 +530,7 @@ class MovementsRepositorySpec
             None,
             Some(GetMovementsSetup.movementEORI),
             None,
-            Some(PageNumber(0)),
+            Some(PageNumber(1)),
             Some(ItemCount(4))
           )
           .value
@@ -559,7 +559,7 @@ class MovementsRepositorySpec
             None,
             Some(GetMovementsSetup.movementEORI),
             None,
-            Some(PageNumber(1)),
+            Some(PageNumber(2)),
             Some(ItemCount(4))
           )
           .value
@@ -588,7 +588,7 @@ class MovementsRepositorySpec
             None,
             Some(GetMovementsSetup.movementEORI),
             None,
-            Some(PageNumber(2)),
+            Some(PageNumber(3)),
             Some(ItemCount(4))
           )
           .value
@@ -617,7 +617,7 @@ class MovementsRepositorySpec
             None,
             Some(GetMovementsSetup.movementEORI),
             None,
-            Some(PageNumber(3)),
+            Some(PageNumber(4)),
             Some(ItemCount(4))
           )
           .value
@@ -642,7 +642,7 @@ class MovementsRepositorySpec
             None,
             Some(GetMovementsSetup.movementEORI),
             None,
-            Some(PageNumber(4)),
+            Some(PageNumber(5)),
             Some(ItemCount(4))
           )
           .value
