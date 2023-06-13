@@ -11,3 +11,5 @@
 
 # Add all the application routes to the prod.routes file
 ->         /                          prod.Routes
+
+DELETE     /test-only/transit-movements/movements           uk.gov.hmrc.transitmovements.testOnly.controllers.TestOnlyController.dropCollection()
