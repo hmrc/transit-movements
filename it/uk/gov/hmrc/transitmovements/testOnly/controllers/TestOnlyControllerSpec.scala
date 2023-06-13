@@ -55,7 +55,7 @@ class TestOnlyControllerSpec
       await(insert(movement))
       documentCount shouldBe 1
 
-      val result = route(app, FakeRequest(DELETE, "/transit-movements/test-only/movements")).value
+      val result = route(app, FakeRequest(DELETE, "/test-only/transit-movements/movements")).value
       status(result) shouldBe OK
 
       documentCount shouldBe 0
