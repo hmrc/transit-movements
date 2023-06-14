@@ -900,7 +900,19 @@ class MovementsControllerSpec
         "must return OK if departures were found" in {
           val response = MovementWithoutMessages.fromMovement(movement)
 
-          when(mockRepository.getMovements(EORINumber(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
+          when(
+            mockRepository.getMovements(
+              EORINumber(any()),
+              eqTo(movementType),
+              eqTo(None),
+              eqTo(None),
+              eqTo(None),
+              eqTo(None),
+              eqTo(None),
+              eqTo(None),
+              eqTo(None)
+            )
+          )
             .thenReturn(EitherT.rightT(Vector(response)))
 
           val result = controller.getMovementsForEori(eoriNumber, movementType)(request)
@@ -936,7 +948,17 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(Vector(response)))
 
             val result =
-              controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, pageNumber, itemCount, localReferenceNumber)(request)
+              controller.getMovementsForEori(
+                eoriNumber,
+                movementType,
+                updatedSince,
+                movementEORI,
+                movementReferenceNumber,
+                pageNumber,
+                itemCount,
+                None,
+                localReferenceNumber
+              )(request)
 
             status(result) mustBe OK
 
@@ -966,7 +988,14 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(Vector.empty[MovementWithoutMessages]))
 
             val result =
-              controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber)(request)
+              controller.getMovementsForEori(
+                eoriNumber,
+                movementType,
+                updatedSince,
+                movementEORI,
+                movementReferenceNumber,
+                localReferenceNumber = localReferenceNumber
+              )(request)
 
             status(result) mustBe OK
             contentAsJson(result) mustBe Json.toJson(Vector.empty[MovementWithoutMessages])
@@ -995,7 +1024,14 @@ class MovementsControllerSpec
               .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
             val result =
-              controller.getMovementsForEori(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber)(request)
+              controller.getMovementsForEori(
+                eoriNumber,
+                movementType,
+                updatedSince,
+                movementEORI,
+                movementReferenceNumber,
+                localReferenceNumber = localReferenceNumber
+              )(request)
 
             status(result) mustBe INTERNAL_SERVER_ERROR
         }
