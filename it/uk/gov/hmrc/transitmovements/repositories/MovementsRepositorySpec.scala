@@ -424,7 +424,7 @@ class MovementsRepositorySpec
   "getDepartures" should
     "return a list of departure movement responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()
-      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None).value)
+      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, None, None, None, None).value)
 
       result.toOption.get should be(
         Vector(
@@ -438,7 +438,7 @@ class MovementsRepositorySpec
     val dateTime = instant
     GetMovementsSetup.setup()
     await(repository.insert(GetMovementsSetup.departureGB3).value)
-    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime), None, None).value)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime), None, None, None, None, None, None).value)
 
     result.toOption.get should be(
       Vector(
@@ -452,7 +452,7 @@ class MovementsRepositorySpec
     val dateTime = instant
     GetMovementsSetup.setup()
     await(repository.insert(GetMovementsSetup.departureGB3).value)
-    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, None, None, Some(dateTime)).value)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, None, None, Some(dateTime), None).value)
 
     result.toOption.get should be(
       Vector(
@@ -472,7 +472,17 @@ class MovementsRepositorySpec
 
     val result = await(
       repository
-        .getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime.minusMinutes(5)), None, None, None, None, Some(dateTime.plusMinutes(10)))
+        .getMovements(
+          GetMovementsSetup.eoriGB,
+          MovementType.Departure,
+          Some(dateTime.minusMinutes(5)),
+          None,
+          None,
+          None,
+          None,
+          Some(dateTime.plusMinutes(10)),
+          None
+        )
         .value
     )
 
@@ -496,7 +506,17 @@ class MovementsRepositorySpec
 
     val result = await(
       repository
-        .getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime.plusMinutes(1)), None, None, None, None, Some(dateTime.minusMinutes(1)))
+        .getMovements(
+          GetMovementsSetup.eoriGB,
+          MovementType.Departure,
+          Some(dateTime.plusMinutes(1)),
+          None,
+          None,
+          None,
+          None,
+          Some(dateTime.minusMinutes(1)),
+          None
+        )
         .value
     )
 
@@ -508,7 +528,9 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed movementEORI" in {
     GetMovementsSetup.setup()
     await(repository.insert(GetMovementsSetup.departureGB4).value)
-    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, Some(GetMovementsSetup.movementEORI), None).value)
+    val result = await(
+      repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, Some(GetMovementsSetup.movementEORI), None, None, None, None, None).value
+    )
 
     result.toOption.get should be(
       Vector(
@@ -531,7 +553,9 @@ class MovementsRepositorySpec
             Some(GetMovementsSetup.movementEORI),
             None,
             Some(PageNumber(1)),
-            Some(ItemCount(4))
+            Some(ItemCount(4)),
+            None,
+            None
           )
           .value
       )
@@ -560,7 +584,9 @@ class MovementsRepositorySpec
             Some(GetMovementsSetup.movementEORI),
             None,
             Some(PageNumber(2)),
-            Some(ItemCount(4))
+            Some(ItemCount(4)),
+            None,
+            None
           )
           .value
       )
@@ -589,7 +615,9 @@ class MovementsRepositorySpec
             Some(GetMovementsSetup.movementEORI),
             None,
             Some(PageNumber(3)),
-            Some(ItemCount(4))
+            Some(ItemCount(4)),
+            None,
+            None
           )
           .value
       )
@@ -618,7 +646,9 @@ class MovementsRepositorySpec
             Some(GetMovementsSetup.movementEORI),
             None,
             Some(PageNumber(4)),
-            Some(ItemCount(4))
+            Some(ItemCount(4)),
+            None,
+            None
           )
           .value
       )
@@ -643,7 +673,9 @@ class MovementsRepositorySpec
             Some(GetMovementsSetup.movementEORI),
             None,
             Some(PageNumber(5)),
-            Some(ItemCount(4))
+            Some(ItemCount(4)),
+            None,
+            None
           )
           .value
       )
@@ -658,7 +690,11 @@ class MovementsRepositorySpec
     GetMovementsSetup.setup()
     await(repository.insert(GetMovementsSetup.departureGB3).value)
     val result =
-      await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime), Some(GetMovementsSetup.movementEORI), None).value)
+      await(
+        repository
+          .getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime), Some(GetMovementsSetup.movementEORI), None, None, None, None, None)
+          .value
+      )
 
     result.toOption.get should be(
       Vector(
@@ -677,7 +713,7 @@ class MovementsRepositorySpec
     val result =
       await(
         repository
-          .getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, Some(GetMovementsSetup.movementEORI), None, None, None, Some(dateTime))
+          .getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, Some(GetMovementsSetup.movementEORI), None, None, None, Some(dateTime), None)
           .value
       )
 
@@ -706,7 +742,8 @@ class MovementsRepositorySpec
             None,
             None,
             None,
-            Some(dateTime.plusMinutes(11))
+            Some(dateTime.plusMinutes(11)),
+            None
           )
           .value
       )
@@ -724,7 +761,21 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed MRN" in {
     await(repository.insert(GetMovementsSetup.departureGB4).value)
     val result =
-      await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, GetMovementsSetup.departureGB4.movementReferenceNumber).value)
+      await(
+        repository
+          .getMovements(
+            GetMovementsSetup.eoriGB,
+            MovementType.Departure,
+            None,
+            None,
+            GetMovementsSetup.departureGB4.movementReferenceNumber,
+            None,
+            None,
+            None,
+            None
+          )
+          .value
+      )
 
     result.toOption.get should be(
       Vector(
@@ -737,7 +788,52 @@ class MovementsRepositorySpec
     await(repository.insert(GetMovementsSetup.departureGB5).value)
     await(repository.insert(GetMovementsSetup.departureGB6).value)
     val result =
-      await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, Some(MovementReferenceNumber("27WF9"))).value)
+      await(
+        repository
+          .getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, Some(MovementReferenceNumber("27WF9")), None, None, None, None)
+          .value
+      )
+
+    result.toOption.get should be(
+      Vector(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB6),
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB5)
+      )
+    )
+  }
+
+  it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed LRN" in {
+    await(repository.insert(GetMovementsSetup.departureGB4).value)
+    val result =
+      await(
+        repository
+          .getMovements(
+            GetMovementsSetup.eoriGB,
+            MovementType.Departure,
+            None,
+            None,
+            None,
+            localReferenceNumber = GetMovementsSetup.departureGB4.localReferenceNumber
+          )
+          .value
+      )
+
+    result.toOption.get should be(
+      Vector(
+        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB4)
+      )
+    )
+  }
+
+  it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with partial match LRN" in {
+    await(repository.insert(GetMovementsSetup.departureGB5).value)
+    await(repository.insert(GetMovementsSetup.departureGB6).value)
+    val result =
+      await(
+        repository
+          .getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, localReferenceNumber = Some(LocalReferenceNumber("3CnsT")))
+          .value
+      )
 
     result.toOption.get should be(
       Vector(
@@ -749,20 +845,22 @@ class MovementsRepositorySpec
 
   it should "return no movement ids for an EORI that doesn't exist" in {
     GetMovementsSetup.setup()
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, None).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, None, None, None, None, None).value)
 
     result.toOption.get should be(Vector.empty[MovementWithoutMessages])
   }
 
   it should "return no movement ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, None).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, None, None, None, None, None).value)
     result.toOption.get should be(Vector.empty[MovementWithoutMessages])
   }
 
   it should "return no movement ids for an MRN that doesn't exist" in {
     GetMovementsSetup.setup()
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, Some(MovementReferenceNumber("invalid"))).value)
+    val result = await(
+      repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, Some(MovementReferenceNumber("invalid")), None, None, None, None).value
+    )
 
     result.toOption.get should be(Vector.empty[MovementWithoutMessages])
   }
@@ -770,7 +868,7 @@ class MovementsRepositorySpec
   "getArrivals" should
     "return a list of an arrival responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()
-      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None, None).value)
+      val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None, None, None, None, None, None).value)
 
       result.toOption.get should be(
         Vector(
@@ -784,7 +882,7 @@ class MovementsRepositorySpec
     val dateTime = instant
     GetMovementsSetup.setup()
     await(repository.insert(GetMovementsSetup.arrivalGB3).value)
-    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), None, None).value)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), None, None, localReferenceNumber = None).value)
 
     result.toOption.get should be(
       Vector(
@@ -797,7 +895,11 @@ class MovementsRepositorySpec
   it should "return a list of an arrival movement responses for the supplied EORI if there are movements that matched with passed movementEORI" in {
     GetMovementsSetup.setup()
     await(repository.insert(GetMovementsSetup.arrivalGB4).value)
-    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, Some(GetMovementsSetup.movementEORI), None).value)
+    val result = await(
+      repository
+        .getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, Some(GetMovementsSetup.movementEORI), None, localReferenceNumber = None)
+        .value
+    )
 
     result.toOption.get should be(
       Vector(
@@ -812,7 +914,11 @@ class MovementsRepositorySpec
     GetMovementsSetup.setup()
     await(repository.insert(GetMovementsSetup.arrivalGB3).value)
     val result =
-      await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), Some(GetMovementsSetup.movementEORI), None).value)
+      await(
+        repository
+          .getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), Some(GetMovementsSetup.movementEORI), None, localReferenceNumber = None)
+          .value
+      )
 
     result.toOption.get should be(
       Vector(
@@ -825,7 +931,21 @@ class MovementsRepositorySpec
   it should "return a list of arrival movement responses for the supplied EORI if there are movements that matched with passed MRN" in {
     await(repository.insert(GetMovementsSetup.arrivalGB3).value)
     val result =
-      await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None, GetMovementsSetup.arrivalGB3.movementReferenceNumber).value)
+      await(
+        repository
+          .getMovements(
+            GetMovementsSetup.eoriGB,
+            MovementType.Arrival,
+            None,
+            None,
+            GetMovementsSetup.arrivalGB3.movementReferenceNumber,
+            None,
+            None,
+            None,
+            None
+          )
+          .value
+      )
 
     result.toOption.get should be(
       Vector(
@@ -838,7 +958,11 @@ class MovementsRepositorySpec
     await(repository.insert(GetMovementsSetup.arrivalGB5).value)
     await(repository.insert(GetMovementsSetup.arrivalGB6).value)
     val result =
-      await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None, Some(MovementReferenceNumber("27WF9"))).value)
+      await(
+        repository
+          .getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None, Some(MovementReferenceNumber("27WF9")), None, None, None, None)
+          .value
+      )
 
     result.toOption.get should be(
       Vector(
@@ -850,20 +974,22 @@ class MovementsRepositorySpec
 
   it should "return no arrival ids for an EORI that doesn't exist" in {
     GetMovementsSetup.setup()
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, None).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, None, None, None, None, None).value)
 
     result.toOption.get should be(Vector.empty[MovementWithoutMessages])
   }
 
   it should "return no arrival ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, None).value)
+    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, None, None, None, None, None).value)
     result.toOption.get should be(Vector.empty[MovementWithoutMessages])
   }
 
   it should "return no movement ids for an MRN that doesn't exist" in {
     GetMovementsSetup.setup()
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, Some(MovementReferenceNumber("invalid"))).value)
+    val result = await(
+      repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, Some(MovementReferenceNumber("invalid")), None, None, None, None).value
+    )
 
     result.toOption.get should be(Vector.empty[MovementWithoutMessages])
   }
@@ -952,7 +1078,8 @@ class MovementsRepositorySpec
         movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
-        movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5"))
+        movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5")),
+        localReferenceNumber = Some(LocalReferenceNumber("3CnsTh79I7hyOy6"))
       )
 
     val departureGB6 =
@@ -961,7 +1088,8 @@ class MovementsRepositorySpec
         movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
-        movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM3"))
+        movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM3")),
+        localReferenceNumber = Some(LocalReferenceNumber("3CnsTh79I7hyOy7"))
       )
 
     val departureGB7 =

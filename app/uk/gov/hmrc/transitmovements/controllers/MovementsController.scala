@@ -299,10 +299,11 @@ class MovementsController @Inject() (
     movementReferenceNumber: Option[MovementReferenceNumber] = None,
     page: Option[PageNumber] = None,
     count: Option[ItemCount] = None,
-    receivedUntil: Option[OffsetDateTime] = None
+    receivedUntil: Option[OffsetDateTime] = None,
+    localReferenceNumber: Option[LocalReferenceNumber] = None
   ): Action[AnyContent] = Action.async {
     repo
-      .getMovements(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, page, count, receivedUntil)
+      .getMovements(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, page, count, receivedUntil, localReferenceNumber)
       .asPresentation
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),

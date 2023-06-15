@@ -104,7 +104,8 @@ trait MovementsRepository {
     movementReferenceNumber: Option[MovementReferenceNumber],
     page: Option[PageNumber] = None,
     count: Option[ItemCount] = None,
-    receivedUntil: Option[OffsetDateTime] = None
+    receivedUntil: Option[OffsetDateTime] = None,
+    localReferenceNumber: Option[LocalReferenceNumber]
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]]
 
   def updateMovement(
@@ -308,7 +309,8 @@ class MovementsRepositoryImpl @Inject() (
     movementReferenceNumber: Option[MovementReferenceNumber],
     page: Option[PageNumber] = None,
     count: Option[ItemCount] = None,
-    receivedUntil: Option[OffsetDateTime] = None
+    receivedUntil: Option[OffsetDateTime] = None,
+    localReferenceNumber: Option[LocalReferenceNumber]
   ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]] = {
 
     val dateTimeFilter: Bson = mAnd(
@@ -320,7 +322,8 @@ class MovementsRepositoryImpl @Inject() (
       mEq("movementType", movementType.value),
       dateTimeFilter,
       movementEORIFilter(movementEORI),
-      movementMRNFilter(movementReferenceNumber)
+      movementMRNFilter(movementReferenceNumber),
+      movementLRNFilter(localReferenceNumber)
     )
 
     val projection = MovementWithoutMessages.projection
@@ -372,6 +375,12 @@ class MovementsRepositoryImpl @Inject() (
     movementReferenceNumber match {
       case Some(movementReferenceNumber) => mAnd(mRegex("movementReferenceNumber", s"\\Q${movementReferenceNumber.value}\\E", "i"))
       case _                             => empty()
+    }
+
+  private def movementLRNFilter(localReferenceNumber: Option[LocalReferenceNumber]): Bson =
+    localReferenceNumber match {
+      case Some(localReferenceNumber) => mAnd(mRegex("localReferenceNumber", s"\\Q${localReferenceNumber.value}\\E", "i"))
+      case _                          => empty()
     }
 
   def attachMessage(

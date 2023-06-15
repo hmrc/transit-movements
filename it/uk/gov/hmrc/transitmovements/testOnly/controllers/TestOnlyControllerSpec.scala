@@ -16,21 +16,24 @@
 
 package uk.gov.hmrc.transitmovements.testOnly.controllers
 
+import org.mockito.scalatest.MockitoSugar
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import play.api.Application
-import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.DefaultAwaitTimeout
 import play.api.test.FakeRequest
 import play.api.test.FutureAwaits
 import play.api.test.Helpers._
+import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
+import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class TestOnlyControllerSpec
     extends AnyFlatSpec
@@ -40,13 +43,22 @@ class TestOnlyControllerSpec
     with DefaultAwaitTimeout
     with DefaultPlayMongoRepositorySupport[Movement]
     with ModelGenerators
-    with OptionValues {
+    with OptionValues
+    with MockitoSugar {
 
-  implicit private lazy val app: Application = GuiceApplicationBuilder()
-    .configure("play.http.router" -> "testOnlyDoNotUseInAppConf.Routes")
-    .build()
+  val appConfig: AppConfig = mock[AppConfig]
+  when(appConfig.documentTtl).thenReturn(1000000) // doesn't matter, just something will do
 
-  override lazy val repository: MovementsRepositoryImpl = app.injector.instanceOf[MovementsRepositoryImpl]
+  override lazy val mongoComponent: MongoComponent = {
+    val databaseName: String = "test-movements-testonly"
+    val mongoUri: String     = s"mongodb://localhost:27017/$databaseName?retryWrites=false"
+    MongoComponent(mongoUri)
+  }
+
+  override lazy val repository: MovementsRepositoryImpl =
+    new MovementsRepositoryImpl(appConfig, mongoComponent)
+
+  lazy val controller = new TestOnlyController(stubControllerComponents(), repository)
 
   private def documentCount: Long = await(count())
 
@@ -55,7 +67,7 @@ class TestOnlyControllerSpec
       await(insert(movement))
       documentCount shouldBe 1
 
-      val result = route(app, FakeRequest(DELETE, "/test-only/transit-movements/movements")).value
+      val result = controller.dropCollection()(FakeRequest("DELETE", "/"))
       status(result) shouldBe OK
 
       documentCount shouldBe 0
