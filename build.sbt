@@ -37,7 +37,7 @@ lazy val scalacSettings = Def.settings(
   // Disable dead code warning as it is triggered by Mockito any()
   Test / scalacOptions ~= {
     opts =>
-      opts.filterNot(Set("-Ywarn-dead-code"))
+      opts.filterNot(Set("-Wdead-code"))
   },
   // Disable warnings arising from generated routing code
   scalacOptions += "-Wconf:src=routes/.*:s"

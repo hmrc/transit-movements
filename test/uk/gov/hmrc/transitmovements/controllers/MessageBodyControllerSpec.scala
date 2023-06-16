@@ -85,11 +85,9 @@ import java.net.URI
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.format.DateTimeParseException
-import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-@nowarn("msg=dead code following this construct")
 class MessageBodyControllerSpec
     extends SpecBase
     with Matchers
