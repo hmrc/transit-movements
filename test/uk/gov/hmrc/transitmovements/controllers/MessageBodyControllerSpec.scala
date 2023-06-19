@@ -42,6 +42,7 @@ import play.api.http.Status.OK
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
+import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Result
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
@@ -51,8 +52,14 @@ import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.internalauth.client.IAAction
+import uk.gov.hmrc.internalauth.client.Predicate
+import uk.gov.hmrc.internalauth.client.Resource
+import uk.gov.hmrc.internalauth.client.ResourceLocation
+import uk.gov.hmrc.internalauth.client.ResourceType
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
+import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
 import uk.gov.hmrc.transitmovements.models.ArrivalData
@@ -146,6 +153,13 @@ class MessageBodyControllerSpec
         val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
         val mockMessageService             = mock[MessageService]
 
+        val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
+        when(
+          mockInternalAuthActionProvider.apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any())
+        ).thenReturn(DefaultActionBuilder(stubControllerComponents().parsers.defaultBodyParser))
+
         implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
 
         val sut = new MessageBodyController(
@@ -155,6 +169,7 @@ class MessageBodyControllerSpec
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
           mockMessageService,
+          mockInternalAuthActionProvider,
           clock
         )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
@@ -221,7 +236,13 @@ class MessageBodyControllerSpec
         val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
         val mockMessageService             = mock[MessageService]
 
-        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
+        implicit val tfc: TemporaryFileCreator                         = SingletonTemporaryFileCreator
+        val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
+        when(
+          mockInternalAuthActionProvider.apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any())
+        ).thenReturn(DefaultActionBuilder(stubControllerComponents().parsers.defaultBodyParser))
 
         val sut = new MessageBodyController(
           stubControllerComponents(),
@@ -230,6 +251,7 @@ class MessageBodyControllerSpec
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
           mockMessageService,
+          mockInternalAuthActionProvider,
           clock
         )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
@@ -282,7 +304,13 @@ class MessageBodyControllerSpec
         val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
         val mockMessageService             = mock[MessageService]
 
-        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
+        implicit val tfc: TemporaryFileCreator                         = SingletonTemporaryFileCreator
+        val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
+        when(
+          mockInternalAuthActionProvider.apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any())
+        ).thenReturn(DefaultActionBuilder(stubControllerComponents().parsers.defaultBodyParser))
 
         val sut = new MessageBodyController(
           stubControllerComponents(),
@@ -291,6 +319,7 @@ class MessageBodyControllerSpec
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
           mockMessageService,
+          mockInternalAuthActionProvider,
           clock
         )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
@@ -334,7 +363,13 @@ class MessageBodyControllerSpec
         val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
         val mockMessageService             = mock[MessageService]
 
-        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
+        implicit val tfc: TemporaryFileCreator                         = SingletonTemporaryFileCreator
+        val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
+        when(
+          mockInternalAuthActionProvider.apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any())
+        ).thenReturn(DefaultActionBuilder(stubControllerComponents().parsers.defaultBodyParser))
 
         val sut = new MessageBodyController(
           stubControllerComponents(),
@@ -343,6 +378,7 @@ class MessageBodyControllerSpec
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
           mockMessageService,
+          mockInternalAuthActionProvider,
           clock
         )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
@@ -383,9 +419,15 @@ class MessageBodyControllerSpec
 
         val mockObjectStoreService = mock[ObjectStoreService]
 
-        val mockMessagesXmlParsingSerivce  = mock[MessagesXmlParsingService]
-        val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
-        val mockMessageService             = mock[MessageService]
+        val mockMessagesXmlParsingSerivce                              = mock[MessagesXmlParsingService]
+        val mockMovementsXmlParsingSerivce                             = mock[MovementsXmlParsingService]
+        val mockMessageService                                         = mock[MessageService]
+        val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
+        when(
+          mockInternalAuthActionProvider.apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any())
+        ).thenReturn(DefaultActionBuilder(stubControllerComponents().parsers.defaultBodyParser))
 
         implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
 
@@ -396,6 +438,7 @@ class MessageBodyControllerSpec
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
           mockMessageService,
+          mockInternalAuthActionProvider,
           clock
         )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
@@ -456,7 +499,13 @@ class MessageBodyControllerSpec
         val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
         val mockMessageService             = mock[MessageService]
 
-        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
+        implicit val tfc: TemporaryFileCreator                         = SingletonTemporaryFileCreator
+        val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
+        when(
+          mockInternalAuthActionProvider.apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any())
+        ).thenReturn(DefaultActionBuilder(stubControllerComponents().parsers.defaultBodyParser))
 
         val sut = new MessageBodyController(
           stubControllerComponents(),
@@ -465,6 +514,7 @@ class MessageBodyControllerSpec
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
           mockMessageService,
+          mockInternalAuthActionProvider,
           clock
         )
         val result: Future[Result] = sut.getBody(eori, movementType, movementId, messageId)(FakeRequest("GET", "/"))
@@ -1355,6 +1405,12 @@ class MessageBodyControllerSpec
       val mockMessagesXmlParsingService: MessagesXmlParsingService   = mock[MessagesXmlParsingService]
       val mockMovementsXmlParsingService: MovementsXmlParsingService = mock[MovementsXmlParsingService]
       val mockMessageService: MessageService                         = mock[MessageService]
+      val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
+      when(
+        mockInternalAuthActionProvider.apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+        )(any())
+      ).thenReturn(DefaultActionBuilder(stubControllerComponents().parsers.defaultBodyParser))
 
       val controller = new MessageBodyController(
         stubControllerComponents(),
@@ -1363,6 +1419,7 @@ class MessageBodyControllerSpec
         mockMessagesXmlParsingService,
         mockMovementsXmlParsingService,
         mockMessageService,
+        mockInternalAuthActionProvider,
         clock
       )
 

@@ -8,14 +8,15 @@ object AppDependencies {
   private val hmrcBootstrapVersion = "7.12.0"
 
   val compile = Seq(
-    "uk.gov.hmrc"             %% "bootstrap-backend-play-28"   % hmrcBootstrapVersion,
-    "uk.gov.hmrc.mongo"       %% "hmrc-mongo-play-28"          % hmrcMongoVersion,
-    "uk.gov.hmrc.objectstore" %% "object-store-client-play-28" % "1.0.0",
-    "org.typelevel"           %% "cats-core"                   % catsVersion,
-    "org.json"                 % "json"                        % "20210307",
-    "io.lemonlabs"            %% "scala-uri"                   % "3.6.0",
-    "com.typesafe.akka"       %% "akka-slf4j"                  % PlayVersion.akkaVersion,
-    "com.lightbend.akka"      %% "akka-stream-alpakka-xml"     % "3.0.4"
+    "uk.gov.hmrc"             %% "bootstrap-backend-play-28"    % hmrcBootstrapVersion,
+    "uk.gov.hmrc.mongo"       %% "hmrc-mongo-play-28"           % hmrcMongoVersion,
+    "uk.gov.hmrc.objectstore" %% "object-store-client-play-28"  % "1.0.0",
+    "org.typelevel"           %% "cats-core"                    % catsVersion,
+    "org.json"                 % "json"                         % "20210307",
+    "io.lemonlabs"            %% "scala-uri"                    % "3.6.0",
+    "com.typesafe.akka"       %% "akka-slf4j"                   % PlayVersion.akkaVersion,
+    "com.lightbend.akka"      %% "akka-stream-alpakka-xml"      % "3.0.4",
+    "uk.gov.hmrc"             %% "internal-auth-client-play-28" % "1.4.0"
   )
 
   val test = Seq(

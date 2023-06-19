@@ -25,6 +25,7 @@ import org.mockito.ArgumentMatchers.argThat
 import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
 import org.scalacheck.Arbitrary.arbitrary
@@ -44,7 +45,7 @@ import play.api.http.Status.OK
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
-import play.api.mvc.AnyContentAsEmpty
+import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Request
 import play.api.mvc.Result
 import play.api.test.FakeHeaders
@@ -55,11 +56,16 @@ import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpVerbs.POST
+import uk.gov.hmrc.internalauth.client.IAAction
+import uk.gov.hmrc.internalauth.client.Predicate
+import uk.gov.hmrc.internalauth.client.Resource
+import uk.gov.hmrc.internalauth.client.ResourceLocation
+import uk.gov.hmrc.internalauth.client.ResourceType
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
-import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.config.AppConfig
+import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
 import uk.gov.hmrc.transitmovements.models._
@@ -79,7 +85,6 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
-import java.util.UUID.randomUUID
 import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -111,9 +116,6 @@ class MovementsControllerSpec
   lazy val updateMessageMetadata: UpdateMessageMetadata = arbitraryUpdateMessageMetadata.arbitrary.sample.get
   lazy val objectSummary: ObjectSummaryWithMd5          = arbitraryObjectSummaryWithMd5.arbitrary.sample.get
   val lrn: LocalReferenceNumber                         = arbitraryLRN.arbitrary.sample.get
-
-  lazy val filePath =
-    Path.Directory(s"transit-movements/movements/${arbitraryMovementId.arbitrary.sample.get}").file(randomUUID.toString).asUri
 
   lazy val movement: Movement = arbitrary[Movement].sample.value.copy(
     _id = movementId,
@@ -162,7 +164,16 @@ class MovementsControllerSpec
   implicit val mockTemporaryFileCreator: TemporaryFileCreator = mock[TemporaryFileCreator]
   val mockAppConfig: AppConfig                                = mock[AppConfig]
 
+  val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
+
+  def resetInternalAuth() = {
+    reset(mockInternalAuthActionProvider)
+    // any here, verify specifics later.
+    when(mockInternalAuthActionProvider.apply(any())(any())).thenReturn(DefaultActionBuilder(stubControllerComponents().parsers.defaultBodyParser))
+  }
+
   override def beforeEach(): Unit = {
+    resetInternalAuth()
     // TODO: Move this to specific tests as required
     when(mockMessageFactory.generateId()).thenReturn(messageId)
     when(mockMovementFactory.generateId()).thenReturn(movementId)
@@ -190,7 +201,8 @@ class MovementsControllerSpec
       mockRepository,
       mockMovementsXmlParsingService,
       mockMessagesXmlParsingService,
-      mockObjectStoreService
+      mockObjectStoreService,
+      mockInternalAuthActionProvider
     )
 
   "createMovement - Departure" - {
@@ -270,7 +282,8 @@ class MovementsControllerSpec
       when(mockRepository.insert(any()))
         .thenReturn(EitherT.rightT(Right(())))
 
-      val request: Request[Source[ByteString, _]] = fakeRequest[Source[ByteString, _]](POST, validXmlStream, Some(MessageType.DeclarationData.code))
+      val request: Request[Source[ByteString, _]] =
+        fakeRequest[Source[ByteString, _]](POST, validXmlStream, Some(MessageType.DeclarationData.code))
 
       val result: Future[Result] =
         controller.createMovement(eoriNumber, MovementType.Departure)(request)
@@ -291,6 +304,11 @@ class MovementsControllerSpec
         any[Source[ByteString, _]],
         eqTo(MessageStatus.Processing)
       )(any[HeaderCarrier])
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST when XML data extraction fails" - {
@@ -305,9 +323,9 @@ class MovementsControllerSpec
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
 
-        val request = fakeRequest(POST, elementNotFoundXml, Some(MessageType.DeclarationData.code))
+        val request = fakeRequest(POST, Source.single(ByteString(elementNotFoundXml.mkString)), Some(MessageType.DeclarationData.code))
 
-        val result =
+        val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Departure)(request)
 
         status(result) mustBe BAD_REQUEST
@@ -315,6 +333,11 @@ class MovementsControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Element messageSender not found"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "contains message to indicate too many elements found" in {
@@ -330,9 +353,9 @@ class MovementsControllerSpec
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
 
-        val request = fakeRequest(POST, tooManyFoundXml, Some(MessageType.DeclarationData.code))
+        val request = fakeRequest(POST, Source.single(ByteString(tooManyFoundXml.mkString)), Some(MessageType.DeclarationData.code))
 
-        val result =
+        val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Departure)(request)
 
         status(result) mustBe BAD_REQUEST
@@ -340,6 +363,11 @@ class MovementsControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Found too many elements of type messageSender"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "contains message to indicate date time failure" in {
@@ -361,9 +389,9 @@ class MovementsControllerSpec
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
 
-        val request = fakeRequest(POST, tooManyFoundXml, Some(MessageType.DeclarationData.code))
+        val request = fakeRequest(POST, Source.single(ByteString(tooManyFoundXml.mkString)), Some(MessageType.DeclarationData.code))
 
-        val result =
+        val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Departure)(request)
 
         status(result) mustBe BAD_REQUEST
@@ -371,6 +399,11 @@ class MovementsControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Could not parse datetime for preparationDateAndTime: Text 'no' could not be parsed at index 0"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
     }
 
@@ -390,10 +423,10 @@ class MovementsControllerSpec
           method = POST,
           uri = routes.MovementsController.createMovement(eoriNumber, MovementType.Departure).url,
           headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
-          body = unknownErrorXml
+          body = Source.single(ByteString(unknownErrorXml))
         )
 
-        val result =
+        val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Departure)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
@@ -401,15 +434,20 @@ class MovementsControllerSpec
           "code"    -> "INTERNAL_SERVER_ERROR",
           "message" -> "Internal server error"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "when file creation fails" in {
 
         when(mockTemporaryFileCreator.create()).thenThrow(new Exception("File creation failed"))
 
-        val request = fakeRequest(POST, validXml, Some(MessageType.DeclarationData.code))
+        val request = fakeRequest(POST, Source.single(ByteString(validXml.mkString)), Some(MessageType.DeclarationData.code))
 
-        val result =
+        val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Departure)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
@@ -417,6 +455,11 @@ class MovementsControllerSpec
           "code"    -> "INTERNAL_SERVER_ERROR",
           "message" -> "Internal server error"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
     }
 
@@ -432,7 +475,7 @@ class MovementsControllerSpec
 
       val request: Request[Source[ByteString, _]] = fakeRequest[Source[ByteString, _]](POST, validXmlStream, Some(MessageType.DeclarationData.code))
 
-      val result =
+      val result: Future[Result] =
         controller.createMovement(eoriNumber, MovementType.Departure)(request)
 
       status(result) mustBe CONFLICT
@@ -441,6 +484,11 @@ class MovementsControllerSpec
         "message" -> "LRN has previously been used and cannot be reused",
         "lrn"     -> "123"
       )
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
   }
 
@@ -525,6 +573,11 @@ class MovementsControllerSpec
         any[Source[ByteString, _]],
         eqTo(MessageStatus.Processing)
       )(any[HeaderCarrier])
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST when XML data extraction fails" - {
@@ -539,9 +592,10 @@ class MovementsControllerSpec
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
 
-        val request = fakeRequest(POST, elementNotFoundXml, Some(MessageType.ArrivalNotification.code))
+        val request =
+          fakeRequest(POST, Source.single(ByteString(elementNotFoundXml.mkString)), Some(MessageType.ArrivalNotification.code))
 
-        val result =
+        val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Arrival)(request)
 
         status(result) mustBe BAD_REQUEST
@@ -549,6 +603,11 @@ class MovementsControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Element messageSender not found"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "contains message to indicate too many elements found" in {
@@ -564,9 +623,9 @@ class MovementsControllerSpec
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
 
-        val request = fakeRequest(POST, tooManyFoundXml, Some(MessageType.ArrivalNotification.code))
+        val request = fakeRequest(POST, Source.single(ByteString(tooManyFoundXml.mkString)), Some(MessageType.ArrivalNotification.code))
 
-        val result =
+        val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Arrival)(request)
 
         status(result) mustBe BAD_REQUEST
@@ -574,6 +633,11 @@ class MovementsControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Found too many elements of type messageSender"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "contains message to indicate date time failure" in {
@@ -595,9 +659,9 @@ class MovementsControllerSpec
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
 
-        val request = fakeRequest(POST, tooManyFoundXml, Some(MessageType.ArrivalNotification.code))
+        val request = fakeRequest(POST, Source.single(ByteString(tooManyFoundXml.mkString)), Some(MessageType.ArrivalNotification.code))
 
-        val result =
+        val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Arrival)(request)
 
         status(result) mustBe BAD_REQUEST
@@ -605,6 +669,11 @@ class MovementsControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Could not parse datetime for preparationDateAndTime: Text 'no' could not be parsed at index 0"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
     }
 
@@ -624,10 +693,10 @@ class MovementsControllerSpec
           method = POST,
           uri = routes.MovementsController.createMovement(eoriNumber, MovementType.Arrival).url,
           headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> MessageType.ArrivalNotification.code)),
-          body = unknownErrorXml
+          body = Source.single(ByteString(unknownErrorXml))
         )
 
-        val result =
+        val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Arrival)(request)
 
         //status(result) mustBe INTERNAL_SERVER_ERROR
@@ -635,15 +704,20 @@ class MovementsControllerSpec
           "code"    -> "INTERNAL_SERVER_ERROR",
           "message" -> "Internal server error"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "when file creation fails" in {
 
         when(mockTemporaryFileCreator.create()).thenThrow(new Exception("File creation failed"))
 
-        val request = fakeRequest(POST, validXml, Some(MessageType.ArrivalNotification.code))
+        val request = fakeRequest(POST, Source.single(ByteString(validXml.mkString)), Some(MessageType.ArrivalNotification.code))
 
-        val result =
+        val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Arrival)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
@@ -651,6 +725,11 @@ class MovementsControllerSpec
           "code"    -> "INTERNAL_SERVER_ERROR",
           "message" -> "Internal server error"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
     }
   }
@@ -666,11 +745,11 @@ class MovementsControllerSpec
       messages = Vector.empty[Message]
     )
 
-    lazy val request = FakeRequest(
+    lazy val streamRequest: Request[Source[ByteString, _]] = FakeRequest(
       method = "POST",
       uri = routes.MovementsController.createMovement(eoriNumber, emptyMovement.movementType).url,
       headers = FakeHeaders(Seq("X-Message-Type" -> emptyMovement.movementType.value)),
-      body = AnyContentAsEmpty
+      body = Source.empty[ByteString]
     )
 
     "must return OK if XML data extraction is successful" in {
@@ -689,14 +768,19 @@ class MovementsControllerSpec
       when(mockRepository.insert(any()))
         .thenReturn(EitherT.rightT(Right((): Unit)))
 
-      val result =
-        controller.createMovement(eoriNumber, MovementType.Departure)(request)
+      val result: Future[Result] =
+        controller.createMovement(eoriNumber, MovementType.Departure)(streamRequest)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
         "movementId" -> movementId.value,
         "messageId"  -> messageId.value
       )
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
 
     "must return INTERNAL_SERVICE_ERROR when insert fails" in {
@@ -715,14 +799,19 @@ class MovementsControllerSpec
       when(mockRepository.insert(any()))
         .thenReturn(EitherT.leftT(MongoError.InsertNotAcknowledged(s"Insert failed")))
 
-      val result =
-        controller.createMovement(eoriNumber, emptyMovement.movementType)(request)
+      val result: Future[Result] =
+        controller.createMovement(eoriNumber, emptyMovement.movementType)(streamRequest)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
       contentAsJson(result) mustBe Json.obj(
         "code"    -> "INTERNAL_SERVER_ERROR",
         "message" -> "Insert failed"
       )
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
   }
 
@@ -737,28 +826,43 @@ class MovementsControllerSpec
           when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
             .thenReturn(EitherT.rightT(MovementWithoutMessages.fromMovement(movement)))
 
-          val result = controller.getMovementWithoutMessages(eoriNumber, movementType, movementId)(request)
+          val result: Future[Result] = controller.getMovementWithoutMessages(eoriNumber, movementType, movementId)(request)
 
           status(result) mustBe OK
           contentAsJson(result) mustBe Json.toJson(MovementWithoutMessages.fromMovement(movement))(PresentationFormats.movementWithoutMessagesFormat)
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "must return NOT_FOUND if no departure found" in {
           when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
             .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
-          val result = controller.getMovementWithoutMessages(eoriNumber, movementType, movementId)(request)
+          val result: Future[Result] = controller.getMovementWithoutMessages(eoriNumber, movementType, movementId)(request)
 
           status(result) mustBe NOT_FOUND
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "must return INTERNAL_SERVER_ERROR if repository has an error" in {
           when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
             .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
-          val result = controller.getMovementWithoutMessages(eoriNumber, movementType, movementId)(request)
+          val result: Future[Result] = controller.getMovementWithoutMessages(eoriNumber, movementType, movementId)(request)
 
           status(result) mustBe INTERNAL_SERVER_ERROR
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
       }
 
@@ -771,10 +875,15 @@ class MovementsControllerSpec
           when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
             .thenReturn(EitherT.rightT(messageResponse))
 
-          val result = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
+          val result: Future[Result] = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
 
           status(result) mustBe OK
           contentAsJson(result) mustBe Json.toJson(messageResponse)
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "must return OK along with uri if message found in the correct format" in {
@@ -783,28 +892,43 @@ class MovementsControllerSpec
           when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
             .thenReturn(EitherT.rightT(messageResponse))
 
-          val result = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
+          val result: Future[Result] = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
 
           status(result) mustBe OK
           contentAsJson(result) mustBe Json.toJson(messageResponse)
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "must return NOT_FOUND if no message found" in {
           when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
             .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
-          val result = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
+          val result: Future[Result] = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
 
           status(result) mustBe NOT_FOUND
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
           when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
             .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
-          val result = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
+          val result: Future[Result] = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
 
           status(result) mustBe INTERNAL_SERVER_ERROR
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
       }
 
@@ -824,10 +948,15 @@ class MovementsControllerSpec
 
           when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
             .thenReturn(EitherT.rightT(paginationMesssageSummary))
-          val result = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
+          val result: Future[Result] = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
 
           status(result) mustBe OK
           contentAsJson(result) mustBe Json.toJson(paginationMesssageSummary)
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "must return empty list if no messages found for given movement" in {
@@ -852,19 +981,29 @@ class MovementsControllerSpec
           )
             .thenReturn(EitherT.rightT(paginationMesssageSummary))
 
-          val result = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
+          val result: Future[Result] = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
 
           status(result) mustBe OK
           contentAsJson(result) mustBe Json.toJson(paginationMesssageSummary)
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "must return NOT_FOUND if no departure found" in {
           when(mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType)))
             .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
-          val result = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
+          val result: Future[Result] = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
 
           status(result) mustBe NOT_FOUND
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
@@ -876,9 +1015,14 @@ class MovementsControllerSpec
           when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
             .thenReturn(EitherT.leftT(UnexpectedError(None)))
 
-          val result = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
+          val result: Future[Result] = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
 
           status(result) mustBe INTERNAL_SERVER_ERROR
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
       }
 
@@ -910,10 +1054,15 @@ class MovementsControllerSpec
           )
             .thenReturn(EitherT.rightT(paginationMovementSummary))
 
-          val result = controller.getMovementsForEori(eoriNumber, movementType)(request)
+          val result: Future[Result] = controller.getMovementsForEori(eoriNumber, movementType)(request)
           status(result) mustBe OK
 
           contentAsJson(result) mustBe Json.toJson(paginationMovementSummary)
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("READ")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "must return OK if departures were found and it match the updatedSince or movementEORI or movementReferenceNumber or localReferenceNumber or all these filters" in forAll(
@@ -925,6 +1074,7 @@ class MovementsControllerSpec
           Gen.option(arbitrary[LocalReferenceNumber])
         ) {
           (updatedSince, movementEORI, movementReferenceNumber, pageNumber, itemCount, localReferenceNumber) =>
+            resetInternalAuth()
             val response = MovementWithoutMessages.fromMovement(movement)
 
             lazy val paginationMovementSummary = PaginationMovementSummary(TotalCount(1), Vector(response))
@@ -944,7 +1094,7 @@ class MovementsControllerSpec
             )
               .thenReturn(EitherT.rightT(paginationMovementSummary))
 
-            val result =
+            val result: Future[Result] =
               controller.getMovementsForEori(
                 eoriNumber,
                 movementType,
@@ -960,6 +1110,10 @@ class MovementsControllerSpec
             status(result) mustBe OK
 
             contentAsJson(result) mustBe Json.toJson(paginationMovementSummary)
+            verify(mockInternalAuthActionProvider, times(1)).apply(
+              eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("READ")))
+            )(any[ExecutionContext])
+            verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "must return empty list if no ids were found" in forAll(
@@ -969,8 +1123,9 @@ class MovementsControllerSpec
           Gen.option(arbitrary[LocalReferenceNumber])
         ) {
           (updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber) =>
-            lazy val paginationMovementSummary = PaginationMovementSummary(TotalCount(0), Vector.empty[MovementWithoutMessages])
+            resetInternalAuth()
 
+            lazy val paginationMovementSummary = PaginationMovementSummary(TotalCount(0), Vector.empty[MovementWithoutMessages])
             when(
               mockRepository.getMovements(
                 EORINumber(any()),
@@ -986,7 +1141,7 @@ class MovementsControllerSpec
             )
               .thenReturn(EitherT.rightT(paginationMovementSummary))
 
-            val result =
+            val result: Future[Result] =
               controller.getMovementsForEori(
                 eoriNumber,
                 movementType,
@@ -998,6 +1153,10 @@ class MovementsControllerSpec
 
             status(result) mustBe OK
             contentAsJson(result) mustBe Json.toJson(paginationMovementSummary)
+            verify(mockInternalAuthActionProvider, times(1)).apply(
+              eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("READ")))
+            )(any[ExecutionContext])
+            verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in forAll(
@@ -1007,6 +1166,7 @@ class MovementsControllerSpec
           Gen.option(arbitrary[LocalReferenceNumber])
         ) {
           (updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber) =>
+            resetInternalAuth()
             when(
               mockRepository.getMovements(
                 EORINumber(any()),
@@ -1022,7 +1182,7 @@ class MovementsControllerSpec
             )
               .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
-            val result =
+            val result: Future[Result] =
               controller.getMovementsForEori(
                 eoriNumber,
                 movementType,
@@ -1033,6 +1193,10 @@ class MovementsControllerSpec
               )(request)
 
             status(result) mustBe INTERNAL_SERVER_ERROR
+            verify(mockInternalAuthActionProvider, times(1)).apply(
+              eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("READ")))
+            )(any[ExecutionContext])
+            verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
       }
     }
@@ -1090,6 +1254,11 @@ class MovementsControllerSpec
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj("messageId" -> messageId.value)
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST when XML data extraction fails" - {
@@ -1125,6 +1294,11 @@ class MovementsControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Could not parse datetime for preparationDateAndTime: Text 'invalid' could not be parsed at index 0"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "contains message to indicate update failed due to document with given id not found" in {
@@ -1162,6 +1336,11 @@ class MovementsControllerSpec
           "code"    -> "NOT_FOUND",
           "message" -> s"No departure found with the given id: ${movementId.value}"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "contains message to indicate message type header not supplied" in {
@@ -1169,9 +1348,9 @@ class MovementsControllerSpec
         val tempFile = SingletonTemporaryFileCreator.create()
         when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
-        val request = fakeRequest(POST, validXml, None, FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)))
+        val request = fakeRequest(POST, Source.single(ByteString(validXml.mkString)), None, FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)))
 
-        val result =
+        val result: Future[Result] =
           controller.updateMovement(movementId, Some(triggerId))(request)
 
         status(result) mustBe BAD_REQUEST
@@ -1179,6 +1358,11 @@ class MovementsControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Missing X-Message-Type header value"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "contains message to indicate the given message type is invalid" in {
@@ -1186,9 +1370,9 @@ class MovementsControllerSpec
         val tempFile = SingletonTemporaryFileCreator.create()
         when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
-        val request = fakeRequest(POST, validXml, Some("invalid"), FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)))
+        val request = fakeRequest(POST, validXmlStream, Some("invalid"), FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)))
 
-        val result =
+        val result: Future[Result] =
           controller.updateMovement(movementId, Some(triggerId))(request)
 
         status(result) mustBe BAD_REQUEST
@@ -1196,6 +1380,11 @@ class MovementsControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Invalid X-Message-Type header value: invalid"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
     }
@@ -1216,10 +1405,10 @@ class MovementsControllerSpec
           method = POST,
           uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
           headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code)),
-          body = unknownErrorXml
+          body = Source.single(ByteString(unknownErrorXml))
         )
 
-        val result =
+        val result: Future[Result] =
           controller.updateMovement(movementId, Some(triggerId))(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
@@ -1227,15 +1416,20 @@ class MovementsControllerSpec
           "code"    -> "INTERNAL_SERVER_ERROR",
           "message" -> "Internal server error"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "when file creation fails" in {
 
         when(mockTemporaryFileCreator.create()).thenThrow(new Exception("File creation failed"))
 
-        val request = fakeRequest(POST, validXml, Some(messageType.code))
+        val request = fakeRequest(POST, Source.single(ByteString(validXml.mkString)), Some(messageType.code))
 
-        val result =
+        val result: Future[Result] =
           controller.updateMovement(movementId, Some(triggerId))(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
@@ -1263,7 +1457,7 @@ class MovementsControllerSpec
       method = "POST",
       uri = routes.MovementsController.updateMovement(movementId, None).url,
       headers = FakeHeaders(Seq.empty[(String, String)]),
-      body = AnyContentAsEmpty
+      body = Source.empty[ByteString]
     )
 
     "must return OK if successfully attaches an empty message to a movement" in {
@@ -1279,11 +1473,16 @@ class MovementsControllerSpec
       when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.rightT(()))
 
-      val result =
+      val result: Future[Result] =
         controller.updateMovement(movementId, None)(request)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj("messageId" -> message.id.value)
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
 
     "must return NOT_FOUND when movement cannot be found in DB" in {
@@ -1301,7 +1500,7 @@ class MovementsControllerSpec
       when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(errorMessage)))
 
-      val result =
+      val result: Future[Result] =
         controller.updateMovement(movementId, None)(request)
 
       status(result) mustBe NOT_FOUND
@@ -1309,6 +1508,11 @@ class MovementsControllerSpec
         "code"    -> "NOT_FOUND",
         "message" -> errorMessage
       )
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
 
     "must return INTERNAL_SERVER_ERROR when an unexpected failure happens during message creation in the DB" in {
@@ -1324,7 +1528,7 @@ class MovementsControllerSpec
       when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(None)))
 
-      val result =
+      val result: Future[Result] =
         controller.updateMovement(movementId, None)(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
@@ -1332,6 +1536,11 @@ class MovementsControllerSpec
         "code"    -> "INTERNAL_SERVER_ERROR",
         "message" -> "Internal server error"
       )
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
 
   }
@@ -1350,6 +1559,7 @@ class MovementsControllerSpec
           arbitraryLRN.arbitrary
         ) {
           (eori, movementId, messageId, messageType, lrn) =>
+            resetInternalAuth()
             val extractDataEither: EitherT[Future, ParseError, Option[ExtractedData]] = {
               if (messageType == MessageType.DeclarationData) EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn)))
               else EitherT.rightT(None)
@@ -1443,7 +1653,7 @@ class MovementsControllerSpec
               body = body
             )
 
-            val result =
+            val result: Future[Result] =
               controller.updateMessage(eori, MovementType.Departure, movementId, messageId)(request)
 
             status(result) mustBe OK
@@ -1460,6 +1670,11 @@ class MovementsControllerSpec
               eqTo(lrnOption),
               any[OffsetDateTime]
             )
+
+            verify(mockInternalAuthActionProvider, times(1)).apply(
+              eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+            )(any[ExecutionContext])
+            verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "if the message is an arrival message and the first one in the movement" in forAll(
@@ -1470,6 +1685,7 @@ class MovementsControllerSpec
           Gen.oneOf(MessageType.arrivalRequestValues)
         ) {
           (eori, movementId, messageId, mrn, messageType) =>
+            resetInternalAuth()
             val tempFile = SingletonTemporaryFileCreator.create()
             when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -1539,7 +1755,7 @@ class MovementsControllerSpec
               body = body
             )
 
-            val result =
+            val result: Future[Result] =
               controller.updateMessage(eori, MovementType.Arrival, movementId, messageId)(request)
 
             status(result) mustBe OK
@@ -1556,6 +1772,11 @@ class MovementsControllerSpec
               eqTo(None),
               any[OffsetDateTime]
             )
+
+            verify(mockInternalAuthActionProvider, times(1)).apply(
+              eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+            )(any[ExecutionContext])
+            verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "if the movement EORI has already been set" in forAll(
@@ -1566,6 +1787,7 @@ class MovementsControllerSpec
           arbitraryLRN.arbitrary
         ) {
           (eori, movementId, messageId, movementType, lrn) =>
+            resetInternalAuth()
             val tempFile = SingletonTemporaryFileCreator.create()
             when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -1641,7 +1863,7 @@ class MovementsControllerSpec
               body = body
             )
 
-            val result =
+            val result: Future[Result] =
               controller.updateMessage(eori, movementType, movementId, messageId)(request)
 
             status(result) mustBe OK
@@ -1658,6 +1880,11 @@ class MovementsControllerSpec
               eqTo(Some(lrn)),
               any[OffsetDateTime]
             )
+
+            verify(mockInternalAuthActionProvider, times(1)).apply(
+              eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+            )(any[ExecutionContext])
+            verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
       }
 
@@ -1670,6 +1897,7 @@ class MovementsControllerSpec
           arbitraryLRN.arbitrary
         ) {
           (eori, movementId, messageId, lrn) =>
+            resetInternalAuth()
             val messageType = MessageType.DeclarationData
 
             val tempFile = SingletonTemporaryFileCreator.create()
@@ -1750,7 +1978,7 @@ class MovementsControllerSpec
               body = body
             )
 
-            val result =
+            val result: Future[Result] =
               controller.updateMessage(eori, MovementType.Departure, movementId, messageId)(request)
 
             status(result) mustBe CONFLICT
@@ -1767,6 +1995,11 @@ class MovementsControllerSpec
               eqTo(Some(lrn)),
               any[OffsetDateTime]
             )
+
+            verify(mockInternalAuthActionProvider, times(1)).apply(
+              eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+            )(any[ExecutionContext])
+            verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
       }
 
@@ -1780,6 +2013,7 @@ class MovementsControllerSpec
           arbitraryLRN.arbitrary
         ) {
           (eori, movementId, messageId, movementType, lrn) =>
+            resetInternalAuth()
             val messageType: MessageType = {
               if (movementType == MovementType.Departure) Gen.oneOf(MessageType.departureRequestValues)
               else Gen.oneOf(MessageType.arrivalRequestValues)
@@ -1848,7 +2082,7 @@ class MovementsControllerSpec
               body = body
             )
 
-            val result =
+            val result: Future[Result] =
               controller.updateMessage(eori, movementType, movementId, messageId)(request)
 
             status(result) mustBe BAD_REQUEST
@@ -1869,6 +2103,11 @@ class MovementsControllerSpec
               eqTo(Some(lrn)),
               any[OffsetDateTime]
             )
+
+            verify(mockInternalAuthActionProvider, times(1)).apply(
+              eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+            )(any[ExecutionContext])
+            verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
       }
 
@@ -1879,6 +2118,7 @@ class MovementsControllerSpec
         arbitrary[MessageType]
       ) {
         (eori, movementType, messageStatus, messageType) =>
+          resetInternalAuth()
           reset(mockRepository) // needed thanks to the generators running the test multiple times.
           val expectedUpdateData = UpdateMessageData(status = messageStatus)
 
@@ -1920,7 +2160,7 @@ class MovementsControllerSpec
             body = body
           )
 
-          val result =
+          val result: Future[Result] =
             controller.updateMessage(eori, movementType, movementId, messageId)(request)
 
           status(result) mustBe OK
@@ -1937,10 +2177,16 @@ class MovementsControllerSpec
             eqTo(None),
             any[OffsetDateTime]
           )
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "must return BAD_REQUEST when JSON data extraction fails" in forAll(arbitrary[EORINumber], arbitrary[MovementType]) {
         (eori, messageType) =>
+          resetInternalAuth()
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
           val body = Json.obj(
             "objectStoreURI" -> "transit-movements/something.xml"
@@ -1952,7 +2198,7 @@ class MovementsControllerSpec
             body = body
           )
 
-          val result =
+          val result: Future[Result] =
             controller.updateMessage(eori, messageType, movementId, messageId)(request)
 
           status(result) mustBe BAD_REQUEST
@@ -1960,6 +2206,10 @@ class MovementsControllerSpec
             "code"    -> "BAD_REQUEST",
             "message" -> "Could not parse the request"
           )
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "must return BAD REQUEST, if the update message is unsuccessful, given invalid status is provided in the request" in forAll(
@@ -1967,6 +2217,7 @@ class MovementsControllerSpec
         arbitrary[MovementType]
       ) {
         (eori, messageType) =>
+          resetInternalAuth()
           when(
             mockRepository.updateMessage(
               any[String].asInstanceOf[MovementId],
@@ -1988,10 +2239,15 @@ class MovementsControllerSpec
             body = body
           )
 
-          val result =
+          val result: Future[Result] =
             controller.updateMessage(eori, messageType, movementId, messageId)(request)
 
           status(result) mustBe BAD_REQUEST
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "must return OK if successful given both MessageType and status" - {
@@ -2003,6 +2259,7 @@ class MovementsControllerSpec
           arbitraryLRN.arbitrary
         ) {
           (eori, movementId, messageId, lrn) =>
+            resetInternalAuth()
             val movementType = MovementType.Departure
             when(
               mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
@@ -2049,7 +2306,7 @@ class MovementsControllerSpec
               body = body
             )
 
-            val result = controller.updateMessage(eori, MovementType.Departure, movementId, messageId)(request)
+            val result: Future[Result] = controller.updateMessage(eori, MovementType.Departure, movementId, messageId)(request)
 
             status(result) mustBe OK
             verify(mockRepository, times(1)).updateMessage(
@@ -2065,6 +2322,11 @@ class MovementsControllerSpec
               eqTo(Some(lrn)),
               any[OffsetDateTime]
             )
+
+            verify(mockInternalAuthActionProvider, times(1)).apply(
+              eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+            )(any[ExecutionContext])
+            verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
         "if the message is an arrival message and the first one in the movement" in forAll(
@@ -2074,6 +2336,7 @@ class MovementsControllerSpec
           arbitrary[MovementReferenceNumber]
         ) {
           (eori, movementId, messageId, mrn) =>
+            resetInternalAuth()
             val movementType = MovementType.Arrival
             val messageType  = MessageType.ArrivalNotification
             when(
@@ -2113,7 +2376,7 @@ class MovementsControllerSpec
               body = body
             )
 
-            val result =
+            val result: Future[Result] =
               controller.updateMessage(eori, MovementType.Arrival, movementId, messageId)(request)
 
             status(result) mustBe OK
@@ -2130,12 +2393,18 @@ class MovementsControllerSpec
               eqTo(None),
               any[OffsetDateTime]
             )
+
+            verify(mockInternalAuthActionProvider, times(1)).apply(
+              eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+            )(any[ExecutionContext])
+            verifyNoMoreInteractions(mockInternalAuthActionProvider)
         }
 
       }
 
       "must return BAD_REQUEST given invalid messageType for departure message" in forAll(arbitrary[EORINumber]) {
         eori =>
+          resetInternalAuth()
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
           val body = Json.obj(
             "status"      -> "Success",
@@ -2148,7 +2417,7 @@ class MovementsControllerSpec
             body = body
           )
 
-          val result =
+          val result: Future[Result] =
             controller.updateMessage(eori, MovementType.Departure, movementId, messageId)(request)
 
           status(result) mustBe BAD_REQUEST
@@ -2156,6 +2425,11 @@ class MovementsControllerSpec
             "code"    -> "BAD_REQUEST",
             "message" -> "Invalid messageType value: ArrivalNotification"
           )
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "must return BAD_REQUEST if the message type does not match the expected type, if one exists" in forAll(
@@ -2166,6 +2440,7 @@ class MovementsControllerSpec
         arbitraryLRN.arbitrary
       ) {
         (eori, movementId, messageId, messageType, lrn) =>
+          resetInternalAuth()
           val movementType = MovementType.Departure
 
           when(
@@ -2214,7 +2489,7 @@ class MovementsControllerSpec
             body = body
           )
 
-          val result = controller.updateMessage(eori, MovementType.Departure, movementId, messageId)(request)
+          val result: Future[Result] = controller.updateMessage(eori, MovementType.Departure, movementId, messageId)(request)
 
           status(result) mustBe BAD_REQUEST
           contentAsJson(result) mustBe Json.obj(
@@ -2234,10 +2509,16 @@ class MovementsControllerSpec
             eqTo(Some(lrn)),
             any[OffsetDateTime]
           )
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
       "must return BAD_REQUEST given invalid messageType for arrival message" in forAll(arbitrary[EORINumber]) {
         eori =>
+          resetInternalAuth()
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
           val body = Json.obj(
             "status"      -> "Success",
@@ -2250,7 +2531,7 @@ class MovementsControllerSpec
             body = body
           )
 
-          val result =
+          val result: Future[Result] =
             controller.updateMessage(eori, MovementType.Arrival, movementId, messageId)(request)
 
           status(result) mustBe BAD_REQUEST
@@ -2258,6 +2539,11 @@ class MovementsControllerSpec
             "code"    -> "BAD_REQUEST",
             "message" -> "Invalid messageType value: DeclarationData"
           )
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+          )(any[ExecutionContext])
+          verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
     }
   }
@@ -2269,6 +2555,7 @@ class MovementsControllerSpec
       arbitrary[MessageStatus]
     ) {
       (movementId, messageId, messageStatus) =>
+        resetInternalAuth()
         reset(mockRepository) // needed thanks to the generators running the test multiple times.
         val expectedUpdateMessageMetadata = UpdateMessageData(status = messageStatus)
 
@@ -2293,7 +2580,7 @@ class MovementsControllerSpec
           body = body
         )
 
-        val result =
+        val result: Future[Result] =
           controller.updateMessageStatus(movementId, messageId)(request)
 
         status(result) mustBe OK
@@ -2303,10 +2590,16 @@ class MovementsControllerSpec
           any[UpdateMessageData],
           any[OffsetDateTime]
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages/status")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST when JSON data extraction fails" in forAll(arbitrary[MovementId], arbitrary[MessageId]) {
       (movementId, messageId) =>
+        resetInternalAuth()
         val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
         val body = Json.obj(
           "status" -> "Nope"
@@ -2318,7 +2611,7 @@ class MovementsControllerSpec
           body = body
         )
 
-        val result =
+        val result: Future[Result] =
           controller.updateMessageStatus(movementId, messageId)(request)
 
         status(result) mustBe BAD_REQUEST
@@ -2326,10 +2619,16 @@ class MovementsControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Could not parse the request"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages/status")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
 
     "must return NOT_FOUND when an incorrect message is specified" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[MessageStatus]) {
       (movementId, messageId, messageStatus) =>
+        resetInternalAuth()
         reset(mockRepository) // needed thanks to the generators running the test multiple times.
         val expectedUpdateMessageMetadata = UpdateMessageData(status = messageStatus)
 
@@ -2354,7 +2653,7 @@ class MovementsControllerSpec
           body = body
         )
 
-        val result =
+        val result: Future[Result] =
           controller.updateMessageStatus(movementId, messageId)(request)
 
         status(result) mustBe NOT_FOUND
@@ -2362,6 +2661,11 @@ class MovementsControllerSpec
           "code"    -> "NOT_FOUND",
           "message" -> s"No movement found with the given id: ${movementId.value}"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages/status")), IAAction("WRITE")))
+        )(any[ExecutionContext])
+        verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
   }
 }

@@ -29,6 +29,9 @@ import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
+import uk.gov.hmrc.transitmovements.config.Constants.Predicates.READ_MESSAGE
+import uk.gov.hmrc.transitmovements.config.Constants.Predicates.WRITE_MESSAGE
+import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
@@ -63,6 +66,7 @@ class MessageBodyController @Inject() (
   messagesXmlParsingService: MessagesXmlParsingService,
   movementsXmlParsingService: MovementsXmlParsingService,
   messageService: MessageService,
+  internalAuth: InternalAuthActionProvider,
   clock: Clock
 )(implicit
   ec: ExecutionContext,
@@ -75,19 +79,20 @@ class MessageBodyController @Inject() (
     with MessageTypeHeaderExtractor
     with ObjectStoreURIHelpers {
 
-  def getBody(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[AnyContent] = Action.async {
-    implicit request =>
-      (for {
-        message <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
-        stream  <- body(message, messageId, movementId)
-      } yield Ok.chunked(stream, Some(MimeTypes.XML)))
-        .valueOrF(
-          error => Future.successful(Status(error.code.statusCode)(Json.toJson(error)))
-        )
-  }
+  def getBody(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[AnyContent] =
+    internalAuth(READ_MESSAGE).async {
+      implicit request =>
+        (for {
+          message <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
+          stream  <- body(message, messageId, movementId)
+        } yield Ok.chunked(stream, Some(MimeTypes.XML)))
+          .valueOrF(
+            error => Future.successful(Status(error.code.statusCode)(Json.toJson(error)))
+          )
+    }
 
   def createBody(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
-    Action.streamWithSize {
+    internalAuth(WRITE_MESSAGE).streamWithSize {
       implicit request => size =>
         val received = OffsetDateTime.now(clock)
         (for {
