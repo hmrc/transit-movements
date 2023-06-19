@@ -59,17 +59,6 @@ trait MessageService {
     status: MessageStatus
   )(implicit hc: HeaderCarrier): EitherT[Future, StreamError, Message]
 
-  @deprecated(message = "This should be phased out in favour of #create -> EitherT", since = "now")
-  def create(
-    movementId: MovementId,
-    messageType: MessageType,
-    generationDate: OffsetDateTime,
-    received: OffsetDateTime,
-    triggerId: Option[MessageId],
-    objectStoreURI: ObjectStoreURI,
-    status: MessageStatus
-  ): Message
-
   def createEmptyMessage(
     messageType: Option[MessageType],
     received: OffsetDateTime
@@ -121,27 +110,6 @@ class MessageServiceImpl @Inject() (
         )
     }
   }
-
-  override def create(
-    movementId: MovementId,
-    messageType: MessageType,
-    generationDate: OffsetDateTime,
-    received: OffsetDateTime,
-    triggerId: Option[MessageId],
-    objectStoreURI: ObjectStoreURI,
-    status: MessageStatus
-  ): Message =
-    Message(
-      id = generateId(),
-      received = received,
-      generated = Some(generationDate),
-      messageType = Some(messageType),
-      triggerId = triggerId,
-      uri = Some(new URI(objectStoreURI.value)),
-      body = None,
-      size = None,
-      status = Some(status)
-    )
 
   def createEmptyMessage(
     messageType: Option[MessageType],

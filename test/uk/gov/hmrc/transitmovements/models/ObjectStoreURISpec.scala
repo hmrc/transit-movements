@@ -22,7 +22,11 @@ import uk.gov.hmrc.transitmovements.base.SpecBase
 class ObjectStoreURISpec extends SpecBase with Matchers {
 
   "asResourceLocation" - {
-    "with an expected owner" in {
+    "with a the expected owner" in {
+      ObjectStoreURI("transit-movements/abc.xml").asResourceLocation mustBe Some(ObjectStoreResourceLocation("abc.xml"))
+    }
+
+    "with an alternative expected owner" in {
       ObjectStoreURI("common-transit-convention-traders/abc.xml").asResourceLocation mustBe Some(ObjectStoreResourceLocation("abc.xml"))
     }
 

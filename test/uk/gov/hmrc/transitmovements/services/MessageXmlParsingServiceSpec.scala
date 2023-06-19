@@ -137,50 +137,43 @@ class MessageXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Ma
           val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor(messageType)).runWith(Sink.head)
 
           whenReady(parsedResult) {
-            result =>
-              val error = result.left.get
-              error mustBe a[ParseError.BadDateTime]
-              error.asInstanceOf[ParseError.BadDateTime].element mustBe "preparationDateAndTime"
-              error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'invaliddate' could not be parsed at index 0"
+            case Left(x: ParseError.BadDateTime) =>
+              x.element mustBe "preparationDateAndTime"
+              x.exception.getMessage mustBe "Text 'invaliddate' could not be parsed at index 0"
+            case _ => fail("Did not get a ParseError.BadDateTime")
           }
         }
 
-        s"$messageTypeDescription, if it is missing the end tag, return ParseError.Unknown" in {
+        s"$messageTypeDescription, if it is missing the end tag, return ParseError.UnexpectedError" in {
           val source = createStream(incompleteXml)
 
           val result = service.extractMessageData(source, messageType)
 
           whenReady(result.value) {
-            either =>
-              either mustBe a[Left[ParseError, _]]
-              either.left.get mustBe a[ParseError.UnexpectedError]
-              either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[IllegalStateException]
+            case Left(ParseError.UnexpectedError(Some(_: IllegalStateException))) => succeed
+            case _                                                                => fail("Did not get an IllegalStateException")
           }
         }
 
-        s"$messageTypeDescription, if it is missing the end of an inner tag, return ParseError.Unknown" in {
+        s"$messageTypeDescription, if it is missing the end of an inner tag, return ParseError.UnexpectedError" in {
           val source = createStream(missingInnerTag)
 
           val result = service.extractMessageData(source, messageType)
 
           whenReady(result.value) {
-            either =>
-              either mustBe a[Left[ParseError, _]]
-              either.left.get mustBe a[ParseError.UnexpectedError]
-              either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
+            case Left(ParseError.UnexpectedError(Some(_: WFCException))) => succeed
+            case _                                                       => fail("Did not get an WCFException")
           }
         }
 
-        s"$messageTypeDescription, if it contains mismatched tags, return ParseError.Unknown" in {
+        s"$messageTypeDescription, if it contains mismatched tags, return ParseError.UnexpectedError" in {
           val source = createStream(mismatchedTags)
 
           val result = service.extractMessageData(source, messageType)
 
           whenReady(result.value) {
-            either =>
-              either mustBe a[Left[ParseError, _]]
-              either.left.get mustBe a[ParseError.UnexpectedError]
-              either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
+            case Left(ParseError.UnexpectedError(Some(_: WFCException))) => succeed
+            case _                                                       => fail("Did not get an WCFException")
           }
         }
     }

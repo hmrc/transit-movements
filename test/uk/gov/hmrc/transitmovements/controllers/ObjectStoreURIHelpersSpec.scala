@@ -18,7 +18,6 @@ package uk.gov.hmrc.transitmovements.controllers
 
 import play.api.mvc.BaseController
 import play.api.mvc.ControllerComponents
-import play.api.mvc.Headers
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
@@ -40,13 +39,13 @@ class ObjectStoreURIHelpersSpec extends SpecBase with ModelGenerators {
 
       whenReady(result.value) {
         _ mustBe Left(
-          PresentationError.badRequestError(s"Provided Object Store URI is not owned by common-transit-convention-traders")
+          PresentationError.badRequestError(s"Provided Object Store URI is not owned by transit-movements")
         )
       }
     }
 
     "if supplied object store uri is valid, return Right" in {
-      val filePath = "common-transit-convention-traders/movements/movementId/abc.xml"
+      val filePath = "transit-movements/movements/movementId/abc.xml"
 
       val result = objectStoreURIExtractor.extractResourceLocation(ObjectStoreURI(filePath))
 

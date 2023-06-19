@@ -167,7 +167,7 @@ trait ModelGenerators extends BaseGenerators {
 
   lazy val dateTimeFormat = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
 
-  private val objectStoreOwner = "common-transit-convention-traders"
+  private val objectStoreOwner = "transit-movements"
 
   def testObjectStoreURI(movementId: MovementId, messageId: MessageId, dateTime: OffsetDateTime): ObjectStoreURI =
     ObjectStoreURI(s"$objectStoreOwner/movements/${movementId.value}/${movementId.value}-${messageId.value}-${dateTimeFormat.format(dateTime)}.xml")

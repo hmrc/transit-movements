@@ -58,11 +58,9 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.UUID.randomUUID
-import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-@nowarn("msg=dead code following this construct")
 class ObjectStoreServiceSpec
     extends AnyFreeSpec
     with Matchers
@@ -79,7 +77,7 @@ class ObjectStoreServiceSpec
   private val now                                          = OffsetDateTime.now(ZoneOffset.UTC)
   private val clock                                        = Clock.fixed(now.toInstant, ZoneOffset.UTC)
 
-  override def beforeEach: Unit =
+  override def beforeEach(): Unit =
     reset(mockObjectStoreClient)
 
   "getObjectStoreFile" - {
@@ -91,7 +89,7 @@ class ObjectStoreServiceSpec
       val content     = "content"
       val fileContent = Option[Object[Source[ByteString, NotUsed]]](Object.apply(OSPath.File(filePath), Source.single(ByteString(content)), metadata))
 
-      when(mockObjectStoreClient.getObject[Source[ByteString, NotUsed]](eqTo(OSPath.File(filePath)), eqTo("common-transit-convention-traders"))(any(), any()))
+      when(mockObjectStoreClient.getObject[Source[ByteString, NotUsed]](eqTo(OSPath.File(filePath)), eqTo("transit-movements"))(any(), any()))
         .thenReturn(Future.successful(fileContent))
       val service = new ObjectStoreServiceImpl()(materializer, clock, mockObjectStoreClient)
       val result  = service.getObjectStoreFile(ObjectStoreResourceLocation(filePath))
@@ -104,7 +102,7 @@ class ObjectStoreServiceSpec
     }
 
     "should return an error when the file is not found on path" in {
-      when(mockObjectStoreClient.getObject(any[OSPath.File](), eqTo("common-transit-convention-traders"))(any(), any())).thenReturn(Future.successful(None))
+      when(mockObjectStoreClient.getObject(any[OSPath.File](), eqTo("transit-movements"))(any(), any())).thenReturn(Future.successful(None))
       val service = new ObjectStoreServiceImpl()(materializer, clock, mockObjectStoreClient)
 
       val result = service.getObjectStoreFile(ObjectStoreResourceLocation("abc/movement/abc.xml"))
@@ -119,7 +117,7 @@ class ObjectStoreServiceSpec
     "on a failed submission, should return a Left with an UnexpectedError" in {
       val error = UpstreamErrorResponse("error", INTERNAL_SERVER_ERROR)
 
-      when(mockObjectStoreClient.getObject(any[OSPath.File](), eqTo("common-transit-convention-traders"))(any(), any())).thenReturn(Future.failed(error))
+      when(mockObjectStoreClient.getObject(any[OSPath.File](), eqTo("transit-movements"))(any(), any())).thenReturn(Future.failed(error))
       val service = new ObjectStoreServiceImpl()(materializer, clock, mockObjectStoreClient)
       val result  = service.getObjectStoreFile(ObjectStoreResourceLocation("abc/movement/abc.xml"))
       whenReady(result.value) {
@@ -147,7 +145,7 @@ class ObjectStoreServiceSpec
             retentionPeriod = any[RetentionPeriod],
             contentType = eqTo(Some(MimeTypes.XML)),
             contentMd5 = any[Option[Md5Hash]],
-            owner = eqTo("common-transit-convention-traders")
+            owner = eqTo("transit-movements")
           )(any(), any())
         )
           .thenReturn(Future.successful(objectSummary))
@@ -166,7 +164,7 @@ class ObjectStoreServiceSpec
               retentionPeriod = any[RetentionPeriod],
               contentType = eqTo(Some(MimeTypes.XML)),
               contentMd5 = any[Option[Md5Hash]],
-              owner = eqTo("common-transit-convention-traders")
+              owner = eqTo("transit-movements")
             )(any(), any())
         }
     }
@@ -185,7 +183,7 @@ class ObjectStoreServiceSpec
             retentionPeriod = any[RetentionPeriod],
             contentType = eqTo(Some(MimeTypes.XML)),
             contentMd5 = any[Option[Md5Hash]],
-            owner = eqTo("common-transit-convention-traders")
+            owner = eqTo("transit-movements")
           )(any(), any())
         )
           .thenReturn(Future.failed(error))
@@ -202,7 +200,7 @@ class ObjectStoreServiceSpec
               retentionPeriod = any[RetentionPeriod],
               contentType = eqTo(Some(MimeTypes.XML)),
               contentMd5 = any[Option[Md5Hash]],
-              owner = eqTo("common-transit-convention-traders")
+              owner = eqTo("transit-movements")
             )(any(), any())
           case x =>
             fail(s"Expected Left(ObjectStoreError.UnexpectedError), instead got $x")

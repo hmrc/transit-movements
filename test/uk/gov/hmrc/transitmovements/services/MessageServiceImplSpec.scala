@@ -21,7 +21,6 @@ import akka.util.ByteString
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.{eq => eqTo}
-import org.mockito.Mockito
 import org.mockito.Mockito.reset
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
@@ -40,7 +39,6 @@ import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageStatus.Pending
 import uk.gov.hmrc.transitmovements.models.MessageStatus.Received
 import uk.gov.hmrc.transitmovements.models.MessageType
@@ -183,22 +181,6 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
             )
           case x => fail(s"Expected a Left(StreamError.UnexpectedError), got $x")
         }
-
-    }
-
-    "creating a message with a pre-existing object store URI returns an appropriate message" in forAll(
-      arbitrary[MovementId],
-      Gen.option(arbitrary[MessageId]),
-      arbitrary[MessageType],
-      arbitrary[MessageStatus]
-    ) {
-      (movementId, triggerId, messageType, messageStatus) =>
-        beforeTest()
-
-        val os     = testObjectStoreURI(movementId, messageId, instant)
-        val result = sut.create(movementId, messageType, instant, instant, triggerId, os, messageStatus)
-
-        result mustBe Message(messageId, instant, Some(instant), Some(messageType), triggerId, Some(new URI(os.value)), None, None, Some(messageStatus))
 
     }
   }

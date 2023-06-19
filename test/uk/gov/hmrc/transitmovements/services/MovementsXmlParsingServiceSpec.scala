@@ -240,11 +240,10 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor(MessageType.DeclarationData)).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        result =>
-          val error = result.left.get
-          error mustBe a[ParseError.BadDateTime]
-          error.asInstanceOf[ParseError.BadDateTime].element mustBe "preparationDateAndTime"
-          error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'notadate' could not be parsed at index 0"
+        case Left(x: ParseError.BadDateTime) =>
+          x.element mustBe "preparationDateAndTime"
+          x.exception.getMessage mustBe "Text 'notadate' could not be parsed at index 0"
+        case _ => fail("Excepted ParseError.BadDateTime")
       }
     }
 
@@ -254,10 +253,8 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        either =>
-          either mustBe a[Left[ParseError, _]]
-          either.left.get mustBe a[ParseError.UnexpectedError]
-          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[IllegalStateException]
+        case Left(ParseError.UnexpectedError(Some(_: IllegalStateException))) => succeed
+        case _                                                                => fail("Expected an UnexpectedError containing an IllegalStateException")
       }
     }
 
@@ -267,10 +264,8 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        either =>
-          either mustBe a[Left[ParseError, _]]
-          either.left.get mustBe a[ParseError.UnexpectedError]
-          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
+        case Left(ParseError.UnexpectedError(Some(_: WFCException))) => succeed
+        case _                                                       => fail("Expected an UnexpectedError containing an WFCException")
       }
     }
 
@@ -280,10 +275,8 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        either =>
-          either mustBe a[Left[ParseError, _]]
-          either.left.get mustBe a[ParseError.UnexpectedError]
-          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[WFCException]
+        case Left(ParseError.UnexpectedError(Some(_: WFCException))) => succeed
+        case _                                                       => fail("Expected an UnexpectedError containing an WFCException")
       }
     }
   }
@@ -326,11 +319,10 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor(MessageType.ArrivalNotification)).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        result =>
-          val error = result.left.get
-          error mustBe a[ParseError.BadDateTime]
-          error.asInstanceOf[ParseError.BadDateTime].element mustBe "preparationDateAndTime"
-          error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'notadate' could not be parsed at index 0"
+        case Left(x: ParseError.BadDateTime) =>
+          x.element mustBe "preparationDateAndTime"
+          x.exception.getMessage mustBe "Text 'notadate' could not be parsed at index 0"
+        case _ => fail("Expected an BadDateTime")
       }
     }
 
@@ -340,11 +332,10 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val result = service.extractArrivalData(source)
 
       whenReady(result.value) {
-        either =>
-          either mustBe a[Left[ParseError, _]]
-          either.left.get mustBe a[ParseError.UnexpectedError]
-          either.left.get.asInstanceOf[ParseError.UnexpectedError].caughtException.get mustBe a[IllegalStateException]
+        case Left(ParseError.UnexpectedError(Some(_: IllegalStateException))) => succeed
+        case _                                                                => fail("Expected an UnexpectedError containing a IllegalStateException")
       }
+
     }
 
     "if it doesn't have a mrn, return ParseError.NoElementFound" in {

@@ -24,11 +24,14 @@ import scala.util.matching.Regex
 
 object ObjectStoreURI {
 
+  private val alternative = "common-transit-convention-traders"
+
   // The URI consists of the service name in the first part of the path, followed
   // by the location of the object in the context of that service. As this service
-  // targets common-transit-convention-traders' objects exclusively, we ensure
-  // the URI is targeting that context. This regex ensures that this is the case.
-  lazy val expectedUriPattern: Regex = s"^${Constants.ObjectStoreOwner}/(.+)$$".r
+  // targets transit-movements' objects exclusively (after transitioning away from
+  // common-transit-convention-traders), we ensure  the URI is targeting that context
+  // or the legacy one. This regex ensures that this is the case.
+  lazy val expectedUriPattern: Regex = s"^(${Constants.ObjectStoreOwner}|$alternative)\\/(.+)$$".r
 
   implicit val objectStoreURIformat: Format[ObjectStoreURI] = Json.valueFormat[ObjectStoreURI]
 }
@@ -38,7 +41,7 @@ case class ObjectStoreURI(value: String) extends AnyVal {
   def asResourceLocation: Option[ObjectStoreResourceLocation] =
     ObjectStoreURI.expectedUriPattern
       .findFirstMatchIn(value)
-      .map(_.group(1))
+      .map(_.group(2))
       .map(ObjectStoreResourceLocation.apply)
 
 }

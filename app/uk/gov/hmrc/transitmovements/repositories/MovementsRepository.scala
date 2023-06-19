@@ -516,7 +516,7 @@ class MovementsRepositoryImpl @Inject() (
         obs.headOption().map {
           case None =>
             Right((): Unit)
-          case Some(opt) =>
+          case Some(_) =>
             Left(ConflictError(s"LRN ${localReferenceNumber.value} has previously been used and cannot be reused", localReferenceNumber))
         }
       case Failure(NonFatal(ex)) =>

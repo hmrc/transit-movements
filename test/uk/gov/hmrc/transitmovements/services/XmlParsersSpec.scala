@@ -142,11 +142,10 @@ class XmlParsersSpec extends AnyFreeSpec with TestActorSystem with Matchers with
       val parsedResult = stream.via(XmlParsers.preparationDateTimeExtractor(MessageType.DeclarationData)).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        result =>
-          val error = result.left.get
-          error mustBe a[ParseError.BadDateTime]
-          error.asInstanceOf[ParseError.BadDateTime].element mustBe "preparationDateAndTime"
-          error.asInstanceOf[ParseError.BadDateTime].exception.getMessage mustBe "Text 'notadatetime' could not be parsed at index 0"
+        case Left(x: ParseError.BadDateTime) =>
+          x.element mustBe "preparationDateAndTime"
+          x.exception.getMessage mustBe "Text 'notadatetime' could not be parsed at index 0"
+        case _ => fail("Expected a ParseError.BadDateTime")
       }
     }
   }
