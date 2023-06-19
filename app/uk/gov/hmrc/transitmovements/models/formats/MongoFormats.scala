@@ -26,6 +26,8 @@ import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
+import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
+import uk.gov.hmrc.transitmovements.models.PaginationMovementSummary
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
 import java.time.OffsetDateTime
@@ -49,10 +51,12 @@ trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
   implicit val offsetDateTimeFormat: Format[OffsetDateTime] = Format.apply(offsetDateTimeReads, offsetDateTimeWrites)
 
   // these use the dates above, so need to be here for compile-time macro expansion
-  implicit val messageFormat: Format[Message]                                 = Json.format[Message]
-  implicit val movementFormat: Format[Movement]                               = Json.format[Movement]
-  implicit val movementWithoutMessagesFormat: Format[MovementWithoutMessages] = Json.format[MovementWithoutMessages]
-  implicit val messageResponseFormat: Format[MessageResponse]                 = Json.format[MessageResponse]
+  implicit val messageFormat: Format[Message]                                     = Json.format[Message]
+  implicit val movementFormat: Format[Movement]                                   = Json.format[Movement]
+  implicit val movementWithoutMessagesFormat: Format[MovementWithoutMessages]     = Json.format[MovementWithoutMessages]
+  implicit val messageResponseFormat: Format[MessageResponse]                     = Json.format[MessageResponse]
+  implicit val paginationMovementSummaryFormat: Format[PaginationMovementSummary] = Json.format[PaginationMovementSummary]
+  implicit val paginationMessageSummaryFormat: Format[PaginationMessageSummary]   = Json.format[PaginationMessageSummary]
 
 }
 

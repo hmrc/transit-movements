@@ -30,10 +30,14 @@ import com.mongodb.client.model.Updates.{set => mSet}
 import com.mongodb.client.model.Updates.{combine => mCombine}
 import com.mongodb.client.model.UpdateOptions
 import org.bson.conversions.Bson
+import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.bson.Document
 import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
 import play.api.Logging
+import play.api.libs.json.Json
 import uk.gov.hmrc.mongo.MongoComponent
+import uk.gov.hmrc.mongo.play.json.Codecs.JsonOps
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.EORINumber
@@ -47,6 +51,8 @@ import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 import uk.gov.hmrc.transitmovements.models.PageNumber
+import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
+import uk.gov.hmrc.transitmovements.models.PaginationMovementSummary
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
@@ -94,7 +100,7 @@ trait MovementsRepository {
     page: Option[PageNumber] = None,
     count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
-  ): EitherT[Future, MongoError, Vector[MessageResponse]]
+  ): EitherT[Future, MongoError, PaginationMessageSummary]
 
   def getMovements(
     eoriNumber: EORINumber,
@@ -106,7 +112,7 @@ trait MovementsRepository {
     count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None,
     localReferenceNumber: Option[LocalReferenceNumber]
-  ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]]
+  ): EitherT[Future, MongoError, PaginationMovementSummary]
 
   def updateMovement(
     movementId: MovementId,
@@ -162,7 +168,9 @@ class MovementsRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.mrnFormat),
         Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
         Codecs.playFormatCodec(MongoFormats.eoriNumberFormat),
-        Codecs.playFormatCodec(MongoFormats.lrnFormat)
+        Codecs.playFormatCodec(MongoFormats.lrnFormat),
+        Codecs.playFormatCodec(MongoFormats.paginationMovementSummaryFormat),
+        Codecs.playFormatCodec(MongoFormats.paginationMessageSummaryFormat)
       )
     )
     with MovementsRepository
@@ -223,9 +231,11 @@ class MovementsRepositoryImpl @Inject() (
     page: Option[PageNumber] = None,
     count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
-  ): EitherT[Future, MongoError, Vector[MessageResponse]] = {
+  ): EitherT[Future, MongoError, PaginationMessageSummary] = {
 
     val projection = MessageResponse.projection
+
+    val messageSummaryQuery = Json.obj("$ifNull" -> Json.arr("$messageSummary", "[]"))
 
     val selector = mAnd(
       mEq("_id", movementId.value),
@@ -247,17 +257,19 @@ class MovementsRepositoryImpl @Inject() (
         Aggregates.filter(dateTimeSelector),
         Aggregates.replaceRoot("$messages"),
         Aggregates.sort(descending("received")),
-        Aggregates.project(projection),
-        Aggregates.skip(from),
-        Aggregates.limit(countNumber)
+        Aggregates.facet(
+          Facet("totalCount", Aggregates.count()),
+          Facet("messageSummary", Aggregates.skip(from), Aggregates.limit(countNumber))
+        ),
+        Aggregates.project(Document("totalCount" -> Codecs.toBson(totalCountQuery()), "messageSummary" -> Codecs.toBson(messageSummaryQuery)))
       )
 
-    mongoRetry(Try(collection.aggregate[MessageResponse](aggregates)) match {
+    mongoRetry(Try(collection.aggregate[PaginationMessageSummary](aggregates)) match {
       case Success(obs) =>
         obs
           .toFuture()
           .map(
-            response => Right(response.toVector)
+            response => Right(response.head)
           )
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
@@ -311,7 +323,7 @@ class MovementsRepositoryImpl @Inject() (
     count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None,
     localReferenceNumber: Option[LocalReferenceNumber]
-  ): EitherT[Future, MongoError, Vector[MovementWithoutMessages]] = {
+  ): EitherT[Future, MongoError, PaginationMovementSummary] = {
 
     val dateTimeFilter: Bson = mAnd(
       mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
@@ -328,23 +340,26 @@ class MovementsRepositoryImpl @Inject() (
 
     val projection = MovementWithoutMessages.projection
 
+    val messageSummaryQuery = Json.obj("$ifNull" -> Json.arr("$messageSummary", "[]"))
+
     val (from, itemCount) = indices(page, count)
 
     val aggregates = Seq(
       Aggregates.filter(selector),
       Aggregates.sort(descending("updated")),
-      Aggregates.project(projection),
-      Aggregates.skip(from),
-      Aggregates.limit(itemCount)
+      Aggregates.facet(
+        Facet("totalCount", Aggregates.count()),
+        Facet("messageSummary", Aggregates.skip(from), Aggregates.limit(itemCount))
+      ),
+      Aggregates.project(Document("totalCount" -> Codecs.toBson(totalCountQuery()), "messageSummary" -> Codecs.toBson(messageSummaryQuery)))
     )
 
-    mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
+    mongoRetry(Try(collection.aggregate[PaginationMovementSummary](aggregates)) match {
       case Success(obs) =>
         obs
           .toFuture()
           .map {
-            response =>
-              Right(response.toVector)
+            response => Right(response.head)
           }
 
       case Failure(NonFatal(ex)) =>
@@ -352,6 +367,23 @@ class MovementsRepositoryImpl @Inject() (
     })
 
   }
+
+  private def totalCountQuery() =
+    Json.obj(
+      "$ifNull" -> Json.arr(
+        Json.obj(
+          "$let" -> Json.obj(
+            "vars" -> Json.obj(
+              "countValue" -> Json.obj(
+                "$arrayElemAt" -> Json.arr("$totalCount", 0)
+              )
+            ),
+            "in" -> "$$countValue.count"
+          )
+        ),
+        0
+      )
+    )
 
   private def indices(pageNumber: Option[PageNumber], itemCount: Option[ItemCount]): (Int, Int) = {
     val startIndex = pageNumber.flatMap(
