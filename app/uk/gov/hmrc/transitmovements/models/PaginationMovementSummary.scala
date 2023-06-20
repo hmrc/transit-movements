@@ -24,6 +24,4 @@ case class PaginationMovementSummary(totalCount: Int, messageSummary: Vector[Mov
 object PaginationMovementSummary {
   implicit lazy val format: OFormat[PaginationMovementSummary]                      = Json.format[PaginationMovementSummary]
   implicit lazy val movementWithoutMessagesFormat: OFormat[MovementWithoutMessages] = Json.format[MovementWithoutMessages]
-  implicit lazy val movementIdFormat: OFormat[MovementId]                           = Json.format[MovementId]
-  implicit lazy val eORINumberFormat: OFormat[EORINumber]                           = Json.format[EORINumber]
 }

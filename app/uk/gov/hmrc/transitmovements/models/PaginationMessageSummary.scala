@@ -25,6 +25,5 @@ case class PaginationMessageSummary(totalCount: Int, messageSummary: Vector[Mess
 object PaginationMessageSummary {
   implicit lazy val format: OFormat[PaginationMessageSummary]       = Json.format[PaginationMessageSummary]
   implicit lazy val messageResponseFormat: OFormat[MessageResponse] = Json.format[MessageResponse]
-  implicit lazy val messageIdFormat: OFormat[MessageId]             = Json.format[MessageId]
 
 }
