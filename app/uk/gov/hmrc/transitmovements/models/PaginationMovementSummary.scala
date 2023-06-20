@@ -19,7 +19,7 @@ package uk.gov.hmrc.transitmovements.models
 import play.api.libs.json.Json
 import play.api.libs.json.OFormat
 
-case class PaginationMovementSummary(totalCount: Int, messageSummary: Vector[MovementWithoutMessages])
+case class PaginationMovementSummary(totalCount: Int, movementSummary: Vector[MovementWithoutMessages])
 
 object PaginationMovementSummary {
   implicit lazy val format: OFormat[PaginationMovementSummary]                      = Json.format[PaginationMovementSummary]

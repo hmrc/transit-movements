@@ -340,7 +340,7 @@ class MovementsRepositoryImpl @Inject() (
 
     val projection = MovementWithoutMessages.projection
 
-    val messageSummaryQuery = Json.obj("$ifNull" -> Json.arr("$messageSummary", "[]"))
+    val messageSummaryQuery = Json.obj("$ifNull" -> Json.arr("$movementSummary", "[]"))
 
     val (from, itemCount) = indices(page, count)
 
@@ -349,9 +349,9 @@ class MovementsRepositoryImpl @Inject() (
       Aggregates.sort(descending("updated")),
       Aggregates.facet(
         Facet("totalCount", Aggregates.count()),
-        Facet("messageSummary", Aggregates.skip(from), Aggregates.limit(itemCount))
+        Facet("movementSummary", Aggregates.skip(from), Aggregates.limit(itemCount))
       ),
-      Aggregates.project(Document("totalCount" -> Codecs.toBson(totalCountQuery()), "messageSummary" -> Codecs.toBson(messageSummaryQuery)))
+      Aggregates.project(Document("totalCount" -> Codecs.toBson(totalCountQuery()), "movementSummary" -> Codecs.toBson(messageSummaryQuery)))
     )
 
     mongoRetry(Try(collection.aggregate[PaginationMovementSummary](aggregates)) match {
