@@ -20,7 +20,7 @@ import play.api.libs.json.Json
 import play.api.libs.json.OFormat
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
-case class PaginationMessageSummary(totalCount: Int, messageSummary: Vector[MessageResponse])
+case class PaginationMessageSummary(totalCount: TotalCount, messageSummary: Vector[MessageResponse])
 
 object PaginationMessageSummary {
   implicit lazy val format: OFormat[PaginationMessageSummary]       = Json.format[PaginationMessageSummary]

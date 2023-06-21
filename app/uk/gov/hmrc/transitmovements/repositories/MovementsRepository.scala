@@ -233,8 +233,6 @@ class MovementsRepositoryImpl @Inject() (
     receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, PaginationMessageSummary] = {
 
-    val projection = MessageResponse.projection
-
     val messageSummaryQuery = Json.obj("$ifNull" -> Json.arr("$messageSummary", "[]"))
 
     val selector = mAnd(
@@ -337,9 +335,6 @@ class MovementsRepositoryImpl @Inject() (
       movementMRNFilter(movementReferenceNumber),
       movementLRNFilter(localReferenceNumber)
     )
-
-    val projection = MovementWithoutMessages.projection
-
     val messageSummaryQuery = Json.obj("$ifNull" -> Json.arr("$movementSummary", "[]"))
 
     val (from, itemCount) = indices(page, count)

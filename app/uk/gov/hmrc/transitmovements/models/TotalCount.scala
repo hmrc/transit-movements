@@ -16,12 +16,11 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import play.api.libs.json.Format
 import play.api.libs.json.Json
-import play.api.libs.json.OFormat
 
-case class PaginationMovementSummary(totalCount: TotalCount, movementSummary: Vector[MovementWithoutMessages])
+case class TotalCount(value: Long) extends AnyVal
 
-object PaginationMovementSummary {
-  implicit lazy val format: OFormat[PaginationMovementSummary]                      = Json.format[PaginationMovementSummary]
-  implicit lazy val movementWithoutMessagesFormat: OFormat[MovementWithoutMessages] = Json.format[MovementWithoutMessages]
+object TotalCount {
+  implicit lazy val totalCountFormat: Format[TotalCount] = Json.valueFormat[TotalCount]
 }
