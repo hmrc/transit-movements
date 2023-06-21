@@ -826,18 +826,19 @@ class MovementsControllerSpec
         "must return OK and a list of message ids" in {
           val messageResponses = MessageResponse.fromMessageWithoutBody(movement.messages.head)
 
-          lazy val messageResponseList = Vector(messageResponses)
+          lazy val messageResponseList       = Vector(messageResponses)
+          lazy val paginationMesssageSummary = PaginationMessageSummary(TotalCount(0), messageResponseList)
           when(
             mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
             .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
           when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
-            .thenReturn(EitherT.rightT(Vector(messageResponses)))
+            .thenReturn(EitherT.rightT(paginationMesssageSummary))
           val result = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
 
           status(result) mustBe OK
-          contentAsJson(result) mustBe Json.toJson(messageResponseList)
+          contentAsJson(result) mustBe Json.toJson(paginationMesssageSummary)
         }
 
         "must return empty list if no messages found for given movement" in {
@@ -846,6 +847,9 @@ class MovementsControllerSpec
             mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
             .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+
+          lazy val paginationMesssageSummary = PaginationMessageSummary(TotalCount(0), Vector.empty[MessageResponse])
+
           when(
             mockRepository.getMessages(
               EORINumber(eqTo(eoriNumber.value)),
@@ -857,12 +861,12 @@ class MovementsControllerSpec
               eqTo(None)
             )
           )
-            .thenReturn(EitherT.rightT(Vector.empty[MessageResponse]))
+            .thenReturn(EitherT.rightT(paginationMesssageSummary))
 
           val result = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
 
           status(result) mustBe OK
-          contentAsJson(result) mustBe Json.toJson(Vector.empty[MessageResponse])
+          contentAsJson(result) mustBe Json.toJson(paginationMesssageSummary)
         }
 
         "must return NOT_FOUND if no departure found" in {
@@ -900,6 +904,8 @@ class MovementsControllerSpec
         "must return OK if departures were found" in {
           val response = MovementWithoutMessages.fromMovement(movement)
 
+          lazy val paginationMovementSummary = PaginationMovementSummary(TotalCount(1), Vector(response))
+
           when(
             mockRepository.getMovements(
               EORINumber(any()),
@@ -913,12 +919,12 @@ class MovementsControllerSpec
               eqTo(None)
             )
           )
-            .thenReturn(EitherT.rightT(Vector(response)))
+            .thenReturn(EitherT.rightT(paginationMovementSummary))
 
           val result = controller.getMovementsForEori(eoriNumber, movementType)(request)
           status(result) mustBe OK
 
-          contentAsJson(result) mustBe Json.toJson(Vector(response))
+          contentAsJson(result) mustBe Json.toJson(paginationMovementSummary)
         }
 
         "must return OK if departures were found and it match the updatedSince or movementEORI or movementReferenceNumber or localReferenceNumber or all these filters" in forAll(
@@ -931,6 +937,8 @@ class MovementsControllerSpec
         ) {
           (updatedSince, movementEORI, movementReferenceNumber, pageNumber, itemCount, localReferenceNumber) =>
             val response = MovementWithoutMessages.fromMovement(movement)
+
+            lazy val paginationMovementSummary = PaginationMovementSummary(TotalCount(1), Vector(response))
 
             when(
               mockRepository.getMovements(
@@ -945,7 +953,7 @@ class MovementsControllerSpec
                 eqTo(localReferenceNumber)
               )
             )
-              .thenReturn(EitherT.rightT(Vector(response)))
+              .thenReturn(EitherT.rightT(paginationMovementSummary))
 
             val result =
               controller.getMovementsForEori(
@@ -962,7 +970,7 @@ class MovementsControllerSpec
 
             status(result) mustBe OK
 
-            contentAsJson(result) mustBe Json.toJson(Vector(response))
+            contentAsJson(result) mustBe Json.toJson(paginationMovementSummary)
         }
 
         "must return empty list if no ids were found" in forAll(
@@ -972,6 +980,8 @@ class MovementsControllerSpec
           Gen.option(arbitrary[LocalReferenceNumber])
         ) {
           (updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber) =>
+            lazy val paginationMovementSummary = PaginationMovementSummary(TotalCount(0), Vector.empty[MovementWithoutMessages])
+
             when(
               mockRepository.getMovements(
                 EORINumber(any()),
@@ -985,7 +995,7 @@ class MovementsControllerSpec
                 eqTo(localReferenceNumber)
               )
             )
-              .thenReturn(EitherT.rightT(Vector.empty[MovementWithoutMessages]))
+              .thenReturn(EitherT.rightT(paginationMovementSummary))
 
             val result =
               controller.getMovementsForEori(
@@ -998,7 +1008,7 @@ class MovementsControllerSpec
               )(request)
 
             status(result) mustBe OK
-            contentAsJson(result) mustBe Json.toJson(Vector.empty[MovementWithoutMessages])
+            contentAsJson(result) mustBe Json.toJson(paginationMovementSummary)
         }
 
         "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in forAll(

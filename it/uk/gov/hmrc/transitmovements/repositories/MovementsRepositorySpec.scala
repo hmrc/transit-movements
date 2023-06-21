@@ -204,7 +204,7 @@ class MovementsRepositorySpec
 
     val dateTime = instant // mongo doesn't (generally) like arbitrary datetime values
     val messages = GetMovementsSetup
-      .setupMessages(dateTime)
+      .setupMessagesWithOutBody(dateTime)
       .sortBy(_.received)
       .reverse
 
@@ -213,7 +213,12 @@ class MovementsRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None).value)
-    result.toOption.get should be(
+
+    val paginationMessageSummary = result.toOption.get
+
+    paginationMessageSummary.totalCount should be(TotalCount(7))
+
+    paginationMessageSummary.messageSummary should be(
       departure.messages.map(
         message => MessageResponse.fromMessageWithoutBody(message)
       )
@@ -223,14 +228,19 @@ class MovementsRepositorySpec
   "getMessages" should "return message responses if there are messages that were received since the given time" in {
     val dateTime = instant // mongo doesn't (generally) like arbitrary datetime values
 
-    val messages = GetMovementsSetup.setupMessages(dateTime)
+    val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, Some(dateTime)).value)
-    result.toOption.get should be(
+
+    val paginationMessageSummary = result.toOption.get
+
+    paginationMessageSummary.totalCount should be(TotalCount(4))
+
+    paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(0, 4)
         .map(
@@ -242,14 +252,19 @@ class MovementsRepositorySpec
   "getMessages" should "return message responses if there are messages that were received up until the given time" in {
     val dateTime = instant
 
-    val messages = GetMovementsSetup.setupMessages(dateTime)
+    val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, None, None, Some(dateTime)).value)
-    result.toOption.get should be(
+
+    val paginationMessageSummary = result.toOption.get
+
+    paginationMessageSummary.totalCount should be(TotalCount(4))
+
+    paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(3, 7)
         .map(
@@ -261,7 +276,7 @@ class MovementsRepositorySpec
   "getMessages" should "return a list of message responses for the first page" in {
     val dateTime = instant
 
-    val messages = GetMovementsSetup.setupMessages(dateTime)
+    val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
@@ -270,7 +285,12 @@ class MovementsRepositorySpec
     val result = await(
       repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, None, Some(ItemCount(2)), None).value
     )
-    result.toOption.get should be(
+
+    val paginationMessageSummary = result.toOption.get
+
+    paginationMessageSummary.totalCount should be(TotalCount(7))
+
+    paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(0, 2)
         .map(
@@ -282,7 +302,7 @@ class MovementsRepositorySpec
   "getMessages" should "return a list of message responses for the second page" in {
     val dateTime = instant
 
-    val messages = GetMovementsSetup.setupMessages(dateTime)
+    val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
@@ -291,7 +311,12 @@ class MovementsRepositorySpec
     val result = await(
       repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(2)), Some(ItemCount(2)), None).value
     )
-    result.toOption.get should be(
+
+    val paginationMessageSummary = result.toOption.get
+
+    paginationMessageSummary.totalCount should be(TotalCount(7))
+
+    paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(2, 4)
         .map(
@@ -303,7 +328,7 @@ class MovementsRepositorySpec
   "getMessages" should "return a list of message responses for the third page" in {
     val dateTime = instant
 
-    val messages = GetMovementsSetup.setupMessages(dateTime)
+    val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
@@ -312,7 +337,12 @@ class MovementsRepositorySpec
     val result = await(
       repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(3)), Some(ItemCount(2)), None).value
     )
-    result.toOption.get should be(
+
+    val paginationMessageSummary = result.toOption.get
+
+    paginationMessageSummary.totalCount should be(TotalCount(7))
+
+    paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(4, 6)
         .map(
@@ -324,7 +354,7 @@ class MovementsRepositorySpec
   "getMessages" should "return a list of message responses for the last page" in {
     val dateTime = instant
 
-    val messages = GetMovementsSetup.setupMessages(dateTime)
+    val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
@@ -333,7 +363,12 @@ class MovementsRepositorySpec
     val result = await(
       repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(4)), Some(ItemCount(2)), None).value
     )
-    result.toOption.get should be(
+
+    val paginationMessageSummary = result.toOption.get
+
+    paginationMessageSummary.totalCount should be(TotalCount(7))
+
+    paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(6, 8)
         .map(
@@ -354,14 +389,19 @@ class MovementsRepositorySpec
     val result = await(
       repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(5)), Some(ItemCount(2)), None).value
     )
-    result.toOption.get should be(Vector.empty)
+
+    val paginationMessageSummary = result.toOption.get
+
+    paginationMessageSummary.totalCount should be(TotalCount(7))
+
+    paginationMessageSummary.messageSummary should be(Vector.empty)
 
   }
 
   "getMessages" should "return all message responses between received since and received until, if they are both supplied" in {
     val dateTime = instant
 
-    val messages = GetMovementsSetup.setupMessages(dateTime)
+    val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
     val departure = arbitrary[Movement].sample.value.copy(messages = messages)
 
@@ -381,7 +421,12 @@ class MovementsRepositorySpec
           )
           .value
       )
-    result.toOption.get should be(
+
+    val paginationMessageSummary = result.toOption.get
+
+    paginationMessageSummary.totalCount should be(TotalCount(5))
+
+    paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(1, 6)
         .map(
@@ -413,12 +458,17 @@ class MovementsRepositorySpec
           )
           .value
       )
-    result.toOption.get should be(Vector.empty)
+
+    val paginationMessageSummary = result.toOption.get
+
+    paginationMessageSummary.totalCount should be(TotalCount(0))
+
+    paginationMessageSummary.messageSummary should be(Vector.empty)
   }
 
   "getMessages" should "return none if the movement doesn't exist" in {
     val result = await(repository.getMessages(EORINumber("NONEXISTENT_EORI"), MovementId("NONEXISTENT_ID"), MovementType.Departure, None).value)
-    result.toOption.get.isEmpty should be(true)
+    result.toOption.get.totalCount should be(TotalCount(0))
   }
 
   "getDepartures" should
@@ -426,7 +476,11 @@ class MovementsRepositorySpec
       GetMovementsSetup.setup()
       val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, None, None, None, None).value)
 
-      result.toOption.get should be(
+      val paginationMovementSummary = result.toOption.get
+
+      paginationMovementSummary.totalCount should be(TotalCount(2))
+
+      paginationMovementSummary.movementSummary should be(
         Vector(
           MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
           MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
@@ -440,7 +494,11 @@ class MovementsRepositorySpec
     await(repository.insert(GetMovementsSetup.departureGB3).value)
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime), None, None, None, None, None, None).value)
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
@@ -454,7 +512,11 @@ class MovementsRepositorySpec
     await(repository.insert(GetMovementsSetup.departureGB3).value)
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, None, None, Some(dateTime), None).value)
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB3)
@@ -486,7 +548,11 @@ class MovementsRepositorySpec
         .value
     )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(4))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB10),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
@@ -520,7 +586,11 @@ class MovementsRepositorySpec
         .value
     )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(0))
+
+    paginationMovementSummary.movementSummary should be(
       Vector.empty
     )
   }
@@ -532,7 +602,11 @@ class MovementsRepositorySpec
       repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, Some(GetMovementsSetup.movementEORI), None, None, None, None, None).value
     )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
@@ -560,7 +634,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(13))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB31),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB30),
@@ -590,7 +668,12 @@ class MovementsRepositorySpec
           )
           .value
       )
-    result.toOption.get should be(
+
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(13))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB27),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB26),
@@ -622,7 +705,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(13))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB23),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB22),
@@ -652,7 +739,12 @@ class MovementsRepositorySpec
           )
           .value
       )
-    result.toOption.get should be(
+
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(13))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB19)
       )
@@ -680,7 +772,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(13))
+
+    paginationMovementSummary.movementSummary should be(
       Vector()
     )
   }
@@ -696,7 +792,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
@@ -717,7 +817,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB3)
@@ -748,7 +852,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(4))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB10),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
@@ -777,7 +885,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(1))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB4)
       )
@@ -794,7 +906,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB6),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB5)
@@ -818,7 +934,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(1))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB4)
       )
@@ -835,7 +955,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB6),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB5)
@@ -847,13 +971,19 @@ class MovementsRepositorySpec
     GetMovementsSetup.setup()
     val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, None, None, None, None, None).value)
 
-    result.toOption.get should be(Vector.empty[MovementWithoutMessages])
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(0))
+    paginationMovementSummary.movementSummary should be(Vector.empty[MovementWithoutMessages])
   }
 
   it should "return no movement ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, None, None, None, None, None).value)
-    result.toOption.get should be(Vector.empty[MovementWithoutMessages])
+    val result                    = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, None, None, None, None, None).value)
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(0))
+    paginationMovementSummary.movementSummary should be(Vector.empty[MovementWithoutMessages])
   }
 
   it should "return no movement ids for an MRN that doesn't exist" in {
@@ -862,7 +992,10 @@ class MovementsRepositorySpec
       repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, Some(MovementReferenceNumber("invalid")), None, None, None, None).value
     )
 
-    result.toOption.get should be(Vector.empty[MovementWithoutMessages])
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(0))
+    paginationMovementSummary.movementSummary should be(Vector.empty[MovementWithoutMessages])
   }
 
   "getArrivals" should
@@ -870,7 +1003,11 @@ class MovementsRepositorySpec
       GetMovementsSetup.setup()
       val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None, None, None, None, None, None).value)
 
-      result.toOption.get should be(
+      val paginationMovementSummary = result.toOption.get
+
+      paginationMovementSummary.totalCount should be(TotalCount(2))
+
+      paginationMovementSummary.movementSummary should be(
         Vector(
           MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
           MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
@@ -884,7 +1021,11 @@ class MovementsRepositorySpec
     await(repository.insert(GetMovementsSetup.arrivalGB3).value)
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), None, None, localReferenceNumber = None).value)
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
@@ -901,7 +1042,11 @@ class MovementsRepositorySpec
         .value
     )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
@@ -920,7 +1065,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
@@ -947,7 +1096,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(1))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB3)
       )
@@ -964,7 +1117,11 @@ class MovementsRepositorySpec
           .value
       )
 
-    result.toOption.get should be(
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
       Vector(
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB6),
         MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB5)
@@ -976,13 +1133,20 @@ class MovementsRepositorySpec
     GetMovementsSetup.setup()
     val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, None, None, None, None, None).value)
 
-    result.toOption.get should be(Vector.empty[MovementWithoutMessages])
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(0))
+
+    paginationMovementSummary.movementSummary should be(Vector.empty[MovementWithoutMessages])
   }
 
   it should "return no arrival ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
-    val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, None, None, None, None, None).value)
-    result.toOption.get should be(Vector.empty[MovementWithoutMessages])
+    val result                    = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, None, None, None, None, None).value)
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(0))
+    paginationMovementSummary.movementSummary should be(Vector.empty[MovementWithoutMessages])
   }
 
   it should "return no movement ids for an MRN that doesn't exist" in {
@@ -991,7 +1155,11 @@ class MovementsRepositorySpec
       repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, Some(MovementReferenceNumber("invalid")), None, None, None, None).value
     )
 
-    result.toOption.get should be(Vector.empty[MovementWithoutMessages])
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(0))
+
+    paginationMovementSummary.movementSummary should be(Vector.empty[MovementWithoutMessages])
   }
 
   object GetMovementsSetup {
@@ -1391,6 +1559,17 @@ class MovementsRepositorySpec
         arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None),
         arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None),
         arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None)
+      )
+
+    def setupMessagesWithOutBody(dateTime: OffsetDateTime) =
+      Vector(
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None, body = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None, body = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None, body = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None, body = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None, body = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None, body = None),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None, body = None)
       )
 
     def setupPagination() = {
