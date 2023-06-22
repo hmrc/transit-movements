@@ -7,24 +7,41 @@ This microservice is in [Beta](https://www.gov.uk/help/beta). The signature may 
 
 
 ### Prerequisites
-- Scala 2.12.11
+- Scala 2.13.8
 - Java 8
-- sbt > 1.3.13
-- [Service Manager](https://github.com/hmrc/service-manager)
+- sbt 1.7.2
+- [Service Manager](https://github.com/hmrc/sm2)
 
 ### Development Setup
 
-Run from the console using: `sbt run`
+Run from the console using: `sbt run`. To run the whole stack, using service manager: `sm2 --start CTC_TRADERS_API`.
 
-To run the whole stack, using service manager: `sm --start CTC_TRADERS_API`
+**On first time setup**, if you wish to test functionality of storing messages in `object-store` (by default, messages over
+0.5MB), you will need to ensure that an appropriate internal auth token is generated. If you run the service via 
+service manager, send the following payload to `POST http://localhost:8470/test-only/token`:
 
-Task | Description | Command
-:-------|:------------|:-----
-test | Runs the standard unit tests | ```$ sbt test```
-it:test  | Runs the integration tests | ```$ sbt it:test ```
-dependencyCheck | Runs dependency-check against the current project. It aggregates dependencies and generates a report | ```$ sbt dependencyCheck```
-dependencyUpdates |  Shows a list of project dependencies that can be updated | ```$ sbt dependencyUpdates```
-dependencyUpdatesReport | Writes a list of project dependencies to a file | ```$ sbt dependencyUpdatesReport```
+```json
+{
+    "token": "transit-movements-token",
+    "principal": "transit-movements",
+    "permissions": [{
+        "resourceType": "object-store",
+        "resourceLocation": "transit-movements",
+        "actions": ["READ", "WRITE"]
+    }]
+}
+```
+
+The following sbt tasks are available on this project
+
+| Task                    | Description                                                                                          | Command                                        |
+|:------------------------|:-----------------------------------------------------------------------------------------------------|:-----------------------------------------------|
+| test                    | Runs the standard unit tests                                                                         | ```$ sbt test```                               |
+| it:test                 | Runs the integration tests                                                                           | ```$ sbt it:test ```                           |
+| scalafmt                | Runs the scala formatter (on project/tests/integration tests)                                        | ```$ sbt scalafmt test:scalafmt it:scalafmt``` |
+| dependencyCheck         | Runs dependency-check against the current project. It aggregates dependencies and generates a report | ```$ sbt dependencyCheck```                    |
+| dependencyUpdates       | Shows a list of project dependencies that can be updated                                             | ```$ sbt dependencyUpdates```                  |
+| dependencyUpdatesReport | Writes a list of project dependencies to a file                                                      | ```$ sbt dependencyUpdatesReport```            |
 
 ### CTC Traders API related documentation
 
