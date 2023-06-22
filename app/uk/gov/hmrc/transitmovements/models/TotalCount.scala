@@ -19,8 +19,8 @@ package uk.gov.hmrc.transitmovements.models
 import play.api.libs.json.Format
 import play.api.libs.json.Json
 
-case class EORINumber(value: String) extends AnyVal
+case class TotalCount(value: Long) extends AnyVal
 
-object EORINumber {
-  implicit lazy val eORINumberFormat: Format[EORINumber] = Json.valueFormat[EORINumber]
+object TotalCount {
+  implicit lazy val totalCountFormat: Format[TotalCount] = Json.valueFormat[TotalCount]
 }

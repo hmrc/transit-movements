@@ -16,11 +16,12 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import play.api.libs.json.Format
 import play.api.libs.json.Json
+import play.api.libs.json.OFormat
 
-case class EORINumber(value: String) extends AnyVal
+case class PaginationMovementSummary(totalCount: TotalCount, movementSummary: Vector[MovementWithoutMessages])
 
-object EORINumber {
-  implicit lazy val eORINumberFormat: Format[EORINumber] = Json.valueFormat[EORINumber]
+object PaginationMovementSummary {
+  implicit lazy val format: OFormat[PaginationMovementSummary]                      = Json.format[PaginationMovementSummary]
+  implicit lazy val movementWithoutMessagesFormat: OFormat[MovementWithoutMessages] = Json.format[MovementWithoutMessages]
 }

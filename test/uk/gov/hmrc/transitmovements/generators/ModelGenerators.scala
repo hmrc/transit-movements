@@ -58,12 +58,12 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =
     Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MovementId)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MovementId(_))
     }
 
   implicit lazy val arbitraryMessageId: Arbitrary[MessageId] =
     Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MessageId)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MessageId(_))
     }
 
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
