@@ -32,6 +32,8 @@ import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
+import uk.gov.hmrc.transitmovements.config.Constants.Predicates._
+import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
@@ -63,7 +65,8 @@ class MovementsController @Inject() (
   repo: MovementsRepository,
   movementsXmlParsingService: MovementsXmlParsingService,
   messagesXmlParsingService: MessagesXmlParsingService,
-  objectStoreService: ObjectStoreService
+  objectStoreService: ObjectStoreService,
+  internalAuth: InternalAuthActionProvider
 )(implicit
   val materializer: Materializer,
   clock: Clock,
@@ -88,7 +91,7 @@ class MovementsController @Inject() (
       case None => createEmptyMovement(eori, movementType)
     }
 
-  private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithSize {
+  private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
     implicit request => size =>
       {
         for {
@@ -104,7 +107,7 @@ class MovementsController @Inject() (
       }.fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), response => Ok(Json.toJson(response)))
   }
 
-  private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = Action.streamWithSize {
+  private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
     implicit request => size =>
       {
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
@@ -125,7 +128,7 @@ class MovementsController @Inject() (
       )
   }
 
-  private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = Action.async(parse.anyContent) {
+  private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = internalAuth(WRITE_MOVEMENT).async(parse.anyContent) {
     _ =>
       val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       val messageType = movementType match {
@@ -154,7 +157,7 @@ class MovementsController @Inject() (
 
   // Initiated from SDES callback
   def updateMessageStatus(movementId: MovementId, messageId: MessageId): Action[JsValue] =
-    Action.async(parse.json) {
+    internalAuth(WRITE_STATUS).async(parse.json) {
       implicit request =>
         (for {
           updateStatus <- require[UpdateStatus](request.body)
@@ -204,7 +207,7 @@ class MovementsController @Inject() (
           .asPresentation
       } yield Ok
 
-    Action.async(parse.json) {
+    internalAuth(WRITE_MESSAGE).async(parse.json) {
       implicit request =>
         val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
         (for {
@@ -226,7 +229,7 @@ class MovementsController @Inject() (
   }
 
   private def updateMovementWithStream(movementId: MovementId, triggerId: Option[MessageId]): Action[Source[ByteString, _]] =
-    Action.streamWithSize {
+    internalAuth(WRITE_MESSAGE).streamWithSize {
       implicit request => size =>
         {
           implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
@@ -264,7 +267,7 @@ class MovementsController @Inject() (
     count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None,
     localReferenceNumber: Option[LocalReferenceNumber] = None
-  ): Action[AnyContent] = Action.async {
+  ): Action[AnyContent] = internalAuth(READ_MOVEMENT).async {
     repo
       .getMovements(eoriNumber, movementType, updatedSince, movementEORI, movementReferenceNumber, page, count, receivedUntil, localReferenceNumber)
       .asPresentation
@@ -274,22 +277,24 @@ class MovementsController @Inject() (
       )
   }
 
-  def getMovementWithoutMessages(eoriNumber: EORINumber, movementType: MovementType, movementId: MovementId): Action[AnyContent] = Action.async {
-    repo
-      .getMovementWithoutMessages(eoriNumber, movementId, movementType)
-      .asPresentation
-      .fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), arrivalWithoutMessages => Ok(Json.toJson(arrivalWithoutMessages)))
-  }
+  def getMovementWithoutMessages(eoriNumber: EORINumber, movementType: MovementType, movementId: MovementId): Action[AnyContent] =
+    internalAuth(READ_MOVEMENT).async {
+      repo
+        .getMovementWithoutMessages(eoriNumber, movementId, movementType)
+        .asPresentation
+        .fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), arrivalWithoutMessages => Ok(Json.toJson(arrivalWithoutMessages)))
+    }
 
-  def getMessage(eoriNumber: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[AnyContent] = Action.async {
-    repo
-      .getSingleMessage(eoriNumber, movementId, messageId, movementType)
-      .asPresentation
-      .fold[Result](
-        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        message => Ok(Json.toJson(message))
-      )
-  }
+  def getMessage(eoriNumber: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[AnyContent] =
+    internalAuth(READ_MESSAGE).async {
+      repo
+        .getSingleMessage(eoriNumber, movementId, messageId, movementType)
+        .asPresentation
+        .fold[Result](
+          baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+          message => Ok(Json.toJson(message))
+        )
+    }
 
   def getMessages(
     eoriNumber: EORINumber,
@@ -300,7 +305,7 @@ class MovementsController @Inject() (
     count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
   ): Action[AnyContent] =
-    Action.async {
+    internalAuth(READ_MESSAGE).async {
       (for {
         _        <- repo.getMovementWithoutMessages(eoriNumber, movementId, movementType).asPresentation
         messages <- repo.getMessages(eoriNumber, movementId, movementType, receivedSince, page, count, receivedUntil).asPresentation
@@ -395,7 +400,7 @@ class MovementsController @Inject() (
       }
     }
 
-  private def attachEmptyMessage(movementId: MovementId): Action[AnyContent] = Action.async {
+  private def attachEmptyMessage(movementId: MovementId): Action[AnyContent] = internalAuth(WRITE_MESSAGE).async {
     val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
 
     val message = messageService.createEmptyMessage(

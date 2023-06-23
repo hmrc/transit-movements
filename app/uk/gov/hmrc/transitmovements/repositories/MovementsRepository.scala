@@ -19,25 +19,23 @@ package uk.gov.hmrc.transitmovements.repositories
 import akka.pattern.retry
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
+import com.mongodb.client.model.Filters.empty
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
-import com.mongodb.client.model.Filters.{regex => mRegex}
 import com.mongodb.client.model.Filters.{gte => mGte}
 import com.mongodb.client.model.Filters.{lte => mLte}
-import com.mongodb.client.model.Filters.empty
+import com.mongodb.client.model.Filters.{regex => mRegex}
+import com.mongodb.client.model.UpdateOptions
+import com.mongodb.client.model.Updates.{combine => mCombine}
 import com.mongodb.client.model.Updates.{push => mPush}
 import com.mongodb.client.model.Updates.{set => mSet}
-import com.mongodb.client.model.Updates.{combine => mCombine}
-import com.mongodb.client.model.UpdateOptions
 import org.bson.conversions.Bson
-import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.Document
-import org.mongodb.scala.model._
 import org.mongodb.scala.model.Sorts.descending
+import org.mongodb.scala.model._
 import play.api.Logging
 import play.api.libs.json.Json
 import uk.gov.hmrc.mongo.MongoComponent
-import uk.gov.hmrc.mongo.play.json.Codecs.JsonOps
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.EORINumber
