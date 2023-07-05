@@ -30,7 +30,9 @@ import com.mongodb.client.model.Updates.{combine => mCombine}
 import com.mongodb.client.model.Updates.{push => mPush}
 import com.mongodb.client.model.Updates.{set => mSet}
 import org.bson.conversions.Bson
+import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.Document
+import org.mongodb.scala.model.Filters.elemMatch
 import org.mongodb.scala.model.Sorts.descending
 import org.mongodb.scala.model._
 import play.api.Logging
@@ -38,20 +40,7 @@ import play.api.libs.json.Json
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.ItemCount
-import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.Movement
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.MovementType
-import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
-import uk.gov.hmrc.transitmovements.models.PageNumber
-import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
-import uk.gov.hmrc.transitmovements.models.PaginationMovementSummary
-import uk.gov.hmrc.transitmovements.models.UpdateMessageData
+import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
@@ -136,6 +125,8 @@ trait MovementsRepository {
 
   def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber): EitherT[Future, MongoError, Unit]
 
+  def isMessageIdUnique(messageId: MessageId): EitherT[Future, MongoError, Unit]
+
 }
 
 object MovementsRepositoryImpl {
@@ -175,20 +166,93 @@ class MovementsRepositoryImpl @Inject() (
     with Logging
     with CommonFormats {
 
+//  def insert(movement: Movement): EitherT[Future, MongoError, Unit] =
+//    mongoRetry(Try(collection.insertOne(movement)) match {
+//      case Success(obs) =>
+//        obs.toFuture().map {
+//          result =>
+//            if (result.wasAcknowledged()) {
+//              Right(())
+//            } else {
+//              Left(InsertNotAcknowledged(s"Insert failed for movement $movement"))
+//            }
+//        }
+//      case Failure(NonFatal(ex)) =>
+//        Future.successful(Left(UnexpectedError(Some(ex))))
+//    })
+//  def insert(movement: Movement): EitherT[Future, MongoError, Unit] =
+//    EitherT {
+//      for {
+//        areMessageIdsUnique <- Future.traverse(movement.messages)(
+//          message => isMessageIdUnique(message.id)
+//        )
+//        if areMessageIdsUnique.forall(identity)
+//        insertionResult <- mongoRetry(Try(collection.insertOne(movement)) match {
+//          case Success(obs) =>
+//            obs.toFuture().map {
+//              result =>
+//                if (result.wasAcknowledged()) {
+//                  Right(())
+//                } else {
+//                  Left(InsertNotAcknowledged(s"Insert failed for movement $movement"))
+//                }
+//            }
+//          case Failure(NonFatal(ex)) =>
+//            Future.successful(Left(UnexpectedError(Some(ex))))
+//        }).value
+//      } yield insertionResult
+//    } recoverWith {
+//      case _ => EitherT.leftT[Future, Unit](InsertNotAcknowledged(s"Duplicate message id found in movement $movement"))
+//    }
+
+//  def insert(movement: Movement): EitherT[Future, MongoError, Unit] =
+//    for {
+//      _ <- EitherT(
+//        Future
+//          .sequence(
+//            movement.messages.map(
+//              message => isMessageIdUnique(message.id).value
+//            )
+//          )
+//          .map {
+//            _.find(_.isLeft).getOrElse(Right(()))
+//          }
+//      )
+//      insertionResult <- mongoRetry(
+//        EitherT
+//          .liftF(collection.insertOne(movement).toFuture())
+//          .flatMap {
+//            result =>
+//              if (result.wasAcknowledged()) EitherT.rightT[Future, MongoError](())
+//              else EitherT.leftT[Future, Unit](InsertNotAcknowledged(s"Insert failed for movement $movement"))
+//          }
+//          .value
+//      )
+//    } yield insertionResult
+
   def insert(movement: Movement): EitherT[Future, MongoError, Unit] =
-    mongoRetry(Try(collection.insertOne(movement)) match {
-      case Success(obs) =>
-        obs.toFuture().map {
-          result =>
-            if (result.wasAcknowledged()) {
-              Right(())
-            } else {
-              Left(InsertNotAcknowledged(s"Insert failed for movement $movement"))
-            }
-        }
-      case Failure(NonFatal(ex)) =>
-        Future.successful(Left(UnexpectedError(Some(ex))))
-    })
+    for {
+      _ <- EitherT(
+        Future
+          .sequence(
+            movement.messages.map(
+              message => isMessageIdUnique(message.id).value
+            )
+          )
+          .map {
+            _.find(_.isLeft).getOrElse(Right(()))
+          }
+      )
+      insertionResult <- mongoRetry(
+        EitherT {
+          collection.insertOne(movement).toFuture().map {
+            result =>
+              if (result.wasAcknowledged()) Right(())
+              else Left(InsertNotAcknowledged(s"Insert failed for movement $movement"))
+          }
+        }.value
+      )
+    } yield insertionResult
 
   def getMovementWithoutMessages(
     eoriNumber: EORINumber,
@@ -548,4 +612,43 @@ class MovementsRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
   }
+
+//  def isMessageIdUnique(messageId: MessageId): Future[Boolean] = {
+//    val filter = elemMatch("messages", BsonDocument.apply("""{ "id": """" + messageId.value + """"}"""))
+//    collection.find(filter).first().toFuture().map {
+//      case null => true
+//      case _    => false
+//    }
+//  }
+
+  def isMessageIdUnique(messageId: MessageId): EitherT[Future, MongoError, Unit] = {
+    val selector = Filters.elemMatch("messages", Filters.eq("id", messageId.value))
+
+    val projection = MovementWithoutMessages.projection
+
+    val aggregates = Seq(
+      Aggregates.filter(selector),
+      Aggregates.sort(Sorts.descending("updated")),
+      Aggregates.project(projection)
+    )
+
+    mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates.toList)) match {
+      case Success(obs) =>
+        obs.headOption().map {
+          case None =>
+            Right((): Unit)
+          case Some(_) =>
+            Left(DuplicateMessageIdError(s"MessageId ${messageId.value} has previously been used and cannot be reused", messageId))
+        }
+      //        obs.headOption().map {
+//          case None =>
+//            Right((): Unit)
+//          case Some(_) =>
+//            Left(ConflictError(s"MessageId ${messageId.value} has previously been used and cannot be reused"))
+//        }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+  }
+
 }
