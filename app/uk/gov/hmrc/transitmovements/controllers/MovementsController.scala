@@ -34,11 +34,10 @@ import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovements.config.Constants.Predicates._
 import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvider
+import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
-import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
-import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
@@ -49,7 +48,6 @@ import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
-import uk.gov.hmrc.transitmovements.services.errors.MongoError.InsertNotAcknowledged
 import uk.gov.hmrc.transitmovements.utils.StreamWithFile
 
 import java.time.Clock
@@ -93,22 +91,6 @@ class MovementsController @Inject() (
       case None => createEmptyMovement(eori, movementType)
     }
 
-//  private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
-//    implicit request => size =>
-//      {
-//        for {
-//          arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
-//          received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-//          movementId = movementFactory.generateId()
-//          message <- messageService
-//            .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, request.body, MessageStatus.Processing)
-//            .asPresentation
-//          movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
-//          _ <- repo.insert(movement).asPresentation
-//        } yield MovementResponse(movement._id, Some(movement.messages.head.id))
-//      }.fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), response => Ok(Json.toJson(response)))
-//  }
-
   def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
     implicit request => size =>
       val result = for {
@@ -127,27 +109,6 @@ class MovementsController @Inject() (
         case Right(response) => Ok(Json.toJson(response))
       }
   }
-
-  //  private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
-//    implicit request => size =>
-//      {
-//        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-//        for {
-//          declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
-//          _               <- repo.restrictDuplicateLRN(declarationData.lrn).asPresentation
-//          received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-//          movementId = movementFactory.generateId()
-//          message <- messageService
-//            .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, request.body, MessageStatus.Processing)
-//            .asPresentation
-//          movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
-//          _ <- repo.insert(movement).asPresentation
-//        } yield MovementResponse(movement._id, Some(movement.messages.head.id))
-//      }.fold[Result](
-//        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-//        response => Ok(Json.toJson(response))
-//      )
-//  }
 
   private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
     implicit request => size =>
@@ -458,5 +419,4 @@ class MovementsController @Inject() (
       message => Ok(Json.toJson(UpdateMovementResponse(message.id)))
     )
   }
-
 }

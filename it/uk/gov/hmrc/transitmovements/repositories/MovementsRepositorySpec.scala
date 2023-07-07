@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.repositories
 
+import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Filters
 import org.mongodb.scala.model.Indexes
 import org.scalacheck.Arbitrary.arbitrary
@@ -615,7 +616,7 @@ class MovementsRepositorySpec
   }
 
   it should "return a list of departure movement responses for the first page" in {
-
+    await(repository.collection.deleteMany(BsonDocument()).toFuture()) // Delete all documents in the collection
     GetMovementsSetup.setupPagination()
     val result =
       await(
@@ -649,7 +650,6 @@ class MovementsRepositorySpec
 
   }
 
-  /*
   it should "return a list of departure movement responses for the second page" in {
     GetMovementsSetup.setupPagination()
 
@@ -898,6 +898,7 @@ class MovementsRepositorySpec
   }
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with partial match MRN" in {
+
     await(repository.insert(GetMovementsSetup.departureGB5).value)
     await(repository.insert(GetMovementsSetup.departureGB6).value)
     val result =
@@ -949,6 +950,7 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with partial match LRN" in {
     await(repository.insert(GetMovementsSetup.departureGB5).value)
     await(repository.insert(GetMovementsSetup.departureGB6).value)
+
     val result =
       await(
         repository
@@ -1162,7 +1164,7 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(Vector.empty[MovementWithoutMessages])
   }
-   */
+
   object GetMovementsSetup {
 
     val eoriGB       = arbitrary[EORINumber].sample.value
@@ -1193,7 +1195,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         created = instant,
         updated = instant,
-        messages = Vector(createUniqueMessage(1000)),
+        messages = Vector(createUniqueMessage(2000)),
         localReferenceNumber = Some(lrn)
       )
 
@@ -1204,7 +1206,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Arrival,
         created = instant,
         updated = instant,
-        messages = Vector(message)
+        messages = Vector(createUniqueMessage(1000))
       )
 
     val mrnGen = arbitrary[MovementReferenceNumber]
@@ -1234,7 +1236,7 @@ class MovementsRepositorySpec
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample,
         localReferenceNumber = Some(lrn),
-        messages = Vector(createUniqueMessage(20000))
+        messages = Vector(createUniqueMessage(4000))
       )
 
     val departureGB3 =
@@ -1245,7 +1247,7 @@ class MovementsRepositorySpec
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample,
         localReferenceNumber = Some(lrn),
-        messages = Vector(createUniqueMessage(30000))
+        messages = Vector(createUniqueMessage(6000))
       )
 
     val departureGB4 =
@@ -1255,7 +1257,8 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample,
-        localReferenceNumber = Some(lrn)
+        localReferenceNumber = Some(lrn),
+        messages = Vector(createUniqueMessage(8000))
       )
 
     val departureGB5 =
@@ -1265,7 +1268,8 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5")),
-        localReferenceNumber = Some(LocalReferenceNumber("3CnsTh79I7hyOy6"))
+        localReferenceNumber = Some(LocalReferenceNumber("3CnsTh79I7hyOy6")),
+        messages = Vector(createUniqueMessage(10000))
       )
 
     val departureGB6 =
@@ -1275,7 +1279,8 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM3")),
-        localReferenceNumber = Some(LocalReferenceNumber("3CnsTh79I7hyOy7"))
+        localReferenceNumber = Some(LocalReferenceNumber("3CnsTh79I7hyOy7")),
+        messages = Vector(createUniqueMessage(12000))
       )
 
     val departureGB7 =
@@ -1285,7 +1290,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.minusMinutes(7),
         movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM3")),
-        messages = Vector(createUniqueMessage(70000))
+        messages = Vector(createUniqueMessage(14000))
       )
 
     val arrivalGB2 =
@@ -1295,7 +1300,8 @@ class MovementsRepositorySpec
         movementType = MovementType.Arrival,
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample,
-        localReferenceNumber = None
+        localReferenceNumber = None,
+        messages = Vector(createUniqueMessage(3000))
       )
 
     val arrivalGB3 =
@@ -1305,7 +1311,8 @@ class MovementsRepositorySpec
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample,
-        localReferenceNumber = None
+        localReferenceNumber = None,
+        messages = Vector(createUniqueMessage(5000))
       )
 
     val arrivalGB4 =
@@ -1315,7 +1322,8 @@ class MovementsRepositorySpec
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
         movementReferenceNumber = mrnGen.sample,
-        localReferenceNumber = None
+        localReferenceNumber = None,
+        messages = Vector(createUniqueMessage(7000))
       )
 
     val arrivalGB5 =
@@ -1324,7 +1332,8 @@ class MovementsRepositorySpec
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
-        movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5"))
+        movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5")),
+        messages = Vector(createUniqueMessage(9000))
       )
 
     val arrivalGB6 =
@@ -1346,7 +1355,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(10),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(100000))
+        messages = Vector(createUniqueMessage(16000))
       )
 
     val departureGB11 =
@@ -1357,7 +1366,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(11),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(110000))
+        messages = Vector(createUniqueMessage(18000))
       )
 
     val departureGB12 =
@@ -1368,7 +1377,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(12),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(120000))
+        messages = Vector(createUniqueMessage(20000))
       )
 
     val departureGB13 =
@@ -1379,7 +1388,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(13),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(130000))
+        messages = Vector(createUniqueMessage(22000))
       )
 
     val departureGB14 =
@@ -1390,7 +1399,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(14),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(140000))
+        messages = Vector(createUniqueMessage(24000))
       )
 
     val departureGB15 =
@@ -1401,7 +1410,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(15),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(150000))
+        messages = Vector(createUniqueMessage(26000))
       )
 
     val departureGB16 =
@@ -1412,7 +1421,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(16),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(160000))
+        messages = Vector(createUniqueMessage(28000))
       )
 
     val departureGB17 =
@@ -1423,7 +1432,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(17),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(170000))
+        messages = Vector(createUniqueMessage(30000))
       )
 
     val departureGB18 =
@@ -1434,7 +1443,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(18),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(180000))
+        messages = Vector(createUniqueMessage(32000))
       )
 
     val departureGB19 =
@@ -1445,7 +1454,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(19),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(190000))
+        messages = Vector(createUniqueMessage(34000))
       )
 
     val departureGB20 =
@@ -1456,7 +1465,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(20),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(200000))
+        messages = Vector(createUniqueMessage(360000))
       )
 
     val departureGB21 =
@@ -1467,7 +1476,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(21),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(210000))
+        messages = Vector(createUniqueMessage(38000))
       )
 
     val departureGB22 =
@@ -1478,7 +1487,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(22),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(240000))
+        messages = Vector(createUniqueMessage(40000))
       )
 
     val departureGB23 =
@@ -1489,7 +1498,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(23),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(230000))
+        messages = Vector(createUniqueMessage(42000))
       )
 
     val departureGB24 =
@@ -1500,7 +1509,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(24),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(240000))
+        messages = Vector(createUniqueMessage(44000))
       )
 
     val departureGB25 =
@@ -1511,7 +1520,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(25),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(250000))
+        messages = Vector(createUniqueMessage(46000))
       )
 
     val departureGB26 =
@@ -1522,7 +1531,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(26),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(260000))
+        messages = Vector(createUniqueMessage(48000))
       )
 
     val departureGB27 =
@@ -1533,7 +1542,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(27),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(270000))
+        messages = Vector(createUniqueMessage(50000))
       )
 
     val departureGB28 =
@@ -1544,7 +1553,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(28),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(280000))
+        messages = Vector(createUniqueMessage(52000))
       )
 
     val departureGB29 =
@@ -1554,7 +1563,8 @@ class MovementsRepositorySpec
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(29),
-        movementReferenceNumber = mrnGen.sample
+        movementReferenceNumber = mrnGen.sample,
+        messages = Vector(createUniqueMessage(54000))
       )
 
     val departureGB30 =
@@ -1565,7 +1575,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(30),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(300000))
+        messages = Vector(createUniqueMessage(56000))
       )
 
     val departureGB31 =
@@ -1576,7 +1586,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         updated = instant.plusMinutes(31),
         movementReferenceNumber = mrnGen.sample,
-        messages = Vector(createUniqueMessage(310000))
+        messages = Vector(createUniqueMessage(58000))
       )
 
     def setup() = {
@@ -1638,7 +1648,7 @@ class MovementsRepositorySpec
     }
 
   }
-  /*
+
   "updateMessages" should "if not MrnAllocated, add a message to the matching movement and set updated parameter to when the latest message was received" in {
     val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None)
 
@@ -2173,5 +2183,5 @@ class MovementsRepositorySpec
     movement.movementReferenceNumber shouldEqual None
     movement.localReferenceNumber shouldEqual None
   }
-   */
+
 }
