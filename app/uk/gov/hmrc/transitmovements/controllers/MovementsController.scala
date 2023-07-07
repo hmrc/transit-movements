@@ -123,9 +123,8 @@ class MovementsController @Inject() (
       } yield MovementResponse(movement._id, Some(movement.messages.head.id))
 
       result.value.map {
-        case Left(e: InsertNotAcknowledged) => Status(ErrorCode.InternalServerError.statusCode)(Json.toJson(ErrorCode.InternalServerError: ErrorCode))
-        case Left(otherError)               => BadRequest(Json.toJson(otherError.toString)) // adjust as per your error handling needs
-        case Right(response)                => Ok(Json.toJson(response))
+        case Left(baseError) => Status(baseError.code.statusCode)(Json.toJson(baseError))
+        case Right(response) => Ok(Json.toJson(response))
       }
   }
 
@@ -167,48 +166,30 @@ class MovementsController @Inject() (
       } yield MovementResponse(movement._id, Some(movement.messages.head.id))
 
       result.value.map {
-        case Left(e: InsertNotAcknowledged) => Status(ErrorCode.InternalServerError.statusCode)(Json.toJson(ErrorCode.InternalServerError: ErrorCode))
-        case Left(otherError)               => BadRequest(Json.toJson(otherError.toString)) // adjust as per your error handling needs
-        case Right(response)                => Ok(Json.toJson(response))
+        case Left(baseError) => Status(baseError.code.statusCode)(Json.toJson(baseError))
+        case Right(response) => Ok(Json.toJson(response))
       }
   }
 
-  //  private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = internalAuth(WRITE_MOVEMENT).async(parse.anyContent) {
-//    _ =>
-//      val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-//      val messageType = movementType match {
-//        case MovementType.Arrival   => MessageType.ArrivalNotification
-//        case MovementType.Departure => MessageType.DeclarationData
-//      }
-//
-//      val message  = messageService.createEmptyMessage(Some(messageType), received)
-//      val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received)
-//
-//      (for {
-//        _ <- repo.insert(movement).asPresentation
-//      } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
-//        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-//        response => Ok(Json.toJson(response))
-//      )
-//  }
+  private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] =
+    internalAuth(WRITE_MOVEMENT).async(parse.anyContent) {
+      _ =>
+        val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+        val messageType = movementType match {
+          case MovementType.Arrival   => MessageType.ArrivalNotification
+          case MovementType.Departure => MessageType.DeclarationData
+        }
 
-  private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = internalAuth(WRITE_MOVEMENT).async(parse.anyContent) {
-    _ =>
-      val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-      val messageType = movementType match {
-        case MovementType.Arrival   => MessageType.ArrivalNotification
-        case MovementType.Departure => MessageType.DeclarationData
-      }
+        val message  = messageService.createEmptyMessage(Some(messageType), received)
+        val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received)
 
-      val message  = messageService.createEmptyMessage(Some(messageType), received)
-      val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received)
-
-      repo.insert(movement).value.map {
-        case Left(e: InsertNotAcknowledged) => Status(ErrorCode.InternalServerError.statusCode)(Json.toJson(ErrorCode.InternalServerError: ErrorCode))
-        case Left(otherError)               => BadRequest(Json.toJson(otherError.toString)) // adjust as per your error handling needs
-        case Right(_)                       => Ok(Json.toJson(MovementResponse(movement._id, Some(movement.messages.head.id))))
-      }
-  }
+        (for {
+          _ <- repo.insert(movement).asPresentation
+        } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
+          baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+          response => Ok(Json.toJson(response))
+        )
+    }
 
   def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
     contentTypeRoute {

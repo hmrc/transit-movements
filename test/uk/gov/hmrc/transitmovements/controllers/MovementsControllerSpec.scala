@@ -44,6 +44,7 @@ import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
+import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Request
@@ -313,9 +314,14 @@ class MovementsControllerSpec
         val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Departure)(request)
 
+        val responseBodyAsJson: JsValue = contentAsJson(result)
+
+        println(s"OKUYE1 : " + responseBodyAsJson)
+
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code"    -> "BAD_REQUEST",
+          "code" -> "BAD_REQUEST",
+//          "message" -> Json.toJson(ParseError.NoElementFound("messageSender").toString)
           "message" -> "Element messageSender not found"
         )
 
@@ -671,28 +677,24 @@ class MovementsControllerSpec
       "contains message to indicate element not found" in {
 
         val elementNotFoundXml: NodeSeq =
-          <CC007C></CC007C>
+          <CC015C></CC015C>
+
+        val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
+        val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
+
+        val triggerId: MessageId = arbitraryMessageId.arbitrary.sample.get
 
         when(mockMessageFactory.generateId()).thenReturn(triggerId)
         when(mockMovementFactory.generateId()).thenReturn(movementId)
-
-        when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
+        when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
           .thenReturn(EitherT.leftT(ParseError.NoElementFound("messageSender")))
 
         when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
-
-        //        val request =
-        //          fakeRequest(POST, Source.single(ByteString(elementNotFoundXml.mkString)), Some(MessageType.ArrivalNotification.code))
-        val request = fakeRequest(
-          POST,
-          Source.single(ByteString(elementNotFoundXml.mkString)),
-          movementId,
-          Some(triggerId),
-          Some(MessageType.ArrivalNotification.code)
-        )
+        val request =
+          fakeRequest(POST, Source.single(ByteString(elementNotFoundXml.mkString)), movementId, Some(triggerId), Some(MessageType.DeclarationData.code))
 
         val result: Future[Result] =
-          controller.createMovement(eoriNumber, MovementType.Arrival)(request)
+          controller.createMovement(eoriNumber, MovementType.Departure)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -705,6 +707,44 @@ class MovementsControllerSpec
         )(any[ExecutionContext])
         verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
+
+//      "contains message to indicate element not found" in {
+//
+//        val elementNotFoundXml: NodeSeq =
+//          <CC007C></CC007C>
+//
+//        when(mockMessageFactory.generateId()).thenReturn(triggerId)
+//        when(mockMovementFactory.generateId()).thenReturn(movementId)
+//
+//        when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
+//          .thenReturn(EitherT.leftT(ParseError.NoElementFound("messageSender")))
+//
+//        when(mockTemporaryFileCreator.create()).thenReturn(SingletonTemporaryFileCreator.create())
+//
+//        //        val request =
+//        //          fakeRequest(POST, Source.single(ByteString(elementNotFoundXml.mkString)), Some(MessageType.ArrivalNotification.code))
+//        val request = fakeRequest(
+//          POST,
+//          Source.single(ByteString(elementNotFoundXml.mkString)),
+//          movementId,
+//          Some(triggerId),
+//          Some(MessageType.ArrivalNotification.code)
+//        )
+//
+//        val result: Future[Result] =
+//          controller.createMovement(eoriNumber, MovementType.Arrival)(request)
+//
+//        status(result) mustBe BAD_REQUEST
+//        contentAsJson(result) mustBe Json.obj(
+//          "code"    -> "BAD_REQUEST",
+//          "message" -> "Element messageSender not found"
+//        )
+//
+//        verify(mockInternalAuthActionProvider, times(1)).apply(
+//          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+//        )(any[ExecutionContext])
+//        verifyNoMoreInteractions(mockInternalAuthActionProvider)
+//      }
 
       "contains message to indicate too many elements found" in {
 
@@ -953,7 +993,9 @@ class MovementsControllerSpec
 
       val result: Future[Result] =
         controller.createMovement(eoriNumber, emptyMovement.movementType)(streamRequest)
+      val responseBodyAsJson: JsValue = contentAsJson(result)
 
+      println(s"Ola  : " + responseBodyAsJson)
       status(result) mustBe INTERNAL_SERVER_ERROR
       contentAsJson(result) mustBe Json.obj(
         "code"    -> "INTERNAL_SERVER_ERROR",
@@ -1747,6 +1789,10 @@ class MovementsControllerSpec
 
         val result: Future[Result] =
           controller.updateMovement(movementId, Some(triggerId))(request)
+
+//        val responseBodyAsJson: JsValue = contentAsJson(result)
+
+//        println(s"KUYE :  " + responseBodyAsJson)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(

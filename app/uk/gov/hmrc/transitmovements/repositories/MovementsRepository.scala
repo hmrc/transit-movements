@@ -127,6 +127,8 @@ trait MovementsRepository {
 
   def isMessageIdUnique(messageId: MessageId): EitherT[Future, MongoError, Unit]
 
+  def verifyUniqueMessageIds(messageIds: Seq[MessageId]): EitherT[Future, MongoError, Unit]
+
 }
 
 object MovementsRepositoryImpl {
@@ -230,19 +232,87 @@ class MovementsRepositoryImpl @Inject() (
 //      )
 //    } yield insertionResult
 
+//  def insert(movement: Movement): EitherT[Future, MongoError, Unit] =
+//    for {
+//      _ <- EitherT(
+//        Future
+//          .sequence(
+//            movement.messages.map(
+//              message => isMessageIdUnique(message.id).value
+//            )
+//          )
+//          .map {
+//            _.find(_.isLeft).getOrElse(Right(()))
+//          }
+//      )
+//      insertionResult <- mongoRetry(
+//        EitherT {
+//          collection.insertOne(movement).toFuture().map {
+//            result =>
+//              if (result.wasAcknowledged()) Right(())
+//              else Left(InsertNotAcknowledged(s"Insert failed for movement $movement"))
+//          }
+//        }.value
+//      )
+//    } yield insertionResult
+
+//  def insert(movement: Movement): EitherT[Future, MongoError, Unit] =
+//    for {
+//      _ <-
+//        if (movement.messages.isEmpty) EitherT.rightT[Future, MongoError](())
+//        else verifyUniqueMessageIds(movement.messages.map(_.id))
+//      println(s"Inserting movement: $movement")
+//      insertionResult <- mongoRetry(
+//        EitherT {
+//          collection.insertOne(movement).toFuture().map {
+//            result =>
+//              if (result.wasAcknowledged()) Right(())
+//              else {
+//                val error = InsertNotAcknowledged(s"Insert failed for movement $movement")
+//                println(error) // add logging here
+//                Left(error)
+//              }
+//          }
+//        }.value
+//
+//        //      insertionResult <- mongoRetry(
+////        EitherT {
+////          collection.insertOne(movement).toFuture().map {
+////            result =>
+////              if (result.wasAcknowledged()) Right(())
+////              else Left(InsertNotAcknowledged(s"Insert failed for movement $movement"))
+////          }
+////        }.value
+//      )
+//    } yield insertionResult
+
+//  import org.slf4j.LoggerFactory
+
+//  val logger = LoggerFactory.getLogger(this.getClass)
+
+//  def insert(movement: Movement): EitherT[Future, MongoError, Unit] = {
+//    println(s"Starting insert method with movement: $movement") // added
+//    for {
+//      _ <-
+//        if (movement.messages.isEmpty) EitherT.rightT[Future, MongoError](())
+//        else verifyUniqueMessageIds(movement.messages.map(_.id))
+//      insertionResult <- mongoRetry(
+//        EitherT {
+//          collection.insertOne(movement).toFuture().map {
+//            result =>
+//              if (result.wasAcknowledged()) Right(())
+//              else Left(InsertNotAcknowledged(s"Insert failed for movement $movement"))
+//          }
+//        }.value
+//      )
+//    } yield insertionResult
+//  }
+
   def insert(movement: Movement): EitherT[Future, MongoError, Unit] =
     for {
-      _ <- EitherT(
-        Future
-          .sequence(
-            movement.messages.map(
-              message => isMessageIdUnique(message.id).value
-            )
-          )
-          .map {
-            _.find(_.isLeft).getOrElse(Right(()))
-          }
-      )
+      _ <-
+        if (movement.messages.isEmpty) EitherT.rightT[Future, MongoError](())
+        else verifyUniqueMessageIds(movement.messages.map(_.id))
       insertionResult <- mongoRetry(
         EitherT {
           collection.insertOne(movement).toFuture().map {
@@ -253,6 +323,24 @@ class MovementsRepositoryImpl @Inject() (
         }.value
       )
     } yield insertionResult
+
+  //  def verifyUniqueMessageIds(messageIds: Seq[MessageId]): EitherT[Future, MongoError, Unit] = {
+//    println(s"Starting verifyUniqueMessageIds method with messageIds: $messageIds") // added
+//    println(s"Verifying unique IDs for: $messageIds")
+//    val uniqueMessageIds = messageIds.distinct
+//    if (uniqueMessageIds.isEmpty) EitherT.rightT[Future, MongoError](())
+//    else {
+//      val uniqueMessageIdFutures = uniqueMessageIds.map(
+//        messageId => isMessageIdUnique(messageId).value
+//      )
+//      val uniqueMessageIdResults = Future.sequence(uniqueMessageIdFutures)
+//      val duplicateResult        = uniqueMessageIdResults.map(_.find(_.isLeft))
+//      EitherT(duplicateResult.map {
+//        case Some(duplicate) => duplicate
+//        case None            => Right(())
+//      })
+//    }
+//  }
 
   def getMovementWithoutMessages(
     eoriNumber: EORINumber,
@@ -613,14 +701,6 @@ class MovementsRepositoryImpl @Inject() (
     })
   }
 
-//  def isMessageIdUnique(messageId: MessageId): Future[Boolean] = {
-//    val filter = elemMatch("messages", BsonDocument.apply("""{ "id": """" + messageId.value + """"}"""))
-//    collection.find(filter).first().toFuture().map {
-//      case null => true
-//      case _    => false
-//    }
-//  }
-
   def isMessageIdUnique(messageId: MessageId): EitherT[Future, MongoError, Unit] = {
     val selector = Filters.elemMatch("messages", Filters.eq("id", messageId.value))
 
@@ -640,15 +720,27 @@ class MovementsRepositoryImpl @Inject() (
           case Some(_) =>
             Left(DuplicateMessageIdError(s"MessageId ${messageId.value} has previously been used and cannot be reused", messageId))
         }
-      //        obs.headOption().map {
-//          case None =>
-//            Right((): Unit)
-//          case Some(_) =>
-//            Left(ConflictError(s"MessageId ${messageId.value} has previously been used and cannot be reused"))
-//        }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
+  }
+
+  def verifyUniqueMessageIds(messageIds: Seq[MessageId]): EitherT[Future, MongoError, Unit] = {
+//    println(s"Starting verifyUniqueMessageIds method with messageIds: $messageIds") // added
+//    println(s"Verifying unique IDs for: $messageIds")
+    val uniqueMessageIds = messageIds.distinct
+    if (uniqueMessageIds.isEmpty) EitherT.rightT[Future, MongoError](())
+    else {
+      val uniqueMessageIdFutures = uniqueMessageIds.map(
+        messageId => isMessageIdUnique(messageId).value
+      )
+      val uniqueMessageIdResults = Future.sequence(uniqueMessageIdFutures)
+      val duplicateResult        = uniqueMessageIdResults.map(_.find(_.isLeft))
+      EitherT(duplicateResult.map {
+        case Some(duplicate) => duplicate
+        case None            => Right(())
+      })
+    }
   }
 
 }
