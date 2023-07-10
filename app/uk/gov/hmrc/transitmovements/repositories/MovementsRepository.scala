@@ -170,9 +170,10 @@ class MovementsRepositoryImpl @Inject() (
 
   def insert(movement: Movement): EitherT[Future, MongoError, Unit] =
     for {
-      _ <-
+      _ <- {
         if (movement.messages.isEmpty) EitherT.rightT[Future, MongoError](())
         else verifyUniqueMessageIds(movement.messages.map(_.id))
+      }
       insertionResult <- mongoRetry(
         EitherT {
           collection.insertOne(movement).toFuture().map {
@@ -544,8 +545,7 @@ class MovementsRepositoryImpl @Inject() (
   }
 
   def isMessageIdUnique(messageId: MessageId): EitherT[Future, MongoError, Unit] = {
-    val selector = Filters.elemMatch("messages", Filters.eq("id", messageId.value))
-
+    val selector   = Filters.elemMatch("messages", Filters.eq("id", messageId.value))
     val projection = MovementWithoutMessages.projection
 
     val aggregates = Seq(
@@ -577,8 +577,10 @@ class MovementsRepositoryImpl @Inject() (
       val uniqueMessageIdResults = Future.sequence(uniqueMessageIdFutures)
       val duplicateResult        = uniqueMessageIdResults.map(_.find(_.isLeft))
       EitherT(duplicateResult.map {
-        case Some(duplicate) => duplicate
-        case None            => Right(())
+        case Some(duplicate) =>
+          duplicate
+        case None =>
+          Right(())
       })
     }
   }

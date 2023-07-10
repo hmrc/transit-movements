@@ -201,6 +201,34 @@ class MovementsRepositorySpec
     result.toOption.isEmpty should be(true)
   }
 
+  "insert" should "insert a movement with messages when messages have unique IDs and database operation succeeds" in {
+    val dateTime             = instant
+    val messages             = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
+    val movementWithMessages = arbitrary[Movement].sample.value.copy(messages = messages)
+
+    val result = await(repository.insert(movementWithMessages).value)
+    result.isRight shouldBe true
+  }
+
+  it should "fail to insert a movement when messages do not have unique IDs" in {
+    // Setup
+    val messageId = "1"
+
+    val existingMovement = arbitrary[Movement].sample.value.copy(
+      messages = Vector(GetMovementsSetup.createUniqueMessage(1, messageId)) // Create message with specific ID
+    )
+
+    await(repository.insert(existingMovement).value)
+
+    // Now try to insert a new movement with a duplicate message ID
+    val newMovement = arbitrary[Movement].sample.value.copy(
+      messages = Vector(GetMovementsSetup.createUniqueMessage(1, messageId)) // Create another message with same ID
+    )
+
+    val result = await(repository.insert(newMovement).value) // Attempt to insert should fail
+    result.isLeft shouldBe true
+  }
+
   "getMessages" should "return message responses if there are messages" in {
 
     val dateTime = instant // mongo doesn't (generally) like arbitrary datetime values
@@ -1175,9 +1203,10 @@ class MovementsRepositorySpec
 
     val messageIdCounter = new AtomicLong(0)
 
-    def createUniqueMessage(startingPoint: Int): Message =
+    def createUniqueMessage(startingPoint: Int, customMessageId: String = ""): Message = {
+      val messageId = if (customMessageId.nonEmpty) customMessageId else (startingPoint + messageIdCounter.getAndIncrement()).toString
       Message(
-        id = MessageId((startingPoint + messageIdCounter.getAndIncrement()).toString),
+        id = MessageId(messageId),
         received = OffsetDateTime.now(),
         generated = Some(OffsetDateTime.now()),
         messageType = Some(MessageType.DeclarationData),
@@ -1187,6 +1216,7 @@ class MovementsRepositorySpec
         size = Some(1000L),
         status = Some(MessageStatus.Pending)
       )
+    }
 
     val departureGB1 =
       arbitrary[Movement].sample.value.copy(
