@@ -127,7 +127,7 @@ trait MovementsRepository {
 
   def isMessageIdUnique(messageId: MessageId): EitherT[Future, MongoError, Unit]
 
-  def verifyUniqueMessageIds(messageIds: Seq[MessageId]): EitherT[Future, MongoError, Unit]
+  def verifyUniqueMessageIdsWithinMovement(movement: Movement): Either[MongoError, Unit]
 
 }
 
@@ -170,9 +170,9 @@ class MovementsRepositoryImpl @Inject() (
 
   def insert(movement: Movement): EitherT[Future, MongoError, Unit] =
     for {
-      _ <- {
-        if (movement.messages.isEmpty) EitherT.rightT[Future, MongoError](())
-        else verifyUniqueMessageIds(movement.messages.map(_.id))
+      _ <- verifyUniqueMessageIdsWithinMovement(movement) match {
+        case Left(mongoError) => EitherT.leftT[Future, Unit](mongoError)
+        case Right(_)         => EitherT.rightT[Future, MongoError](())
       }
       insertionResult <- mongoRetry(
         EitherT {
@@ -567,21 +567,14 @@ class MovementsRepositoryImpl @Inject() (
     })
   }
 
-  def verifyUniqueMessageIds(messageIds: Seq[MessageId]): EitherT[Future, MongoError, Unit] = {
-    val uniqueMessageIds = messageIds.distinct
-    if (uniqueMessageIds.isEmpty) EitherT.rightT[Future, MongoError](())
-    else {
-      val uniqueMessageIdFutures = uniqueMessageIds.map(
-        messageId => isMessageIdUnique(messageId).value
-      )
-      val uniqueMessageIdResults = Future.sequence(uniqueMessageIdFutures)
-      val duplicateResult        = uniqueMessageIdResults.map(_.find(_.isLeft))
-      EitherT(duplicateResult.map {
-        case Some(duplicate) =>
-          duplicate
-        case None =>
-          Right(())
-      })
+  def verifyUniqueMessageIdsWithinMovement(movement: Movement): Either[MongoError, Unit] = {
+    val messageIds = movement.messages.map(_.id)
+    if (messageIds.distinct.length != messageIds.length) {
+      // Duplicate message IDs found within the same movement
+      Left(MongoError.DuplicateMessageIdsWithinSameMovement)
+    } else {
+      // All message IDs are unique within the same movement
+      Right(())
     }
   }
 

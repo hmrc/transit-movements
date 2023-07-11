@@ -91,45 +91,41 @@ class MovementsController @Inject() (
       case None => createEmptyMovement(eori, movementType)
     }
 
-  def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
+  private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
     implicit request => size =>
-      val result = for {
-        arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
-        received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-        movementId = movementFactory.generateId()
-        message <- messageService
-          .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, request.body, MessageStatus.Processing)
-          .asPresentation
-        movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
-        _ <- repo.insert(movement).asPresentation
-      } yield MovementResponse(movement._id, Some(movement.messages.head.id))
-
-      result.value.map {
-        case Left(baseError) => Status(baseError.code.statusCode)(Json.toJson(baseError))
-        case Right(response) => Ok(Json.toJson(response))
-      }
+      {
+        for {
+          arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
+          received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+          movementId = movementFactory.generateId()
+          message <- messageService
+            .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, request.body, MessageStatus.Processing)
+            .asPresentation
+          movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
+          _ <- repo.insert(movement).asPresentation
+        } yield MovementResponse(movement._id, Some(movement.messages.head.id))
+      }.fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), response => Ok(Json.toJson(response)))
   }
 
   private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
     implicit request => size =>
-      implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-
-      val result = for {
-        declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
-        _               <- repo.restrictDuplicateLRN(declarationData.lrn).asPresentation
-        received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-        movementId = movementFactory.generateId()
-        message <- messageService
-          .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, request.body, MessageStatus.Processing)
-          .asPresentation
-        movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
-        _ <- repo.insert(movement).asPresentation
-      } yield MovementResponse(movement._id, Some(movement.messages.head.id))
-
-      result.value.map {
-        case Left(baseError) => Status(baseError.code.statusCode)(Json.toJson(baseError))
-        case Right(response) => Ok(Json.toJson(response))
-      }
+      {
+        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+        for {
+          declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
+          _               <- repo.restrictDuplicateLRN(declarationData.lrn).asPresentation
+          received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+          movementId = movementFactory.generateId()
+          message <- messageService
+            .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, request.body, MessageStatus.Processing)
+            .asPresentation
+          movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
+          _ <- repo.insert(movement).asPresentation
+        } yield MovementResponse(movement._id, Some(movement.messages.head.id))
+      }.fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        response => Ok(Json.toJson(response))
+      )
   }
 
   private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] =

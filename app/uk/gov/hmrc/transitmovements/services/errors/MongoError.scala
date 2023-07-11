@@ -28,6 +28,6 @@ object MongoError {
   case class DocumentNotFound(message: String)                              extends MongoError
   case class ConflictError(message: String, lrn: LocalReferenceNumber)      extends MongoError
   case class DuplicateMessageIdError(message: String, messageId: MessageId) extends MongoError
-  case class InsertMovementError(message: String)                           extends MongoError
+  case object DuplicateMessageIdsWithinSameMovement                         extends MongoError
 
 }

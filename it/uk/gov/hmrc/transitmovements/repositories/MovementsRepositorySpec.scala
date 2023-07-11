@@ -94,17 +94,22 @@ class MovementsRepositorySpec
   }
 
   "insert" should "add the given movement to the database" in {
-
-    val departure = arbitrary[Movement].sample.value.copy(_id = MovementId("2"))
-    await(
-      repository.insert(departure).value
+    val departure = arbitrary[Movement].sample.value.copy(
+      _id = MovementId("2"),
+      messages = Vector(
+        GetMovementsSetup.createUniqueMessage(1, "MessageId1"),
+        GetMovementsSetup.createUniqueMessage(2, "MessageId2")
+      )
     )
-
-    val firstItem = await {
-      repository.collection.find(Filters.eq("_id", departure._id.value)).first().toFuture()
+    await(repository.insert(departure).value) match {
+      case Right(_) =>
+        val firstItem = await {
+          repository.collection.find(Filters.eq("_id", departure._id.value)).first().toFuture()
+        }
+        firstItem._id.value should be(departure._id.value)
+      case Left(error) =>
+        fail(s"Insert operation failed with error: $error")
     }
-
-    firstItem._id.value should be(departure._id.value)
   }
 
   "insert" should "add an empty movement to the database" in {
@@ -130,12 +135,19 @@ class MovementsRepositorySpec
   }
 
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists" in {
-    val movement = arbitrary[Movement].sample.value
+    val movement = arbitrary[Movement].sample.value.copy(
+      messages = Vector(
+        GetMovementsSetup.createUniqueMessage(1, "MessageId1"),
+        GetMovementsSetup.createUniqueMessage(2, "MessageId2")
+      )
+    )
 
-    await(repository.insert(movement).value)
-
-    val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
-    result.toOption.get should be(MovementWithoutMessages.fromMovement(movement))
+    await(repository.insert(movement).value) match {
+      case Right(_) =>
+        val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
+        result shouldBe Right(MovementWithoutMessages.fromMovement(movement))
+      case Left(error) => fail(s"Insert failed with error: $error")
+    }
   }
 
   "getMovementWithoutMessages" should "return none if the movement doesn't exist" in {
@@ -210,22 +222,22 @@ class MovementsRepositorySpec
     result.isRight shouldBe true
   }
 
-  it should "fail to insert a movement when messages do not have unique IDs" in {
+  it should "fail to insert a movement when it contains duplicate message IDs" in {
     // Setup
     val messageId = "1"
 
-    val existingMovement = arbitrary[Movement].sample.value.copy(
-      messages = Vector(GetMovementsSetup.createUniqueMessage(1, messageId)) // Create message with specific ID
-    )
+    // Create a message with specific ID
+    val messageWithSpecificId = GetMovementsSetup.createUniqueMessage(1, messageId)
 
-    await(repository.insert(existingMovement).value)
-
-    // Now try to insert a new movement with a duplicate message ID
+    // Create a movement with duplicate message IDs
     val newMovement = arbitrary[Movement].sample.value.copy(
-      messages = Vector(GetMovementsSetup.createUniqueMessage(1, messageId)) // Create another message with same ID
+      messages = Vector(messageWithSpecificId, messageWithSpecificId) // Duplicate messages
     )
 
-    val result = await(repository.insert(newMovement).value) // Attempt to insert should fail
+    // Try to insert the movement
+    val result = await(repository.insert(newMovement).value)
+
+    // We expect an error because the movement contains duplicate message IDs
     result.isLeft shouldBe true
   }
 
@@ -1049,8 +1061,14 @@ class MovementsRepositorySpec
   it should "return a list of an arrival movement responses for the supplied EORI if there are movements that were updated since the given time" in {
     val dateTime = instant
     GetMovementsSetup.setup()
+
     await(repository.insert(GetMovementsSetup.arrivalGB3).value)
-    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), None, None, localReferenceNumber = None).value)
+
+    val result = await(
+      repository
+        .getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), None, None, localReferenceNumber = None)
+        .value
+    )
 
     val paginationMovementSummary = result.toOption.get
 
@@ -1138,9 +1156,13 @@ class MovementsRepositorySpec
     )
   }
 
-  it should "return a list of arrival movement responses for the supplied EORI if there are movements that matched with partial match MRN" in {
-    await(repository.insert(GetMovementsSetup.arrivalGB5).value)
-    await(repository.insert(GetMovementsSetup.arrivalGB6).value)
+  "getMovements" should "return a list of arrival movement responses for the supplied EORI if there are movements that matched with partial match MRN" in {
+    await(repository.insert(GetMovementsSetup.arrivalGB5).value).map(
+      result => println(s"Insert 1 result: $result")
+    )
+//    await(repository.insert(GetMovementsSetup.arrivalGB5).value)
+    val insertResult2 = await(repository.insert(GetMovementsSetup.arrivalGB6).value)
+
     val result =
       await(
         repository
@@ -1372,7 +1394,8 @@ class MovementsRepositorySpec
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
         updated = instant.minusMinutes(3),
-        movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM6"))
+        movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM6")),
+        messages = Vector(createUniqueMessage(9001)) // ensure unique MessageId
       )
 
     // For Pagination
@@ -1644,13 +1667,13 @@ class MovementsRepositorySpec
 
     def setupMessagesWithOutBody(dateTime: OffsetDateTime) =
       Vector(
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None, body = None)
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None, body = None, id = MessageId(s"msg1")),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None, body = None, id = MessageId(s"msg2")),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None, body = None, id = MessageId(s"msg3")),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None, body = None, id = MessageId(s"msg4")),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None, body = None, id = MessageId(s"msg5")),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None, body = None, id = MessageId(s"msg6")),
+        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None, body = None, id = MessageId(s"msg7"))
       )
 
     def setupPagination() = {
