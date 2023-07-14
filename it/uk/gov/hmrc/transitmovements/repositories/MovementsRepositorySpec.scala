@@ -87,7 +87,7 @@ class MovementsRepositorySpec
       .map(
         item => item.getKeys
       )
-      .contains(Indexes.ascending("localReferenceNumber")) shouldBe true
+      .contains(Indexes.ascending("localReferenceNumber", "messageSender")) shouldBe true
   }
 
   "insert" should "add the given movement to the database" in {
@@ -1920,17 +1920,18 @@ class MovementsRepositorySpec
   ) {
     (movementId, eori, mrn) =>
       val result = await(
-        repository.updateMovement(movementId, Some(eori), Some(mrn), None, instant).value
+        repository.updateMovement(movementId, Some(eori), Some(mrn), None, None, instant).value
       )
 
       result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
   }
 
-  "checkDuplicate" should "check the duplicate LRN" in {
+  "checkDuplicate" should "check the duplicate LRN + messageSender combination" in {
 
     val eoriXI       = arbitrary[EORINumber].sample.value
     val movementEORI = arbitrary[EORINumber].sample.value
     val lrn          = arbitrary[LocalReferenceNumber].sample
+    val sender       = arbitrary[MessageSender].sample
     val mrnGen       = arbitrary[MovementReferenceNumber]
 
     val message1 =
@@ -1943,13 +1944,14 @@ class MovementsRepositorySpec
         updated = instant,
         movementReferenceNumber = mrnGen.sample,
         localReferenceNumber = lrn,
+        messageSender = sender,
         messages = Vector(message1)
       )
 
     await(repository.insert(departureXi2).value)
 
     val alreadyExistResult = await(
-      repository.restrictDuplicateLRN(lrn.value).value
+      repository.restrictDuplicateLRN(lrn.value, sender.value).value
     )
 
     alreadyExistResult should be(
@@ -1958,11 +1960,23 @@ class MovementsRepositorySpec
 
     val notExistLRN = LocalReferenceNumber("1234")
 
-    val notExistResult = await(
-      repository.restrictDuplicateLRN(notExistLRN).value
+    val existMessageSender = sender.value
+
+    val notExistResultForLRN = await(
+      repository.restrictDuplicateLRN(notExistLRN, existMessageSender).value
     )
 
-    notExistResult should be(Right(()))
+    notExistResultForLRN should be(Right(()))
+
+    val existLRN = lrn.value
+
+    val notExistMessageSender = MessageSender("token1234")
+
+    val notExistResultForMessageSender = await(
+      repository.restrictDuplicateLRN(existLRN, notExistMessageSender).value
+    )
+
+    notExistResultForMessageSender should be(Right(()))
 
   }
 
@@ -1983,7 +1997,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, None, receivedInstant).value
+      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, None, None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -2015,7 +2029,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, None, Some(mrn), None, receivedInstant).value
+      repository.updateMovement(departureMovement._id, None, Some(mrn), None, None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -2039,10 +2053,12 @@ class MovementsRepositorySpec
           movementType = MovementType.Departure,
           movementEORINumber = None,
           movementReferenceNumber = None,
-          localReferenceNumber = None
+          localReferenceNumber = None,
+          messageSender = None
         )
 
-    val lrn = arbitrary[LocalReferenceNumber].sample.get
+    val lrn    = arbitrary[LocalReferenceNumber].sample.get
+    val sender = arbitrary[MessageSender].sample.get
 
     await(
       repository.insert(departureMovement).value
@@ -2050,7 +2066,7 @@ class MovementsRepositorySpec
 
     val result = await(
       repository
-        .updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, Some(lrn), receivedInstant)
+        .updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), None, Some(lrn), Some(sender), receivedInstant)
         .value
     )
 
@@ -2084,7 +2100,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), Some(mrn), None, receivedInstant).value
+      repository.updateMovement(departureMovement._id, Some(departureMovement.enrollmentEORINumber), Some(mrn), None, None, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -2108,7 +2124,8 @@ class MovementsRepositorySpec
           movementType = MovementType.Arrival,
           movementEORINumber = None,
           movementReferenceNumber = None,
-          localReferenceNumber = None
+          localReferenceNumber = None,
+          messageSender = None
         )
 
     await(
@@ -2116,7 +2133,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMovement(departureMovement._id, None, None, None, receivedInstant).value
+      repository.updateMovement(departureMovement._id, None, None, None, None, receivedInstant).value
     )
 
     result should be(Right(()))

@@ -16,17 +16,11 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import java.time.OffsetDateTime
+import play.api.libs.json.Format
+import play.api.libs.json.Json
 
-case class Movement(
-  _id: MovementId,
-  movementType: MovementType,
-  enrollmentEORINumber: EORINumber,
-  movementEORINumber: Option[EORINumber],
-  movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
-  localReferenceNumber: Option[LocalReferenceNumber],
-  messageSender: Option[MessageSender],
-  created: OffsetDateTime,
-  updated: OffsetDateTime,
-  messages: Vector[Message]
-)
+case class MessageSender(value: String) extends AnyVal
+
+object MessageSender {
+  implicit val messageSenderFormat: Format[MessageSender] = Json.valueFormat[MessageSender]
+}

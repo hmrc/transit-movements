@@ -27,6 +27,7 @@ import uk.gov.hmrc.transitmovements.models.ItemCount
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.Movement
@@ -124,7 +125,8 @@ trait ModelGenerators extends BaseGenerators {
         updated                 <- arbitrary[OffsetDateTime]
         messages                <- arbitrary[Vector[Message]]
         lrn                     <- arbitrary[Option[LocalReferenceNumber]]
-      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, lrn, created, updated, messages)
+        messageSender           <- arbitrary[Option[MessageSender]]
+      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, lrn, messageSender, created, updated, messages)
     }
 
   implicit lazy val arbitraryMessageResponse: Arbitrary[MessageResponse] =
@@ -192,4 +194,9 @@ trait ModelGenerators extends BaseGenerators {
       l => ItemCount(Math.abs(l % (Int.MaxValue - 1)).toInt) // // require a positive integer
     )
   }
+
+  implicit lazy val arbitraryMessageSender: Arbitrary[MessageSender] =
+    Arbitrary {
+      Gen.alphaNumStr.map(MessageSender(_))
+    }
 }

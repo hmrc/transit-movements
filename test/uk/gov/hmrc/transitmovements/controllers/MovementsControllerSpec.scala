@@ -181,7 +181,8 @@ class MovementsControllerSpec
       val validXmlStream: Source[ByteString, _] = Source.single(ByteString(validXml.mkString))
       val eoriNumber: EORINumber                = arbitrary[EORINumber].sample.get
       val lrn: LocalReferenceNumber             = arbitraryLRN.arbitrary.sample.get
-      val declarationData                       = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn)
+      val messageSender: MessageSender          = arbitraryMessageSender.arbitrary.sample.get
+      val declarationData                       = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn, messageSender)
 
       val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
         EitherT.rightT(declarationData)
@@ -230,7 +231,7 @@ class MovementsControllerSpec
       when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockRepository.restrictDuplicateLRN(eqTo(lrn))).thenReturn(EitherT.rightT(Right((): Unit)))
+      when(mockRepository.restrictDuplicateLRN(eqTo(lrn), eqTo(messageSender))).thenReturn(EitherT.rightT(Right((): Unit)))
 
       when(
         mockMovementFactory.createDeparture(
@@ -492,13 +493,14 @@ class MovementsControllerSpec
 
       val validXmlStream: Source[ByteString, _] = Source.single(ByteString(validXml.mkString))
 
-      val lrn: LocalReferenceNumber = arbitraryLRN.arbitrary.sample.get
+      val lrn: LocalReferenceNumber    = arbitraryLRN.arbitrary.sample.get
+      val messageSender: MessageSender = arbitraryMessageSender.arbitrary.sample.get
 
       val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
 
       val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
       val triggerId: MessageId   = arbitraryMessageId.arbitrary.sample.get
-      val declarationData        = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn)
+      val declarationData        = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn, messageSender)
 
       val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
         EitherT.rightT(declarationData)
@@ -513,7 +515,7 @@ class MovementsControllerSpec
       when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockRepository.restrictDuplicateLRN(eqTo(lrn)))
+      when(mockRepository.restrictDuplicateLRN(eqTo(lrn), eqTo(messageSender)))
         .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", LocalReferenceNumber("123"))))
       val request: Request[Source[ByteString, _]] = fakeRequest(
         POST,
@@ -1908,12 +1910,13 @@ class MovementsControllerSpec
           arbitrary[MovementId],
           arbitrary[MessageId],
           Gen.oneOf(MessageType.departureRequestValues),
-          arbitraryLRN.arbitrary
+          arbitraryLRN.arbitrary,
+          arbitraryMessageSender.arbitrary
         ) {
-          (eori, movementId, messageId, messageType, lrn) =>
+          (eori, movementId, messageId, messageType, lrn, messageSender) =>
             resetInternalAuth()
             val extractDataEither: EitherT[Future, ParseError, Option[ExtractedData]] = {
-              if (messageType == MessageType.DeclarationData) EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn)))
+              if (messageType == MessageType.DeclarationData) EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn, messageSender)))
               else EitherT.rightT(None)
             }
 
@@ -1921,6 +1924,11 @@ class MovementsControllerSpec
 
             val lrnOption: Option[LocalReferenceNumber] = {
               if (messageType == MessageType.DeclarationData) Some(lrn)
+              else None
+            }
+
+            val messageSenderOption: Option[MessageSender] = {
+              if (messageType == MessageType.DeclarationData) Some(messageSender)
               else None
             }
 
@@ -1965,7 +1973,7 @@ class MovementsControllerSpec
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
-            when(mockRepository.restrictDuplicateLRN(eqTo(lrn)))
+            when(mockRepository.restrictDuplicateLRN(eqTo(lrn), eqTo(messageSender)))
               .thenReturn(EitherT.rightT(Right(())))
 
             when(
@@ -1993,6 +2001,7 @@ class MovementsControllerSpec
                 eqTo(eoriOption),
                 eqTo(None),
                 eqTo(lrnOption),
+                eqTo(messageSenderOption),
                 any[OffsetDateTime]
               )
             )
@@ -2026,6 +2035,7 @@ class MovementsControllerSpec
               eqTo(eoriOption),
               eqTo(None),
               eqTo(lrnOption),
+              eqTo(messageSenderOption),
               any[OffsetDateTime]
             )
 
@@ -2104,7 +2114,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(()))
 
             when(
-              mockRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(Some(mrn)), eqTo(None), any[OffsetDateTime])
+              mockRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(Some(mrn)), eqTo(None), eqTo(None), any[OffsetDateTime])
             )
               .thenReturn(EitherT.rightT(()))
 
@@ -2136,6 +2146,7 @@ class MovementsControllerSpec
               eqTo(Some(eori)),
               eqTo(Some(mrn)),
               eqTo(None),
+              eqTo(None),
               any[OffsetDateTime]
             )
 
@@ -2150,9 +2161,10 @@ class MovementsControllerSpec
           arbitrary[MovementId],
           arbitrary[MessageId],
           arbitrary[MovementType],
-          arbitraryLRN.arbitrary
+          arbitraryLRN.arbitrary,
+          arbitraryMessageSender.arbitrary
         ) {
-          (eori, movementId, messageId, movementType, lrn) =>
+          (eori, movementId, messageId, movementType, lrn, messageSender) =>
             resetInternalAuth()
             val now: OffsetDateTime           = OffsetDateTime.now
             val generatedTime: OffsetDateTime = now.minusMinutes(1)
@@ -2202,12 +2214,12 @@ class MovementsControllerSpec
             when(
               mockMovementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]])
             )
-              .thenReturn(EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn))))
+              .thenReturn(EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn, messageSender))))
 
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
-            when(mockRepository.restrictDuplicateLRN(eqTo(lrn)))
+            when(mockRepository.restrictDuplicateLRN(eqTo(lrn), eqTo(messageSender)))
               .thenReturn(EitherT.rightT((): Unit))
 
             when(
@@ -2216,6 +2228,7 @@ class MovementsControllerSpec
                 eqTo(None),
                 eqTo(None),
                 eqTo(Some(lrn)),
+                eqTo(Some(messageSender)),
                 any[OffsetDateTime]
               )
             )
@@ -2249,6 +2262,7 @@ class MovementsControllerSpec
               eqTo(None),
               eqTo(None),
               eqTo(Some(lrn)),
+              eqTo(Some(messageSender)),
               any[OffsetDateTime]
             )
 
@@ -2265,9 +2279,10 @@ class MovementsControllerSpec
           arbitrary[EORINumber],
           arbitrary[MovementId],
           arbitrary[MessageId],
-          arbitraryLRN.arbitrary
+          arbitraryLRN.arbitrary,
+          arbitraryMessageSender.arbitrary
         ) {
-          (eori, movementId, messageId, lrn) =>
+          (eori, movementId, messageId, lrn, messageSender) =>
             resetInternalAuth()
 
             val messageType                   = MessageType.DeclarationData
@@ -2305,12 +2320,12 @@ class MovementsControllerSpec
             when(
               mockMovementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]])
             )
-              .thenReturn(EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn))))
+              .thenReturn(EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn, messageSender))))
 
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
-            when(mockRepository.restrictDuplicateLRN(eqTo(lrn)))
+            when(mockRepository.restrictDuplicateLRN(eqTo(lrn), eqTo(messageSender)))
               .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", lrn)))
 
             when(
@@ -2338,6 +2353,7 @@ class MovementsControllerSpec
                 eqTo(Some(eori)),
                 eqTo(None),
                 eqTo(Some(lrn)),
+                eqTo(Some(messageSender)),
                 any[OffsetDateTime]
               )
             )
@@ -2371,6 +2387,7 @@ class MovementsControllerSpec
               eqTo(Some(eori)),
               eqTo(None),
               eqTo(Some(lrn)),
+              eqTo(Some(messageSender)),
               any[OffsetDateTime]
             )
 
@@ -2388,9 +2405,10 @@ class MovementsControllerSpec
           arbitrary[MovementId],
           arbitrary[MessageId],
           arbitrary[MovementType],
-          arbitraryLRN.arbitrary
+          arbitraryLRN.arbitrary,
+          arbitraryMessageSender.arbitrary
         ) {
-          (eori, movementId, messageId, movementType, lrn) =>
+          (eori, movementId, messageId, movementType, lrn, messageSender) =>
             resetInternalAuth()
 
             val now: OffsetDateTime           = OffsetDateTime.now
@@ -2428,7 +2446,7 @@ class MovementsControllerSpec
             when(
               mockMovementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]])
             )
-              .thenReturn(EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn))))
+              .thenReturn(EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn, messageSender))))
 
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))
@@ -2449,6 +2467,7 @@ class MovementsControllerSpec
                 eqTo(Some(eori)),
                 eqTo(None),
                 eqTo(Some(lrn)),
+                eqTo(Some(messageSender)),
                 any[OffsetDateTime]
               )
             )
@@ -2486,6 +2505,7 @@ class MovementsControllerSpec
               eqTo(Some(eori)),
               eqTo(None),
               eqTo(Some(lrn)),
+              eqTo(Some(messageSender)),
               any[OffsetDateTime]
             )
 
@@ -2563,6 +2583,7 @@ class MovementsControllerSpec
           verify(mockRepository, times(0)).updateMovement(
             MovementId(eqTo(movementId.value)),
             eqTo(Some(eori)),
+            eqTo(None),
             eqTo(None),
             eqTo(None),
             any[OffsetDateTime]
@@ -2654,9 +2675,10 @@ class MovementsControllerSpec
           arbitrary[EORINumber],
           arbitrary[MovementId],
           arbitrary[MessageId],
-          arbitraryLRN.arbitrary
+          arbitraryLRN.arbitrary,
+          arbitraryMessageSender.arbitrary
         ) {
-          (eori, movementId, messageId, lrn) =>
+          (eori, movementId, messageId, lrn, messageSender) =>
             resetInternalAuth()
             val movementType                  = MovementType.Departure
             val now: OffsetDateTime           = OffsetDateTime.now
@@ -2683,7 +2705,7 @@ class MovementsControllerSpec
             when(
               mockMovementsXmlParsingService.extractData(eqTo(MovementType.Departure), any[Source[ByteString, _]])
             )
-              .thenReturn(EitherT.rightT(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn)))
+              .thenReturn(EitherT.rightT(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn, messageSender)))
 
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(MessageType.DeclarationData)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))
@@ -2724,6 +2746,7 @@ class MovementsControllerSpec
               eqTo(Some(eori)),
               eqTo(None),
               eqTo(Some(lrn)),
+              eqTo(Some(messageSender)),
               any[OffsetDateTime]
             )
 
@@ -2799,6 +2822,7 @@ class MovementsControllerSpec
               eqTo(Some(eori)),
               eqTo(Some(mrn)),
               eqTo(None),
+              eqTo(None),
               any[OffsetDateTime]
             )
 
@@ -2851,9 +2875,10 @@ class MovementsControllerSpec
         arbitrary[MovementId],
         arbitrary[MessageId],
         Gen.oneOf(MessageType.departureRequestValues),
-        arbitraryLRN.arbitrary
+        arbitraryLRN.arbitrary,
+        arbitraryMessageSender.arbitrary
       ) {
-        (eori, movementId, messageId, messageType, lrn) =>
+        (eori, movementId, messageId, messageType, lrn, messageSender) =>
           resetInternalAuth()
           val movementType                  = MovementType.Departure
           val now: OffsetDateTime           = OffsetDateTime.now
@@ -2881,7 +2906,7 @@ class MovementsControllerSpec
           when(
             mockMovementsXmlParsingService.extractData(eqTo(MovementType.Departure), any[Source[ByteString, _]])
           )
-            .thenReturn(EitherT.rightT(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn)))
+            .thenReturn(EitherT.rightT(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn, messageSender)))
 
           when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(MessageType.DeclarationData)))
             .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))
@@ -2927,6 +2952,7 @@ class MovementsControllerSpec
             eqTo(Some(eori)),
             eqTo(None),
             eqTo(Some(lrn)),
+            eqTo(Some(messageSender)),
             any[OffsetDateTime]
           )
 

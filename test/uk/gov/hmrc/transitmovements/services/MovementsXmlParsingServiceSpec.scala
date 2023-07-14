@@ -27,6 +27,7 @@ import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
@@ -167,7 +168,7 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val result = service.extractData(MovementType.Departure, source)
 
       whenReady(result.value) {
-        _ mustBe Right(DeclarationData(Some(EORINumber("GB1234")), testDate, LocalReferenceNumber("12yuP9")))
+        _ mustBe Right(DeclarationData(Some(EORINumber("GB1234")), testDate, LocalReferenceNumber("12yuP9"), MessageSender("token")))
       }
     }
 
@@ -191,7 +192,7 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        _ mustBe Right(DeclarationData(Some(EORINumber("GB1234")), testDate, LocalReferenceNumber("12yuP9")))
+        _ mustBe Right(DeclarationData(Some(EORINumber("GB1234")), testDate, LocalReferenceNumber("12yuP9"), MessageSender("token")))
       }
     }
 
@@ -201,7 +202,7 @@ class MovementsXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with 
       val result = service.extractDeclarationData(source)
 
       whenReady(result.value) {
-        _ mustBe Right(DeclarationData(None, testDate, LocalReferenceNumber("12yuP9")))
+        _ mustBe Right(DeclarationData(None, testDate, LocalReferenceNumber("12yuP9"), MessageSender("token")))
       }
     }
 

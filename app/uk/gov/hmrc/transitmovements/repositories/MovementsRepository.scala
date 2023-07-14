@@ -43,6 +43,7 @@ import uk.gov.hmrc.transitmovements.models.ItemCount
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
@@ -117,6 +118,7 @@ trait MovementsRepository {
     movementEORI: Option[EORINumber],
     mrn: Option[MovementReferenceNumber],
     lrn: Option[LocalReferenceNumber],
+    messageSender: Option[MessageSender],
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
@@ -134,7 +136,7 @@ trait MovementsRepository {
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
 
-  def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber): EitherT[Future, MongoError, Unit]
+  def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber, messageSender: MessageSender): EitherT[Future, MongoError, Unit]
 
 }
 
@@ -154,7 +156,8 @@ class MovementsRepositoryImpl @Inject() (
       domainFormat = MongoFormats.movementFormat,
       indexes = Seq(
         IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS)),
-        IndexModel(Indexes.ascending(fieldNames = "localReferenceNumber")),
+        //IndexModel(Indexes.ascending(fieldNames = "localReferenceNumber")),
+        IndexModel(Indexes.ascending(fieldNames = "localReferenceNumber", "messageSender")),
         IndexModel(Indexes.ascending("movementReferenceNumber"), IndexOptions().background(true))
       ),
       extraCodecs = Seq(
@@ -167,6 +170,7 @@ class MovementsRepositoryImpl @Inject() (
         Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
         Codecs.playFormatCodec(MongoFormats.eoriNumberFormat),
         Codecs.playFormatCodec(MongoFormats.lrnFormat),
+        Codecs.playFormatCodec(MongoFormats.messageSenderFormat),
         Codecs.playFormatCodec(MongoFormats.paginationMovementSummaryFormat),
         Codecs.playFormatCodec(MongoFormats.paginationMessageSummaryFormat)
       )
@@ -478,6 +482,7 @@ class MovementsRepositoryImpl @Inject() (
     movementEORI: Option[EORINumber],
     mrn: Option[MovementReferenceNumber],
     lrn: Option[LocalReferenceNumber],
+    messageSender: Option[MessageSender],
     updated: OffsetDateTime
   ): EitherT[Future, MongoError, Unit] = {
     val filter: Bson = mEq(movementId.value)
@@ -496,6 +501,11 @@ class MovementsRepositoryImpl @Inject() (
         lrn
           .map(
             e => Seq(mSet("localReferenceNumber", e.value))
+          )
+          .getOrElse(Seq.empty[Bson]) ++
+        messageSender
+          .map(
+            e => Seq(mSet("messageSender", e.value))
           )
           .getOrElse(Seq.empty[Bson])
 
@@ -525,8 +535,8 @@ class MovementsRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber): EitherT[Future, MongoError, Unit] = {
-    val selector = mEq("localReferenceNumber", localReferenceNumber.value)
+  def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber, messageSender: MessageSender): EitherT[Future, MongoError, Unit] = {
+    val selector = mAnd(mEq("localReferenceNumber", localReferenceNumber.value), mEq("messageSender", messageSender.value))
 
     val projection = MovementWithoutMessages.projection
 

@@ -38,6 +38,7 @@ import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.ExtractedData
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
@@ -71,13 +72,15 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
   private def buildDeclarationData(
     eoriMaybe: ParseResult[Option[EORINumber]],
     dateMaybe: ParseResult[OffsetDateTime],
-    lrnMaybe: ParseResult[LocalReferenceNumber]
+    lrnMaybe: ParseResult[LocalReferenceNumber],
+    messageSenderMaybe: ParseResult[MessageSender]
   ): ParseResult[DeclarationData] =
     for {
       eoriNumber     <- eoriMaybe
       generationDate <- dateMaybe
       lrn            <- lrnMaybe
-    } yield DeclarationData(eoriNumber, generationDate, lrn)
+      messageSender  <- messageSenderMaybe
+    } yield DeclarationData(eoriNumber, generationDate, lrn, messageSender)
 
   private val declarationFlow: Flow[ByteString, ParseResult[DeclarationData], NotUsed] =
     Flow.fromGraph(
@@ -85,24 +88,26 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
         implicit builder =>
           import GraphDSL.Implicits._
 
-          val broadcast = builder.add(Broadcast[ParseEvent](3))
+          val broadcast = builder.add(Broadcast[ParseEvent](4))
           val combiner = builder.add(
-            ZipWith[ParseResult[Option[EORINumber]], ParseResult[OffsetDateTime], ParseResult[LocalReferenceNumber], ParseResult[
+            ZipWith[ParseResult[Option[EORINumber]], ParseResult[OffsetDateTime], ParseResult[LocalReferenceNumber], ParseResult[MessageSender], ParseResult[
               DeclarationData
             ]](
               buildDeclarationData
             )
           )
 
-          val xmlParsing = builder.add(XmlParsing.parser)
-          val eoriFlow   = builder.add(XmlParsers.movementEORINumberExtractor("CC015C", "HolderOfTheTransitProcedure"))
-          val dateFlow   = builder.add(XmlParsers.preparationDateTimeExtractor(MessageType.DeclarationData))
-          val lrnFlow    = builder.add(XmlParsers.movementLRNExtractor("CC015C"))
+          val xmlParsing        = builder.add(XmlParsing.parser)
+          val eoriFlow          = builder.add(XmlParsers.movementEORINumberExtractor("CC015C", "HolderOfTheTransitProcedure"))
+          val dateFlow          = builder.add(XmlParsers.preparationDateTimeExtractor(MessageType.DeclarationData))
+          val lrnFlow           = builder.add(XmlParsers.movementLRNExtractor("CC015C"))
+          val messageSenderFlow = builder.add(XmlParsers.movementMessageSenderExtractor("CC015C"))
 
           xmlParsing.out ~> broadcast.in
           broadcast.out(0) ~> eoriFlow ~> combiner.in0
           broadcast.out(1) ~> dateFlow ~> combiner.in1
           broadcast.out(2) ~> lrnFlow ~> combiner.in2
+          broadcast.out(3) ~> messageSenderFlow ~> combiner.in3
 
           FlowShape(xmlParsing.in, combiner.out)
       }
