@@ -22,13 +22,17 @@ import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.empty
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
+import com.mongodb.client.model.Filters.{exists => mExists}
 import com.mongodb.client.model.Filters.{gte => mGte}
 import com.mongodb.client.model.Filters.{lte => mLte}
+import com.mongodb.client.model.Filters.{not => mNot}
+import com.mongodb.client.model.Filters.{or => mOr}
 import com.mongodb.client.model.Filters.{regex => mRegex}
 import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates.{combine => mCombine}
 import com.mongodb.client.model.Updates.{push => mPush}
 import com.mongodb.client.model.Updates.{set => mSet}
+
 import org.bson.conversions.Bson
 import org.mongodb.scala.bson.Document
 import org.mongodb.scala.model.Sorts.descending
@@ -535,7 +539,10 @@ class MovementsRepositoryImpl @Inject() (
     })
 
   def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber, messageSender: MessageSender): EitherT[Future, MongoError, Unit] = {
-    val selector = mAnd(mEq("localReferenceNumber", localReferenceNumber.value), mEq("messageSender", messageSender.value))
+    val selector = mOr(
+      mAnd(mEq("localReferenceNumber", localReferenceNumber.value), mEq("messageSender", messageSender.value)),
+      mAnd(mEq("localReferenceNumber", localReferenceNumber.value), mNot(mExists("messageSender")))
+    )
 
     val projection = MovementWithoutMessages.projection
 
