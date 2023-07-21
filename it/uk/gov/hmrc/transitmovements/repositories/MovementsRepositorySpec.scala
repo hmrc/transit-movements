@@ -1926,6 +1926,42 @@ class MovementsRepositorySpec
       result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
   }
 
+  "checkDuplicate for LRN without messageSender" should "return left with DuplicateLRNError" in {
+
+    val eoriXI       = arbitrary[EORINumber].sample.value
+    val movementEORI = arbitrary[EORINumber].sample.value
+    val lrn          = arbitrary[LocalReferenceNumber].sample
+    val sender       = arbitrary[MessageSender].sample
+    val mrnGen       = arbitrary[MovementReferenceNumber]
+
+    val message1 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
+
+    val departureXi2 =
+      arbitrary[Movement].sample.value.copy(
+        _id = MovementId("2"),
+        enrollmentEORINumber = eoriXI,
+        movementEORINumber = Some(movementEORI),
+        movementType = MovementType.Departure,
+        updated = instant,
+        movementReferenceNumber = mrnGen.sample,
+        localReferenceNumber = lrn,
+        messages = Vector(message1),
+        messageSender = None
+      )
+
+    await(repository.insert(departureXi2).value)
+
+    val alreadyExistLRNWithSender = await(
+      repository.restrictDuplicateLRN(lrn.value, sender.value).value
+    )
+
+    alreadyExistLRNWithSender should be(
+      Left(MongoError.ConflictError(s"LRN ${lrn.value.value} has previously been used and cannot be reused", lrn.value))
+    )
+
+  }
+
   "checkDuplicate" should "check the duplicate LRN + messageSender combination" in {
 
     val eoriXI       = arbitrary[EORINumber].sample.value
