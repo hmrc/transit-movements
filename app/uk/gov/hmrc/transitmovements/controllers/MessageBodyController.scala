@@ -105,7 +105,8 @@ class MessageBodyController @Inject() (
             case MessageType.DeclarationData =>
               repo
                 .restrictDuplicateLRN(
-                  extractedData.flatMap(_.localReferenceNumber).get
+                  extractedData.flatMap(_.localReferenceNumber).get,
+                  extractedData.flatMap(_.messageSender).get
                 )
                 .asPresentation
             case _ => EitherT.rightT[Future, MongoError]((): Unit).asPresentation
@@ -167,6 +168,7 @@ class MessageBodyController @Inject() (
         extractedData.flatMap(_.movementEoriNumber),
         extractedData.flatMap(_.movementReferenceNumber).orElse(messageData.mrn),
         extractedData.flatMap(_.localReferenceNumber),
+        extractedData.flatMap(_.messageSender),
         received
       )
       .asPresentation

@@ -23,6 +23,7 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.Movement
@@ -116,9 +117,15 @@ trait ModelGenerators extends BaseGenerators {
         eori                    <- arbitrary[EORINumber]
         movementReferenceNumber <- arbitrary[Option[MovementReferenceNumber]]
         movementLRN             <- arbitrary[Option[LocalReferenceNumber]]
+        messageSender           <- arbitrary[Option[MessageSender]]
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
         messages                <- arbitrary[Vector[Message]]
-      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, movementLRN, created, updated, messages)
+      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, movementLRN, messageSender, created, updated, messages)
+    }
+
+  implicit lazy val arbitraryMessagaSender: Arbitrary[MessageSender] =
+    Arbitrary {
+      Gen.alphaNumStr.map(MessageSender(_))
     }
 }

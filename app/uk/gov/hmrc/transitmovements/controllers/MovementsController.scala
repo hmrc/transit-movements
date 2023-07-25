@@ -113,7 +113,7 @@ class MovementsController @Inject() (
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         for {
           declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
-          _               <- repo.restrictDuplicateLRN(declarationData.lrn).asPresentation
+          _               <- repo.restrictDuplicateLRN(declarationData.lrn, declarationData.sender).asPresentation
           received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
           movementId = movementFactory.generateId()
           message <- messageService
@@ -335,7 +335,8 @@ class MovementsController @Inject() (
               case MessageType.DeclarationData =>
                 repo
                   .restrictDuplicateLRN(
-                    extractedData.flatMap(_.localReferenceNumber).get
+                    extractedData.flatMap(_.localReferenceNumber).get,
+                    extractedData.flatMap(_.messageSender).get
                   )
                   .asPresentation
               case _ =>
@@ -351,6 +352,7 @@ class MovementsController @Inject() (
                   .flatMap(_.movementEoriNumber),
                 extractedData.flatMap(_.movementReferenceNumber),
                 extractedData.flatMap(_.localReferenceNumber),
+                extractedData.flatMap(_.messageSender),
                 received
               )
               .asPresentation
