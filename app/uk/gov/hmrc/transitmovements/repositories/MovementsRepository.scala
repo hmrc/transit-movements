@@ -347,6 +347,7 @@ class MovementsRepositoryImpl @Inject() (
     val aggregates = Seq(
       Aggregates.filter(selector),
       Aggregates.sort(descending("updated")),
+      Aggregates.project(Projections.exclude("messages")),
       Aggregates.facet(
         Facet("totalCount", Aggregates.count()),
         Facet("movementSummary", Aggregates.skip(from), Aggregates.limit(itemCount))
