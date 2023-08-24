@@ -16,6 +16,8 @@
 
 package uk.gov.hmrc.transitmovements.repositories
 
+import org.mockito.Mockito
+import org.mockito.Mockito.when
 import org.mongodb.scala.model.Filters
 import org.mongodb.scala.model.Indexes
 import org.scalacheck.Arbitrary.arbitrary
@@ -63,8 +65,12 @@ class MovementsRepositorySpec
     MongoComponent(mongoUri)
   }
 
-  implicit lazy val app: Application = GuiceApplicationBuilder().configure().build()
-  private val appConfig              = app.injector.instanceOf[AppConfig]
+  implicit lazy val app: Application = GuiceApplicationBuilder()
+    .configure(
+      "checkDuplicateLRN" -> true
+    )
+    .build()
+  private val appConfig = Mockito.spy(app.injector.instanceOf[AppConfig])
 
   override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent)
 
@@ -2182,6 +2188,59 @@ class MovementsRepositorySpec
     movement.movementEORINumber shouldEqual None
     movement.movementReferenceNumber shouldEqual None
     movement.localReferenceNumber shouldEqual None
+  }
+
+  "checkDuplicate when the check is turned off" should "check the duplicate LRN" in {
+    when(appConfig.lrnDuplicateCheck).thenReturn(false)
+
+    val eoriXI       = arbitrary[EORINumber].sample.value
+    val movementEORI = arbitrary[EORINumber].sample.value
+    val lrn          = arbitrary[LocalReferenceNumber].sample
+    val sender       = arbitrary[MessageSender].sample
+    val mrnGen       = arbitrary[MovementReferenceNumber]
+
+    val message1 =
+      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
+
+    val departureXi2 =
+      arbitrary[Movement].sample.value.copy(
+        enrollmentEORINumber = eoriXI,
+        movementEORINumber = Some(movementEORI),
+        updated = instant,
+        movementReferenceNumber = mrnGen.sample,
+        localReferenceNumber = lrn,
+        messageSender = sender,
+        messages = Vector(message1)
+      )
+
+    await(repository.insert(departureXi2).value)
+
+    val alreadyExistResult = await(
+      repository.restrictDuplicateLRN(lrn.value, sender.value).value
+    )
+
+    alreadyExistResult should be(Right((): Unit))
+
+    val notExistLRN = LocalReferenceNumber("1234")
+
+    val existMessageSender = sender.value
+
+    val notExistResultForLRN = await(
+      repository.restrictDuplicateLRN(notExistLRN, existMessageSender).value
+    )
+
+    notExistResultForLRN should be(Right(()))
+
+    val existLRN = lrn.value
+
+    val notExistMessageSender = MessageSender("token1234")
+
+    val notExistResultForMessageSender = await(
+      repository.restrictDuplicateLRN(existLRN, notExistMessageSender).value
+    )
+
+    notExistResultForMessageSender should be(Right(()))
+
   }
 
 }
