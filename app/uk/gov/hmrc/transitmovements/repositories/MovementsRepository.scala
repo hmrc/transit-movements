@@ -539,30 +539,31 @@ class MovementsRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber, messageSender: MessageSender): EitherT[Future, MongoError, Unit] = {
-    val selector = mOr(
-      mAnd(mEq("localReferenceNumber", localReferenceNumber.value), mEq("messageSender", messageSender.value)),
-      mAnd(mEq("localReferenceNumber", localReferenceNumber.value), mNot(mExists("messageSender")))
-    )
+  def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber, messageSender: MessageSender): EitherT[Future, MongoError, Unit] =
+    if (appConfig.lrnDuplicateCheck) {
+      val selector = mOr(
+        mAnd(mEq("localReferenceNumber", localReferenceNumber.value), mEq("messageSender", messageSender.value)),
+        mAnd(mEq("localReferenceNumber", localReferenceNumber.value), mNot(mExists("messageSender")))
+      )
 
-    val projection = MovementWithoutMessages.projection
+      val projection = MovementWithoutMessages.projection
 
-    val aggregates = Seq(
-      Aggregates.filter(selector),
-      Aggregates.sort(descending("updated")),
-      Aggregates.project(projection)
-    )
+      val aggregates = Seq(
+        Aggregates.filter(selector),
+        Aggregates.sort(descending("updated")),
+        Aggregates.project(projection)
+      )
 
-    mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
-      case Success(obs) =>
-        obs.headOption().map {
-          case None =>
-            Right((): Unit)
-          case Some(_) =>
-            Left(ConflictError(s"LRN ${localReferenceNumber.value} has previously been used and cannot be reused", localReferenceNumber))
-        }
-      case Failure(NonFatal(ex)) =>
-        Future.successful(Left(UnexpectedError(Some(ex))))
-    })
-  }
+      mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
+        case Success(obs) =>
+          obs.headOption().map {
+            case None =>
+              Right((): Unit)
+            case Some(_) =>
+              Left(ConflictError(s"LRN ${localReferenceNumber.value} has previously been used and cannot be reused", localReferenceNumber))
+          }
+        case Failure(NonFatal(ex)) =>
+          Future.successful(Left(UnexpectedError(Some(ex))))
+      })
+    } else EitherT.rightT((): Unit)
 }
