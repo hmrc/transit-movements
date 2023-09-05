@@ -350,7 +350,7 @@ class MovementsRepositoryImpl @Inject() (
           .map(
             _.headOption
               .map(
-                bsonDocument => Right(bsonDocument.get("count").asInt32().longValue())
+                bsonDocument => Right(bsonDocument.get("count").asNumber().longValue())
               )
               .getOrElse(Right(0L))
           )
