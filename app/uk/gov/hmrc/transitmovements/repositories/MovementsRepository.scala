@@ -33,6 +33,7 @@ import com.mongodb.client.model.Updates.{combine => mCombine}
 import com.mongodb.client.model.Updates.{push => mPush}
 import com.mongodb.client.model.Updates.{set => mSet}
 import org.bson.conversions.Bson
+import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Sorts.descending
 import org.mongodb.scala.model._
 import play.api.Logging
@@ -56,6 +57,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import scala.annotation.nowarn
 import scala.concurrent._
+import scala.reflect.ClassTag
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -247,14 +249,14 @@ class MovementsRepositoryImpl @Inject() (
       )
 
     for {
-      perPageMessages <- filterPerPageMessages(aggregates)
-      totalCount      <- totalCountMessages(filterAggregates)
+      perPageMessages <- filterPerPage[MessageResponse](aggregates)
+      totalCount      <- countItems(filterAggregates)
     } yield PaginationMessageSummary(TotalCount(totalCount), perPageMessages)
 
   }
 
-  private def filterPerPageMessages(aggregates: Seq[Bson]): EitherT[Future, MongoError, Vector[MessageResponse]] =
-    mongoRetry(Try(collection.aggregate[MessageResponse](aggregates)) match {
+  private def filterPerPage[R](aggregates: Seq[Bson])(implicit c: ClassTag[R]): EitherT[Future, MongoError, Vector[R]] =
+    mongoRetry(Try(collection.aggregate[R](aggregates)) match {
       case Success(obs) =>
         obs
           .toFuture()
@@ -334,41 +336,24 @@ class MovementsRepositoryImpl @Inject() (
       Aggregates.limit(itemCount)
     )
     for {
-      perPageMovements <- filterPerPageMovements(aggregates)
-      totalCount       <- totalCountMovements(filterAggregates)
+      perPageMovements <- filterPerPage[MovementWithoutMessages](aggregates)
+      totalCount       <- countItems(filterAggregates)
     } yield PaginationMovementSummary(TotalCount(totalCount), perPageMovements)
 
   }
 
-  private def filterPerPageMovements(aggregates: Seq[Bson]): EitherT[Future, MongoError, Vector[MovementWithoutMessages]] =
-    mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
+  private def countItems(totalDocument: Seq[Bson]): EitherT[Future, MongoError, Long] =
+    mongoRetry(Try(collection.aggregate[BsonDocument](totalDocument ++ Seq(Aggregates.count()))) match {
       case Success(obs) =>
         obs
           .toFuture()
-          .map {
-            response => Right(response.toVector)
-          }
-
-      case Failure(NonFatal(ex)) =>
-        Future.successful(Left(UnexpectedError(Some(ex))))
-    })
-
-  private def totalCountMovements(totalDocument: Seq[Bson]): EitherT[Future, MongoError, Long] =
-    mongoRetry(Try(collection.aggregate[MovementWithoutMessages](totalDocument)) match {
-      case Success(obs) =>
-        obs.toFuture().map {
-          response => Right(response.size.toLong)
-        }
-      case Failure(NonFatal(ex)) =>
-        Future.successful(Left(UnexpectedError(Some(ex))))
-    })
-
-  private def totalCountMessages(totalDocument: Seq[Bson]): EitherT[Future, MongoError, Long] =
-    mongoRetry(Try(collection.aggregate[MessageResponse](totalDocument)) match {
-      case Success(obs) =>
-        obs.toFuture().map {
-          response => Right(response.size.toLong)
-        }
+          .map(
+            _.headOption
+              .map(
+                bsonDocument => Right(bsonDocument.get("count").asInt32().longValue())
+              )
+              .getOrElse(Right(0L))
+          )
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
