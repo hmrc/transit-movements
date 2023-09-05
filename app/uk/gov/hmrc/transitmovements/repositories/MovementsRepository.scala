@@ -32,31 +32,15 @@ import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates.{combine => mCombine}
 import com.mongodb.client.model.Updates.{push => mPush}
 import com.mongodb.client.model.Updates.{set => mSet}
-
 import org.bson.conversions.Bson
-import org.mongodb.scala.bson.Document
+import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Sorts.descending
 import org.mongodb.scala.model._
 import play.api.Logging
-import play.api.libs.json.Json
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.ItemCount
-import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageSender
-import uk.gov.hmrc.transitmovements.models.Movement
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.MovementType
-import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
-import uk.gov.hmrc.transitmovements.models.PageNumber
-import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
-import uk.gov.hmrc.transitmovements.models.PaginationMovementSummary
-import uk.gov.hmrc.transitmovements.models.UpdateMessageData
+import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
@@ -73,6 +57,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import scala.annotation.nowarn
 import scala.concurrent._
+import scala.reflect.ClassTag
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -238,8 +223,6 @@ class MovementsRepositoryImpl @Inject() (
     receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, PaginationMessageSummary] = {
 
-    val messageSummaryQuery = Json.obj("$ifNull" -> Json.arr("$messageSummary", "[]"))
-
     val selector = mAnd(
       mEq("_id", movementId.value),
       mEq("enrollmentEORINumber", eoriNumber.value),
@@ -250,35 +233,40 @@ class MovementsRepositoryImpl @Inject() (
       mGte("messages.received", receivedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
       mLte("messages.received", receivedUntil.map(_.toLocalDateTime).getOrElse(OffsetDateTime.now()))
     )
-
+    val filterAggregates = Seq(
+      Aggregates.filter(selector),
+      Aggregates.unwind("$messages"),
+      Aggregates.filter(dateTimeSelector),
+      Aggregates.replaceRoot("$messages")
+    )
     val (from, countNumber) = indices(page, count)
 
     val aggregates =
-      Seq(
-        Aggregates.filter(selector),
-        Aggregates.unwind("$messages"),
-        Aggregates.filter(dateTimeSelector),
-        Aggregates.replaceRoot("$messages"),
+      filterAggregates ++ Seq(
         Aggregates.sort(descending("received")),
-        Aggregates.facet(
-          Facet("totalCount", Aggregates.count()),
-          Facet("messageSummary", Aggregates.skip(from), Aggregates.limit(countNumber))
-        ),
-        Aggregates.project(Document("totalCount" -> Codecs.toBson(totalCountQuery()), "messageSummary" -> Codecs.toBson(messageSummaryQuery)))
+        Aggregates.skip(from),
+        Aggregates.limit(countNumber)
       )
 
-    mongoRetry(Try(collection.aggregate[PaginationMessageSummary](aggregates)) match {
+    for {
+      perPageMessages <- filterPerPage[MessageResponse](aggregates)
+      totalCount      <- countItems(filterAggregates)
+    } yield PaginationMessageSummary(TotalCount(totalCount), perPageMessages)
+
+  }
+
+  private def filterPerPage[R](aggregates: Seq[Bson])(implicit c: ClassTag[R]): EitherT[Future, MongoError, Vector[R]] =
+    mongoRetry(Try(collection.aggregate[R](aggregates)) match {
       case Success(obs) =>
         obs
           .toFuture()
-          .map(
-            response => Right(response.head)
-          )
+          .map {
+            response => Right(response.toVector)
+          }
+
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
-
-  }
 
   def getSingleMessage(
     eoriNumber: EORINumber,
@@ -340,51 +328,35 @@ class MovementsRepositoryImpl @Inject() (
       movementMRNFilter(movementReferenceNumber),
       movementLRNFilter(localReferenceNumber)
     )
-    val messageSummaryQuery = Json.obj("$ifNull" -> Json.arr("$movementSummary", "[]"))
-
     val (from, itemCount) = indices(page, count)
-
-    val aggregates = Seq(
-      Aggregates.filter(selector),
+    val filterAggregates  = Seq(Aggregates.filter(selector))
+    val aggregates = filterAggregates ++ Seq(
       Aggregates.sort(descending("updated")),
-      Aggregates.project(Projections.exclude("messages")),
-      Aggregates.facet(
-        Facet("totalCount", Aggregates.count()),
-        Facet("movementSummary", Aggregates.skip(from), Aggregates.limit(itemCount))
-      ),
-      Aggregates.project(Document("totalCount" -> Codecs.toBson(totalCountQuery()), "movementSummary" -> Codecs.toBson(messageSummaryQuery)))
+      Aggregates.skip(from),
+      Aggregates.limit(itemCount)
     )
-
-    mongoRetry(Try(collection.aggregate[PaginationMovementSummary](aggregates)) match {
-      case Success(obs) =>
-        obs
-          .toFuture()
-          .map {
-            response => Right(response.head)
-          }
-
-      case Failure(NonFatal(ex)) =>
-        Future.successful(Left(UnexpectedError(Some(ex))))
-    })
+    for {
+      perPageMovements <- filterPerPage[MovementWithoutMessages](aggregates)
+      totalCount       <- countItems(filterAggregates)
+    } yield PaginationMovementSummary(TotalCount(totalCount), perPageMovements)
 
   }
 
-  private def totalCountQuery() =
-    Json.obj(
-      "$ifNull" -> Json.arr(
-        Json.obj(
-          "$let" -> Json.obj(
-            "vars" -> Json.obj(
-              "countValue" -> Json.obj(
-                "$arrayElemAt" -> Json.arr("$totalCount", 0)
+  private def countItems(totalDocument: Seq[Bson]): EitherT[Future, MongoError, Long] =
+    mongoRetry(Try(collection.aggregate[BsonDocument](totalDocument ++ Seq(Aggregates.count()))) match {
+      case Success(obs) =>
+        obs
+          .toFuture()
+          .map(
+            _.headOption
+              .map(
+                bsonDocument => Right(bsonDocument.get("count").asNumber().longValue())
               )
-            ),
-            "in" -> "$$countValue.count"
+              .getOrElse(Right(0L))
           )
-        ),
-        0
-      )
-    )
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
 
   private def indices(pageNumber: Option[PageNumber], itemCount: Option[ItemCount]): (Int, Int) = {
     val startIndex = pageNumber.flatMap(
