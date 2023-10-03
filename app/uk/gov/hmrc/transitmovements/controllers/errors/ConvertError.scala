@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovements.controllers.errors
 
 import cats.data.EitherT
 import play.api.Logging
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError.FileNotFound
@@ -32,24 +33,39 @@ trait ConvertError {
 
   implicit class ErrorConverter[E, A](value: EitherT[Future, E, A]) {
 
-    def asPresentation(implicit c: Converter[E], ec: ExecutionContext): EitherT[Future, PresentationError, A] =
-      value.leftMap(c.convert).leftSemiflatTap {
-        case InternalServiceError(message, _, cause) =>
-          val causeText = cause
-            .map {
-              ex =>
-                s"""
-                |Message: ${ex.getMessage}
-                |Trace: ${ex.getStackTrace.mkString(System.lineSeparator())}
-                |""".stripMargin
-            }
-            .getOrElse("No exception is available")
-          logger.error(s"""Internal Server Error: $message
-               |
-               |$causeText""".stripMargin)
-          Future.successful(())
-        case _ => Future.successful(())
-      }
+    def asPresentation(implicit c: Converter[E], ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, PresentationError, A] =
+      value
+        .leftSemiflatTap {
+          error =>
+            logger.error(
+              s"""
+                 |Error has been thrown:
+                 |
+                 |Request ID: ${hc.requestId.getOrElse("not found")}
+                 |Error: ${error.getClass.getSimpleName}
+                 |""".stripMargin
+            )
+            Future.successful(())
+        }
+        .leftMap(c.convert)
+        .leftSemiflatTap {
+          case InternalServiceError(message, _, cause) =>
+            val causeText = cause
+              .map {
+                ex =>
+                  s"""
+                  |Request ID: ${hc.requestId.getOrElse("not found")}
+                  |Message: ${ex.getMessage}
+                  |Trace: ${ex.getStackTrace.mkString(System.lineSeparator())}
+                  |""".stripMargin
+              }
+              .getOrElse("No exception is available")
+            logger.error(s"""Internal Server Error: $message
+                 |
+                 |$causeText""".stripMargin)
+            Future.successful(())
+          case _ => Future.successful(())
+        }
   }
 
   sealed trait Converter[E] {
