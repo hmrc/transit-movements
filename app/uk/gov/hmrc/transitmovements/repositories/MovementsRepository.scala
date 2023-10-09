@@ -22,11 +22,8 @@ import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.empty
 import com.mongodb.client.model.Filters.{and => mAnd}
 import com.mongodb.client.model.Filters.{eq => mEq}
-import com.mongodb.client.model.Filters.{exists => mExists}
 import com.mongodb.client.model.Filters.{gte => mGte}
 import com.mongodb.client.model.Filters.{lte => mLte}
-import com.mongodb.client.model.Filters.{not => mNot}
-import com.mongodb.client.model.Filters.{or => mOr}
 import com.mongodb.client.model.Filters.{regex => mRegex}
 import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates.{combine => mCombine}
@@ -124,8 +121,6 @@ trait MovementsRepository {
     message: UpdateMessageData,
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit]
-
-  def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber, messageSender: MessageSender): EitherT[Future, MongoError, Unit]
 
 }
 
@@ -511,31 +506,4 @@ class MovementsRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def restrictDuplicateLRN(localReferenceNumber: LocalReferenceNumber, messageSender: MessageSender): EitherT[Future, MongoError, Unit] =
-    if (appConfig.lrnDuplicateCheck) {
-      val selector = mOr(
-        mAnd(mEq("localReferenceNumber", localReferenceNumber.value), mEq("messageSender", messageSender.value)),
-        mAnd(mEq("localReferenceNumber", localReferenceNumber.value), mNot(mExists("messageSender")))
-      )
-
-      val projection = MovementWithoutMessages.projection
-
-      val aggregates = Seq(
-        Aggregates.filter(selector),
-        Aggregates.sort(descending("updated")),
-        Aggregates.project(projection)
-      )
-
-      mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
-        case Success(obs) =>
-          obs.headOption().map {
-            case None =>
-              Right((): Unit)
-            case Some(_) =>
-              Left(ConflictError(s"LRN ${localReferenceNumber.value} has previously been used and cannot be reused", localReferenceNumber))
-          }
-        case Failure(NonFatal(ex)) =>
-          Future.successful(Left(UnexpectedError(Some(ex))))
-      })
-    } else EitherT.rightT((): Unit)
 }
