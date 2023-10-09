@@ -21,9 +21,8 @@ import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 sealed abstract class MongoError
 
 object MongoError {
-  case class UnexpectedError(exception: Option[Throwable] = None)      extends MongoError
-  case class InsertNotAcknowledged(message: String)                    extends MongoError
-  case class UpdateNotAcknowledged(message: String)                    extends MongoError
-  case class DocumentNotFound(message: String)                         extends MongoError
-  case class ConflictError(message: String, lrn: LocalReferenceNumber) extends MongoError
+  case class UnexpectedError(exception: Option[Throwable] = None) extends MongoError
+  case class InsertNotAcknowledged(message: String)               extends MongoError
+  case class UpdateNotAcknowledged(message: String)               extends MongoError
+  case class DocumentNotFound(message: String)                    extends MongoError
 }

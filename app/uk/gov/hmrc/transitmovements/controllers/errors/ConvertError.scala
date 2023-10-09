@@ -76,7 +76,6 @@ trait ConvertError {
       case InsertNotAcknowledged(message) => PresentationError.internalServiceError(message = message)
       case UpdateNotAcknowledged(message) => PresentationError.internalServiceError(message = message)
       case DocumentNotFound(message)      => PresentationError.notFoundError(message = message)
-      case ConflictError(message, lrn)    => PresentationError.duplicateLRNError(message, lrn)
     }
   }
 

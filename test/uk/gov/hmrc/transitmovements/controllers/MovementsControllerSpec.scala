@@ -229,8 +229,6 @@ class MovementsControllerSpec
       when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
         .thenReturn(departureDataEither)
 
-      when(mockRepository.restrictDuplicateLRN(eqTo(lrn), eqTo(messageSender))).thenReturn(EitherT.rightT(Right((): Unit)))
-
       when(
         mockMovementFactory.createDeparture(
           any[String].asInstanceOf[MovementId],
@@ -480,63 +478,6 @@ class MovementsControllerSpec
         )(any[ExecutionContext])
         verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
-    }
-
-    "must return CONFLICT error" in {
-      val validXml: NodeSeq =
-        <CC015C>
-          <messageSender>ABC123</messageSender>
-          <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        </CC015C>
-
-      val validXmlStream: Source[ByteString, _] = Source.single(ByteString(validXml.mkString))
-
-      val lrn: LocalReferenceNumber    = arbitraryLRN.arbitrary.sample.get
-      val messageSender: MessageSender = arbitraryMessageSender.arbitrary.sample.get
-
-      val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-
-      val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
-      val triggerId: MessageId   = arbitraryMessageId.arbitrary.sample.get
-      val declarationData        = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn, messageSender)
-
-      val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
-        EitherT.rightT(declarationData)
-
-      val tempFile = SingletonTemporaryFileCreator.create()
-
-      when(mockMessageFactory.generateId()).thenReturn(triggerId)
-      when(mockMovementFactory.generateId()).thenReturn(movementId)
-
-      when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
-
-      when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
-        .thenReturn(departureDataEither)
-
-      when(mockRepository.restrictDuplicateLRN(eqTo(lrn), eqTo(messageSender)))
-        .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", LocalReferenceNumber("123"))))
-      val request: Request[Source[ByteString, _]] = fakeRequest(
-        POST,
-        validXmlStream,
-        movementId,
-        Some(triggerId),
-        Some(MessageType.DeclarationData.code)
-      )
-
-      val result: Future[Result] =
-        controller.createMovement(eoriNumber, MovementType.Departure)(request)
-
-      status(result) mustBe CONFLICT
-      contentAsJson(result) mustBe Json.obj(
-        "code"    -> "CONFLICT",
-        "message" -> "LRN has previously been used and cannot be reused",
-        "lrn"     -> "123"
-      )
-
-      verify(mockInternalAuthActionProvider, times(1)).apply(
-        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
-      )(any[ExecutionContext])
-      verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
   }
 
@@ -1971,9 +1912,6 @@ class MovementsControllerSpec
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
-            when(mockRepository.restrictDuplicateLRN(eqTo(lrn), eqTo(messageSender)))
-              .thenReturn(EitherT.rightT(Right(())))
-
             when(
               mockRepository.updateMessage(
                 MovementId(eqTo(movementId.value)),
@@ -2217,9 +2155,6 @@ class MovementsControllerSpec
             when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
-            when(mockRepository.restrictDuplicateLRN(eqTo(lrn), eqTo(messageSender)))
-              .thenReturn(EitherT.rightT((): Unit))
-
             when(
               mockRepository.updateMovement(
                 MovementId(eqTo(movementId.value)),
@@ -2258,131 +2193,6 @@ class MovementsControllerSpec
             verify(mockRepository, times(1)).updateMovement(
               MovementId(eqTo(movementId.value)),
               eqTo(None),
-              eqTo(None),
-              eqTo(Some(lrn)),
-              eqTo(Some(messageSender)),
-              any[OffsetDateTime]
-            )
-
-            verify(mockInternalAuthActionProvider, times(1)).apply(
-              eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
-            )(any[ExecutionContext])
-            verifyNoMoreInteractions(mockInternalAuthActionProvider)
-        }
-      }
-
-      "must return Conflict" - {
-
-        "if the message is a departure message and the first one in the movement with LRN already exists" in forAll(
-          arbitrary[EORINumber],
-          arbitrary[MovementId],
-          arbitrary[MessageId],
-          arbitraryLRN.arbitrary,
-          arbitraryMessageSender.arbitrary
-        ) {
-          (eori, movementId, messageId, lrn, messageSender) =>
-            resetInternalAuth()
-
-            val messageType                   = MessageType.DeclarationData
-            val now: OffsetDateTime           = OffsetDateTime.now
-            val generatedTime: OffsetDateTime = now.minusMinutes(1)
-
-            val tempFile = SingletonTemporaryFileCreator.create()
-
-            when(mockMessageFactory.generateId()).thenReturn(messageId)
-            when(mockMovementFactory.generateId()).thenReturn(movementId)
-
-            when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
-
-            when(
-              mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
-            )
-              .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
-
-            when(
-              mockRepository.getSingleMessage(
-                EORINumber(eqTo(eori.value)),
-                MovementId(eqTo(movementId.value)),
-                MessageId(eqTo(messageId.value)),
-                eqTo(MovementType.Departure)
-              )
-            )
-              .thenReturn(EitherT.rightT(MessageResponse(messageId, now, None, None, Some(MessageStatus.Pending), None)))
-
-            when(
-              mockObjectStoreService
-                .getObjectStoreFile(ObjectStoreResourceLocation(eqTo("movements/abcdef0123456789/abc.xml")))(any[ExecutionContext], any[HeaderCarrier])
-            )
-              .thenReturn(EitherT.rightT(Source.empty[ByteString]))
-
-            when(
-              mockMovementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]])
-            )
-              .thenReturn(EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn, messageSender))))
-
-            when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
-              .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
-
-            when(mockRepository.restrictDuplicateLRN(eqTo(lrn), eqTo(messageSender)))
-              .thenReturn(EitherT.leftT(MongoError.ConflictError("LRN has previously been used and cannot be reused", lrn)))
-
-            when(
-              mockRepository.updateMessage(
-                MovementId(eqTo(movementId.value)),
-                MessageId(eqTo(messageId.value)),
-                argThat(
-                  UpdateMessageDataMatcher(
-                    Some(ObjectStoreURI("transit-movements/movements/abcdef0123456789/abc.xml")),
-                    None,
-                    MessageStatus.Success,
-                    Some(messageType),
-                    Some(generatedTime),
-                    expectSize = false
-                  )
-                ),
-                any[OffsetDateTime]
-              )
-            )
-              .thenReturn(EitherT.rightT(()))
-
-            when(
-              mockRepository.updateMovement(
-                MovementId(eqTo(movementId.value)),
-                eqTo(Some(eori)),
-                eqTo(None),
-                eqTo(Some(lrn)),
-                eqTo(Some(messageSender)),
-                any[OffsetDateTime]
-              )
-            )
-              .thenReturn(EitherT.rightT(()))
-
-            val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-            val body = Json.obj(
-              "messageType"    -> messageType.code,
-              "objectStoreURI" -> "transit-movements/movements/abcdef0123456789/abc.xml",
-              "status"         -> "Success"
-            )
-            val request = FakeRequest(
-              method = POST,
-              uri = routes.MovementsController.updateMessage(eori, MovementType.Arrival, movementId, messageId).url,
-              headers = headers,
-              body = body
-            )
-
-            val result: Future[Result] =
-              controller.updateMessage(eori, MovementType.Departure, movementId, messageId)(request)
-
-            status(result) mustBe CONFLICT
-            verify(mockRepository, times(0)).updateMessage(
-              MovementId(eqTo(movementId.value)),
-              MessageId(eqTo(messageId.value)),
-              any[UpdateMessageData],
-              any[OffsetDateTime]
-            )
-            verify(mockRepository, times(0)).updateMovement(
-              MovementId(eqTo(movementId.value)),
-              eqTo(Some(eori)),
               eqTo(None),
               eqTo(Some(lrn)),
               eqTo(Some(messageSender)),
