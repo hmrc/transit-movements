@@ -39,7 +39,7 @@ import uk.gov.hmrc.mongo.play.json._
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
-import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
+import uk.gov.hmrc.transitmovements.models.formats.MovementMongoFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
@@ -133,29 +133,30 @@ object MovementsRepositoryImpl {
 class MovementsRepositoryImpl @Inject() (
   appConfig: AppConfig,
   mongoComponent: MongoComponent
-)(implicit ec: ExecutionContext)
+)(implicit ec: ExecutionContext, mongoFormats: MovementMongoFormats)
     extends PlayMongoRepository[Movement](
       mongoComponent = mongoComponent,
       collectionName = "movements",
-      domainFormat = MongoFormats.movementFormat,
+      domainFormat = mongoFormats.movementFormat,
       indexes = Seq(
         IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS)),
         IndexModel(Indexes.ascending(fieldNames = "localReferenceNumber", "messageSender")),
         IndexModel(Indexes.ascending("movementReferenceNumber"), IndexOptions().background(true))
       ),
       extraCodecs = Seq(
-        Codecs.playFormatCodec(MongoFormats.movementFormat),
-        Codecs.playFormatCodec(MongoFormats.movementWithoutMessagesFormat),
-        Codecs.playFormatCodec(MongoFormats.messageResponseFormat),
-        Codecs.playFormatCodec(MongoFormats.messageFormat),
-        Codecs.playFormatCodec(MongoFormats.movementIdFormat),
-        Codecs.playFormatCodec(MongoFormats.mrnFormat),
-        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
-        Codecs.playFormatCodec(MongoFormats.eoriNumberFormat),
-        Codecs.playFormatCodec(MongoFormats.lrnFormat),
-        Codecs.playFormatCodec(MongoFormats.messageSenderFormat),
-        Codecs.playFormatCodec(MongoFormats.paginationMovementSummaryFormat),
-        Codecs.playFormatCodec(MongoFormats.paginationMessageSummaryFormat)
+        Codecs.playFormatCodec(mongoFormats.movementFormat),
+        Codecs.playFormatCodec(mongoFormats.movementWithoutMessagesFormat),
+        Codecs.playFormatCodec(mongoFormats.messageResponseFormat),
+        Codecs.playFormatCodec(mongoFormats.messageFormat),
+        Codecs.playFormatCodec(mongoFormats.movementIdFormat),
+        Codecs.playFormatCodec(mongoFormats.mrnFormat),
+        Codecs.playFormatCodec(mongoFormats.offsetDateTimeFormat),
+        Codecs.playFormatCodec(mongoFormats.eoriNumberFormat),
+        Codecs.playFormatCodec(mongoFormats.lrnFormat),
+        Codecs.playFormatCodec(mongoFormats.messageSenderFormat),
+        Codecs.playFormatCodec(mongoFormats.paginationMovementSummaryFormat),
+        Codecs.playFormatCodec(mongoFormats.paginationMessageSummaryFormat),
+        Codecs.playFormatCodec(mongoFormats.sensitiveStringFormat)
       )
     )
     with MovementsRepository

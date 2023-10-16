@@ -51,6 +51,7 @@ import play.api.test.Helpers.contentAsString
 import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.internalauth.client.IAAction
 import uk.gov.hmrc.internalauth.client.Predicate
@@ -134,7 +135,7 @@ class MessageBodyControllerSpec
             messageId,
             now,
             Some(messageType),
-            Some(xml),
+            Some(SensitiveString(xml)),
             Some(MessageStatus.Success),
             None
           )
@@ -940,7 +941,7 @@ class MessageBodyControllerSpec
                 messageId,
                 now,
                 None,
-                Some(string),
+                Some(SensitiveString(string)),
                 Some(MessageStatus.Processing),
                 None
               )

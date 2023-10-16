@@ -16,6 +16,8 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
+
 import java.net.URI
 import java.time.OffsetDateTime
 
@@ -26,7 +28,7 @@ case class Message(
   messageType: Option[MessageType],
   triggerId: Option[MessageId],
   uri: Option[URI],
-  body: Option[String],
+  body: Option[SensitiveString],
   size: Option[Long],
   status: Option[MessageStatus]
 )

@@ -22,20 +22,41 @@ import org.scalatest.OptionValues
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import play.api.libs.json.Json
+import uk.gov.hmrc.crypto.Crypted
+import uk.gov.hmrc.crypto.Decrypter
+import uk.gov.hmrc.crypto.Encrypter
+import uk.gov.hmrc.crypto.PlainBytes
+import uk.gov.hmrc.crypto.PlainContent
+import uk.gov.hmrc.crypto.PlainText
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-class MongoFormatsSpec extends AnyFreeSpec with Matchers with ModelGenerators with OptionValues {
+class MovementMongoFormatsSpec extends AnyFreeSpec with Matchers with ModelGenerators with OptionValues {
+
+  object DummyCrypto extends Encrypter with Decrypter {
+
+    override def encrypt(plain: PlainContent): Crypted = plain match {
+      case PlainText(value)  => Crypted(value)
+      case PlainBytes(value) => Crypted(new String(value, StandardCharsets.UTF_8))
+    }
+
+    override def decrypt(reversiblyEncrypted: Crypted): PlainText = PlainText(reversiblyEncrypted.value)
+
+    override def decryptAsBytes(reversiblyEncrypted: Crypted): PlainBytes = PlainBytes(reversiblyEncrypted.value.getBytes(StandardCharsets.UTF_8))
+  }
+
+  lazy val movementMongoFormats: MovementMongoFormats = new MovementMongoFormats(false)(DummyCrypto)
 
   "OffsetDateTime, when written to Json, must be in a format Mongo can consume" in {
 
     val dateTime     = arbitrary[OffsetDateTime].sample.value
     val timeInMillis = dateTime.toInstant.toEpochMilli
 
-    MongoFormats.offsetDateTimeWrites.writes(dateTime) mustBe Json.obj(
+    movementMongoFormats.offsetDateTimeWrites.writes(dateTime) mustBe Json.obj(
       "$date" -> Json.obj(
         "$numberLong" -> timeInMillis.toString
       )
@@ -50,7 +71,7 @@ class MongoFormatsSpec extends AnyFreeSpec with Matchers with ModelGenerators wi
       )
     )
 
-    MongoFormats.offsetDateTimeReads.reads(mongoDateTimeFormat).get mustBe Instant.ofEpochMilli(long).atOffset(ZoneOffset.UTC)
+    movementMongoFormats.offsetDateTimeReads.reads(mongoDateTimeFormat).get mustBe Instant.ofEpochMilli(long).atOffset(ZoneOffset.UTC)
   }
 
 }

@@ -17,7 +17,6 @@
 package uk.gov.hmrc.transitmovements.repositories
 
 import org.mockito.Mockito
-import org.mockito.Mockito.when
 import org.mongodb.scala.model.Filters
 import org.mongodb.scala.model.Indexes
 import org.scalacheck.Arbitrary.arbitrary
@@ -30,12 +29,14 @@ import play.api.Logging
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.DefaultAwaitTimeout
 import play.api.test.FutureAwaits
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
+import uk.gov.hmrc.crypto.SymmetricCryptoFactory
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
-import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
+import uk.gov.hmrc.transitmovements.models.formats.MovementMongoFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
@@ -58,6 +59,12 @@ class MovementsRepositorySpec
 
   val instant: OffsetDateTime         = OffsetDateTime.of(2022, 5, 25, 16, 0, 0, 0, ZoneOffset.UTC)
   val receivedInstant: OffsetDateTime = OffsetDateTime.of(2022, 6, 12, 0, 0, 0, 0, ZoneOffset.UTC)
+
+  implicit lazy val movementMongoFormats: MovementMongoFormats = new MovementMongoFormats(false)(
+    SymmetricCryptoFactory.aesGcmCrypto(
+      "w3j7/4tPbrc122Sg3hJ+E+W/os+giOgaWuC326Zpa8Y="
+    )
+  )
 
   override lazy val mongoComponent: MongoComponent = {
     val databaseName: String = "test-movements"
@@ -85,7 +92,7 @@ class MovementsRepositorySpec
   }
 
   "DepartureMovementRepository" should "have the correct domain format" in {
-    repository.domainFormat shouldEqual MongoFormats.movementFormat
+    repository.domainFormat shouldEqual movementMongoFormats.movementFormat
   }
 
   "DepartureMovementRepository" should "have the index for localReferenceNumber" in {
@@ -174,7 +181,7 @@ class MovementsRepositorySpec
 
     val message1 =
       arbitrary[Message].sample.value.copy(
-        body = Some("body"),
+        body = Some(SensitiveString("body")),
         messageType = Some(MessageType.DeclarationData),
         triggerId = None,
         status = Some(MessageStatus.Pending),

@@ -30,6 +30,7 @@ import org.scalacheck.Gen
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
@@ -87,7 +88,9 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
 
         whenReady(result.value) {
           r =>
-            r mustBe Right(Message(messageId, instant, Some(instant), Some(messageType), triggerId, None, Some("test"), Some(4), Some(Received)))
+            r mustBe Right(
+              Message(messageId, instant, Some(instant), Some(messageType), triggerId, None, Some(SensitiveString("test")), Some(4), Some(Received))
+            )
 
             verify(objectStoreServiceMock, times(0)).putObjectStoreFile(MovementId(any()), MessageId(any()), any())(any(), any()) // must not be called at all
         }

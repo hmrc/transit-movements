@@ -20,6 +20,10 @@ import play.api.libs.json.Format
 import play.api.libs.json.Json
 import play.api.libs.json.Reads
 import play.api.libs.json.Writes
+import uk.gov.hmrc.crypto.Decrypter
+import uk.gov.hmrc.crypto.Encrypter
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
+import uk.gov.hmrc.crypto.json.JsonEncryption
 import uk.gov.hmrc.mongo.play.json.formats.MongoBinaryFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
@@ -33,7 +37,24 @@ import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with MongoJavatimeFormats.Implicits with MongoUuidFormats.Implicits {
+// If shouldFallback is true, then assume that unencrypted values could be left in the database so to fallback to that
+class MovementMongoFormats(shouldFallback: Boolean)(implicit crypto: Encrypter with Decrypter)
+    extends CommonFormats
+    with MongoBinaryFormats.Implicits
+    with MongoJavatimeFormats.Implicits
+    with MongoUuidFormats.Implicits {
+
+  implicit lazy val writes: Writes[SensitiveString] =
+    JsonEncryption.sensitiveEncrypter[String, SensitiveString]
+
+  implicit lazy val reads: Reads[SensitiveString] =
+    JsonEncryption.sensitiveDecrypter(SensitiveString.apply)
+
+  implicit lazy val readsWithFallback: Reads[SensitiveString] =
+    reads.orElse(implicitly[Reads[String]].map(SensitiveString.apply))
+
+  implicit lazy val sensitiveStringFormat: Format[SensitiveString] =
+    Format(if (shouldFallback) readsWithFallback else reads, writes)
 
   implicit val offsetDateTimeReads: Reads[OffsetDateTime] = Reads {
     value =>
@@ -59,5 +80,3 @@ trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
   implicit val paginationMessageSummaryFormat: Format[PaginationMessageSummary]   = Json.format[PaginationMessageSummary]
 
 }
-
-object MongoFormats extends MongoFormats

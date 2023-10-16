@@ -26,13 +26,21 @@ import play.api.test.DefaultAwaitTimeout
 import play.api.test.FakeRequest
 import play.api.test.FutureAwaits
 import play.api.test.Helpers._
+import uk.gov.hmrc.crypto.Crypted
+import uk.gov.hmrc.crypto.Decrypter
+import uk.gov.hmrc.crypto.Encrypter
+import uk.gov.hmrc.crypto.PlainBytes
+import uk.gov.hmrc.crypto.PlainContent
+import uk.gov.hmrc.crypto.PlainText
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
+import uk.gov.hmrc.transitmovements.models.formats.MovementMongoFormats
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl
 
+import java.nio.charset.StandardCharsets
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class TestOnlyControllerSpec
@@ -45,6 +53,20 @@ class TestOnlyControllerSpec
     with ModelGenerators
     with OptionValues
     with MockitoSugar {
+
+  object DummyCrypto extends Encrypter with Decrypter {
+
+    override def encrypt(plain: PlainContent): Crypted = plain match {
+      case PlainText(value)  => Crypted(value)
+      case PlainBytes(value) => Crypted(new String(value, StandardCharsets.UTF_8))
+    }
+
+    override def decrypt(reversiblyEncrypted: Crypted): PlainText = PlainText(reversiblyEncrypted.value)
+
+    override def decryptAsBytes(reversiblyEncrypted: Crypted): PlainBytes = PlainBytes(reversiblyEncrypted.value.getBytes(StandardCharsets.UTF_8))
+  }
+
+  implicit lazy val movementMongoFormats: MovementMongoFormats = new MovementMongoFormats(false)(DummyCrypto)
 
   val appConfig: AppConfig = mock[AppConfig]
   when(appConfig.documentTtl).thenReturn(1000000) // doesn't matter, just something will do

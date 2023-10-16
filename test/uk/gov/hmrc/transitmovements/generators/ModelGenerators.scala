@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovements.generators
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
@@ -109,8 +110,10 @@ trait ModelGenerators extends BaseGenerators {
         triggerId   <- arbitrary[Option[MessageId]]
         url         <- arbitrary[Option[URI]]
         size        <- Gen.chooseNum(1L, 250000L)
-        body        <- arbitrary[Option[String]]
-        status      <- Gen.oneOf(MessageStatus.statusValues)
+        body <- arbitrary[Option[String]].map(
+          input => input.map(SensitiveString)
+        )
+        status <- Gen.oneOf(MessageStatus.statusValues)
       } yield Message(id, received, generated, Some(messageType), triggerId, url, body, Some(size), Some(status))
     }
 

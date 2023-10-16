@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovements.models.responses
 
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
@@ -30,7 +31,7 @@ case class MessageResponse(
   id: MessageId,
   received: OffsetDateTime,
   messageType: Option[MessageType],
-  body: Option[String],
+  body: Option[SensitiveString],
   status: Option[MessageStatus],
   uri: Option[URI] = None
 )

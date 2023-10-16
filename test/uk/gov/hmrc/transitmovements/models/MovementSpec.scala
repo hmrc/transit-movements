@@ -20,6 +20,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsString
 import play.api.libs.json.Json
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 
 import java.net.URI
@@ -47,7 +48,7 @@ class MovementSpec extends AnyFlatSpec with Matchers with PresentationFormats {
           messageType = Some(MessageType.ReleaseForTransit),
           triggerId = Some(MessageId("888")),
           uri = Some(URI.create("xyz")),
-          body = Some("body"),
+          body = Some(SensitiveString("body")),
           size = Some(1L),
           status = Some(MessageStatus.Processing)
         )

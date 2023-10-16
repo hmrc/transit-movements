@@ -18,19 +18,28 @@ package uk.gov.hmrc.transitmovements.models.formats
 
 import play.api.libs.json.Format
 import play.api.libs.json.Json
+import play.api.libs.json.OFormat
+import play.api.libs.json.Reads
+import play.api.libs.json.Writes
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
+import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
 trait PresentationFormats extends CommonFormats {
 
+  implicit val sensitiveStringReads: Reads[SensitiveString]   = implicitly[Reads[String]].map(SensitiveString.apply)
+  implicit val sensitiveStringWrites: Writes[SensitiveString] = implicitly[Writes[String]].contramap(_.decryptedValue)
+
   // as these use the OffsetDateTime times, these need to be here to avoid the macro expansion of
   // OffsetDateTime when used with Mongo.
-  implicit val messageFormat: Format[Message]                                 = Json.format[Message]
-  implicit val movementFormat: Format[Movement]                               = Json.format[Movement]
-  implicit val movementWithoutMessagesFormat: Format[MovementWithoutMessages] = Json.format[MovementWithoutMessages]
-  implicit val messageResponseFormat: Format[MessageResponse]                 = Json.format[MessageResponse]
+  implicit val messageFormat: Format[Message]                                   = Json.format[Message]
+  implicit val movementFormat: Format[Movement]                                 = Json.format[Movement]
+  implicit val movementWithoutMessagesFormat: Format[MovementWithoutMessages]   = Json.format[MovementWithoutMessages]
+  implicit val messageResponseFormat: Format[MessageResponse]                   = Json.format[MessageResponse]
+  implicit val paginationMessageSummaryFormat: Format[PaginationMessageSummary] = Json.format[PaginationMessageSummary]
 
 }
 

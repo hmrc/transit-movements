@@ -130,7 +130,7 @@ class MessageBodyController @Inject() (
     hc: HeaderCarrier
   ): EitherT[Future, PresentationError, Source[ByteString, _]] =
     messageResponse match {
-      case MessageResponse(_, _, _, Some(body), _, _) => EitherT.rightT(Source.single(ByteString(body)))
+      case MessageResponse(_, _, _, Some(body), _, _) => EitherT.rightT(Source.single(ByteString(body.decryptedValue)))
       case MessageResponse(_, _, _, None, _, Some(uri)) =>
         for {
           resourceLocation <- extractResourceLocation(ObjectStoreURI(uri.toString))

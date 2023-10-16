@@ -22,6 +22,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovements.models.BodyStorage
 import uk.gov.hmrc.transitmovements.models.Message
@@ -104,7 +105,7 @@ class MessageServiceImpl @Inject() (
           uri = bodyStorage.objectStore.map(
             x => new URI(x.value)
           ),
-          body = bodyStorage.mongo,
+          body = bodyStorage.mongo.map(SensitiveString),
           size = Some(size),
           status = Some(status)
         )

@@ -54,6 +54,7 @@ import play.api.test.Helpers.await
 import play.api.test.Helpers.contentAsJson
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.internalauth.client.IAAction
@@ -197,7 +198,7 @@ class MovementsControllerSpec
           Some(MessageType.DeclarationData),
           Some(messageId),
           Some(uri),
-          Some("content"),
+          Some(SensitiveString("content")),
           Some(size),
           Some(MessageStatus.Processing)
         )
