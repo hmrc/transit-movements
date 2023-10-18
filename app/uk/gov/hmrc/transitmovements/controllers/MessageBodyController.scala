@@ -50,6 +50,7 @@ import uk.gov.hmrc.transitmovements.services.MessageService
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 import uk.gov.hmrc.transitmovements.services.ObjectStoreService
+import uk.gov.hmrc.transitmovements.services.PersistenceService
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -58,14 +59,14 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 class MessageBodyController @Inject() (
-  cc: ControllerComponents,
-  repo: MovementsRepository,
-  objectStoreService: ObjectStoreService,
-  messagesXmlParsingService: MessagesXmlParsingService,
-  movementsXmlParsingService: MovementsXmlParsingService,
-  messageService: MessageService,
-  internalAuth: InternalAuthActionProvider,
-  clock: Clock
+                                        cc: ControllerComponents,
+                                        repo: PersistenceService,
+                                        objectStoreService: ObjectStoreService,
+                                        messagesXmlParsingService: MessagesXmlParsingService,
+                                        movementsXmlParsingService: MovementsXmlParsingService,
+                                        messageService: MessageService,
+                                        internalAuth: InternalAuthActionProvider,
+                                        clock: Clock
 )(implicit
   ec: ExecutionContext,
   val materializer: Materializer,

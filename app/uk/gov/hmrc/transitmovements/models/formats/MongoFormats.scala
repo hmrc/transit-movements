@@ -16,24 +16,47 @@
 
 package uk.gov.hmrc.transitmovements.models.formats
 
+import com.google.inject.Inject
 import play.api.libs.json.Format
 import play.api.libs.json.Json
 import play.api.libs.json.Reads
 import play.api.libs.json.Writes
+import uk.gov.hmrc.crypto.Decrypter
+import uk.gov.hmrc.crypto.Encrypter
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
+import uk.gov.hmrc.crypto.SymmetricCryptoFactory
+import uk.gov.hmrc.crypto.json.JsonEncryption
 import uk.gov.hmrc.mongo.play.json.formats.MongoBinaryFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
-import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.Movement
+import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
 import uk.gov.hmrc.transitmovements.models.PaginationMovementSummary
+import uk.gov.hmrc.transitmovements.models.mongo.MongoMessage
+import uk.gov.hmrc.transitmovements.models.mongo.MongoMovement
+import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMessages
+import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMovements
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with MongoJavatimeFormats.Implicits with MongoUuidFormats.Implicits {
+class MongoFormats @Inject() (appConfig: AppConfig) extends CommonFormats with MongoBinaryFormats.Implicits with MongoJavatimeFormats.Implicits with MongoUuidFormats.Implicits {
+
+  implicit lazy val crypto: Encrypter with Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
+
+  implicit lazy val writes: Writes[SensitiveString] =
+    JsonEncryption.sensitiveEncrypter[String, SensitiveString]
+
+  implicit lazy val reads: Reads[SensitiveString] =
+    JsonEncryption.sensitiveDecrypter(SensitiveString.apply)
+
+  implicit lazy val readsWithFallback: Reads[SensitiveString] =
+    reads.orElse(implicitly[Reads[String]].map(SensitiveString.apply))
+
+  implicit lazy val sensitiveStringFormat: Format[SensitiveString] =
+    Format(if (appConfig.encryptionTolerantRead) readsWithFallback else reads, writes)
 
   implicit val offsetDateTimeReads: Reads[OffsetDateTime] = Reads {
     value =>
@@ -51,13 +74,10 @@ trait MongoFormats extends CommonFormats with MongoBinaryFormats.Implicits with 
   implicit val offsetDateTimeFormat: Format[OffsetDateTime] = Format.apply(offsetDateTimeReads, offsetDateTimeWrites)
 
   // these use the dates above, so need to be here for compile-time macro expansion
-  implicit val messageFormat: Format[Message]                                     = Json.format[Message]
-  implicit val movementFormat: Format[Movement]                                   = Json.format[Movement]
-  implicit val movementWithoutMessagesFormat: Format[MovementWithoutMessages]     = Json.format[MovementWithoutMessages]
-  implicit val messageResponseFormat: Format[MessageResponse]                     = Json.format[MessageResponse]
-  implicit val paginationMovementSummaryFormat: Format[PaginationMovementSummary] = Json.format[PaginationMovementSummary]
-  implicit val paginationMessageSummaryFormat: Format[PaginationMessageSummary]   = Json.format[PaginationMessageSummary]
+  implicit val messageFormat: Format[MongoMessage]                              = Json.format[MongoMessage]
+  implicit val movementFormat: Format[MongoMovement]                            = Json.format[MongoMovement]
+  implicit val paginationMovementSummaryFormat: Format[MongoPaginatedMovements] = Json.format[MongoPaginatedMovements]
+  implicit val paginationMessageSummaryFormat: Format[MongoPaginatedMessages]   = Json.format[MongoPaginatedMessages]
 
 }
 
-object MongoFormats extends MongoFormats

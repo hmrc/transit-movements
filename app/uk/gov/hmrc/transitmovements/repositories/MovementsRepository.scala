@@ -40,7 +40,11 @@ import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
+import uk.gov.hmrc.transitmovements.models.mongo.MongoMessage
+import uk.gov.hmrc.transitmovements.models.mongo.MongoMessageUpdateData
+import uk.gov.hmrc.transitmovements.models.mongo.MongoMovement
+import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMessages
+import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMovements
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError._
@@ -54,7 +58,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import scala.annotation.nowarn
 import scala.concurrent._
-import scala.reflect.ClassTag
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -62,20 +65,44 @@ import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[MovementsRepositoryImpl])
 trait MovementsRepository {
-  def insert(movement: Movement): EitherT[Future, MongoError, Unit]
+  def insert(movement: MongoMovement): EitherT[Future, MongoError, Unit]
+
+  def updateMovement(
+                      movementId: MovementId,
+                      movementEORI: Option[EORINumber],
+                      mrn: Option[MovementReferenceNumber],
+                      lrn: Option[LocalReferenceNumber],
+                      messageSender: Option[MessageSender],
+                      received: OffsetDateTime
+                    ): EitherT[Future, MongoError, Unit]
+
+  def attachMessage(
+                     movementId: MovementId,
+                     message: MongoMessage,
+                     mrn: Option[MovementReferenceNumber],
+                     received: OffsetDateTime
+                   ): EitherT[Future, MongoError, Unit]
+
+  def updateMessage(
+                     movementId: MovementId,
+                     messageId: MessageId,
+                     message: MongoMessageUpdateData,
+                     received: OffsetDateTime
+                   ): EitherT[Future, MongoError, Unit]
+
 
   def getMovementWithoutMessages(
     eoriNumber: EORINumber,
     movementId: MovementId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, MovementWithoutMessages]
+  ): EitherT[Future, MongoError, MongoMovement]
 
   def getSingleMessage(
     eoriNumber: EORINumber,
     movementId: MovementId,
     messageId: MessageId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, MessageResponse]
+  ): EitherT[Future, MongoError, MongoMessage]
 
   def getMessages(
     eoriNumber: EORINumber,
@@ -85,7 +112,7 @@ trait MovementsRepository {
     page: Option[PageNumber] = None,
     count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
-  ): EitherT[Future, MongoError, PaginationMessageSummary]
+  ): EitherT[Future, MongoError, MongoPaginatedMessages]
 
   def getMovements(
     eoriNumber: EORINumber,
@@ -97,31 +124,7 @@ trait MovementsRepository {
     count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None,
     localReferenceNumber: Option[LocalReferenceNumber]
-  ): EitherT[Future, MongoError, PaginationMovementSummary]
-
-  def updateMovement(
-    movementId: MovementId,
-    movementEORI: Option[EORINumber],
-    mrn: Option[MovementReferenceNumber],
-    lrn: Option[LocalReferenceNumber],
-    messageSender: Option[MessageSender],
-    received: OffsetDateTime
-  ): EitherT[Future, MongoError, Unit]
-
-  def attachMessage(
-    movementId: MovementId,
-    message: Message,
-    mrn: Option[MovementReferenceNumber],
-    received: OffsetDateTime
-  ): EitherT[Future, MongoError, Unit]
-
-  def updateMessage(
-    movementId: MovementId,
-    messageId: MessageId,
-    message: UpdateMessageData,
-    received: OffsetDateTime
-  ): EitherT[Future, MongoError, Unit]
-
+  ): EitherT[Future, MongoError, MongoPaginatedMovements]
 }
 
 object MovementsRepositoryImpl {
@@ -132,37 +135,35 @@ object MovementsRepositoryImpl {
 @nowarn("msg=It would fail on the following input: Failure\\(_\\)") // this would be fatal exceptions -- we don't want to catch those
 class MovementsRepositoryImpl @Inject() (
   appConfig: AppConfig,
-  mongoComponent: MongoComponent
+  mongoComponent: MongoComponent,
+  mongoFormats: MongoFormats
 )(implicit ec: ExecutionContext)
-    extends PlayMongoRepository[Movement](
+    extends PlayMongoRepository[MongoMovement](
       mongoComponent = mongoComponent,
       collectionName = "movements",
-      domainFormat = MongoFormats.movementFormat,
+      domainFormat = mongoFormats.movementFormat,
       indexes = Seq(
         IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS)),
-        IndexModel(Indexes.ascending(fieldNames = "localReferenceNumber", "messageSender")),
         IndexModel(Indexes.ascending("movementReferenceNumber"), IndexOptions().background(true))
       ),
       extraCodecs = Seq(
-        Codecs.playFormatCodec(MongoFormats.movementFormat),
-        Codecs.playFormatCodec(MongoFormats.movementWithoutMessagesFormat),
-        Codecs.playFormatCodec(MongoFormats.messageResponseFormat),
-        Codecs.playFormatCodec(MongoFormats.messageFormat),
-        Codecs.playFormatCodec(MongoFormats.movementIdFormat),
-        Codecs.playFormatCodec(MongoFormats.mrnFormat),
-        Codecs.playFormatCodec(MongoFormats.offsetDateTimeFormat),
-        Codecs.playFormatCodec(MongoFormats.eoriNumberFormat),
-        Codecs.playFormatCodec(MongoFormats.lrnFormat),
-        Codecs.playFormatCodec(MongoFormats.messageSenderFormat),
-        Codecs.playFormatCodec(MongoFormats.paginationMovementSummaryFormat),
-        Codecs.playFormatCodec(MongoFormats.paginationMessageSummaryFormat)
+        Codecs.playFormatCodec(mongoFormats.movementFormat),
+        Codecs.playFormatCodec(mongoFormats.messageFormat),
+        Codecs.playFormatCodec(mongoFormats.movementIdFormat),
+        Codecs.playFormatCodec(mongoFormats.mrnFormat),
+        Codecs.playFormatCodec(mongoFormats.offsetDateTimeFormat),
+        Codecs.playFormatCodec(mongoFormats.eoriNumberFormat),
+        Codecs.playFormatCodec(mongoFormats.lrnFormat),
+        Codecs.playFormatCodec(mongoFormats.messageSenderFormat),
+        Codecs.playFormatCodec(mongoFormats.paginationMovementSummaryFormat),
+        Codecs.playFormatCodec(mongoFormats.paginationMessageSummaryFormat)
       )
     )
     with MovementsRepository
     with Logging
     with CommonFormats {
 
-  def insert(movement: Movement): EitherT[Future, MongoError, Unit] =
+  override def insert(movement: MongoMovement): EitherT[Future, MongoError, Unit] =
     mongoRetry(Try(collection.insertOne(movement)) match {
       case Success(obs) =>
         obs.toFuture().map {
@@ -177,25 +178,25 @@ class MovementsRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def getMovementWithoutMessages(
+  override def getMovementWithoutMessages(
     eoriNumber: EORINumber,
     movementId: MovementId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, MovementWithoutMessages] = {
+  ): EitherT[Future, MongoError, MongoMovement] = {
 
     val selector = mAnd(
       mEq("_id", movementId.value),
       mEq("enrollmentEORINumber", eoriNumber.value),
       mEq("movementType", movementType.value)
     )
-    val projection = MovementWithoutMessages.projection
+    val projection = MongoMovement.withoutMovementsProjection
 
     val aggregates = Seq(
       Aggregates.filter(selector),
       Aggregates.project(projection)
     )
 
-    mongoRetry(Try(collection.aggregate[MovementWithoutMessages](aggregates)) match {
+    mongoRetry(Try(collection.aggregate[MongoMovement](aggregates)) match {
       case Success(obs) =>
         obs
           .headOption()
@@ -216,7 +217,7 @@ class MovementsRepositoryImpl @Inject() (
     page: Option[PageNumber] = None,
     count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
-  ): EitherT[Future, MongoError, PaginationMessageSummary] = {
+  ): EitherT[Future, MongoError, MongoPaginatedMessages] = {
 
     val selector = mAnd(
       mEq("_id", movementId.value),
@@ -240,17 +241,18 @@ class MovementsRepositoryImpl @Inject() (
       filterAggregates ++ Seq(
         Aggregates.sort(descending("received")),
         Aggregates.skip(from),
-        Aggregates.limit(countNumber)
+        Aggregates.limit(countNumber),
+        Aggregates.project(MongoMessage.simpleMetadataProjection)
       )
 
     for {
-      perPageMessages <- filterPerPage[MessageResponse](aggregates)
+      perPageMessages <- filterPerPage[MongoMessage](aggregates)
       totalCount      <- countItems(filterAggregates)
-    } yield PaginationMessageSummary(TotalCount(totalCount), perPageMessages)
+    } yield MongoPaginatedMessages(TotalCount(totalCount), perPageMessages)
 
   }
 
-  private def filterPerPage[R](aggregates: Seq[Bson])(implicit c: ClassTag[R]): EitherT[Future, MongoError, Vector[R]] =
+  private def filterPerPage[R](aggregates: Seq[Bson]): EitherT[Future, MongoError, Vector[R]] =
     mongoRetry(Try(collection.aggregate[R](aggregates)) match {
       case Success(obs) =>
         obs
@@ -263,12 +265,12 @@ class MovementsRepositoryImpl @Inject() (
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def getSingleMessage(
+  override def getSingleMessage(
     eoriNumber: EORINumber,
     movementId: MovementId,
     messageId: MessageId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, MessageResponse] = {
+  ): EitherT[Future, MongoError, MongoMessage] = {
 
     val selector = mAnd(
       mEq("_id", movementId.value),
@@ -278,9 +280,14 @@ class MovementsRepositoryImpl @Inject() (
     )
     val secondarySelector = mEq("messages.id", messageId.value)
     val aggregates =
-      Seq(Aggregates.filter(selector), Aggregates.unwind("$messages"), Aggregates.filter(secondarySelector), Aggregates.replaceRoot("$messages"))
+      Seq(
+        Aggregates.filter(selector),
+        Aggregates.unwind("$messages"),
+        Aggregates.filter(secondarySelector),
+        Aggregates.replaceRoot("$messages")
+      )
 
-    mongoRetry(Try(collection.aggregate[MessageResponse](aggregates)) match {
+    mongoRetry(Try(collection.aggregate[MongoMessage](aggregates)) match {
       case Success(obs) =>
         obs.headOption().map {
           case Some(opt) => Right(opt)
@@ -309,7 +316,7 @@ class MovementsRepositoryImpl @Inject() (
     count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None,
     localReferenceNumber: Option[LocalReferenceNumber]
-  ): EitherT[Future, MongoError, PaginationMovementSummary] = {
+  ): EitherT[Future, MongoError, MongoPaginatedMovements] = {
 
     val dateTimeFilter: Bson = mAnd(
       mGte("updated", updatedSince.map(_.toLocalDateTime).getOrElse(EPOCH_TIME)),
@@ -328,12 +335,13 @@ class MovementsRepositoryImpl @Inject() (
     val aggregates = filterAggregates ++ Seq(
       Aggregates.sort(descending("updated")),
       Aggregates.skip(from),
-      Aggregates.limit(itemCount)
+      Aggregates.limit(itemCount),
+      Aggregates.project(MongoMessage.simpleMetadataProjection)
     )
     for {
-      perPageMovements <- filterPerPage[MovementWithoutMessages](aggregates)
+      perPageMovements <- filterPerPage[MongoMovement](aggregates)
       totalCount       <- countItems(filterAggregates)
-    } yield PaginationMovementSummary(TotalCount(totalCount), perPageMovements)
+    } yield MongoPaginatedMovements(TotalCount(totalCount), perPageMovements)
 
   }
 
@@ -383,9 +391,9 @@ class MovementsRepositoryImpl @Inject() (
       case _                          => empty()
     }
 
-  def attachMessage(
+  override def attachMessage(
     movementId: MovementId,
-    message: Message,
+    message: MongoMessage,
     mrn: Option[MovementReferenceNumber],
     received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit] = {
@@ -417,11 +425,11 @@ class MovementsRepositoryImpl @Inject() (
     })
   }
 
-  def updateMessage(
-    movementId: MovementId,
-    messageId: MessageId,
-    message: UpdateMessageData,
-    received: OffsetDateTime
+  override def updateMessage(
+                              movementId: MovementId,
+                              messageId: MessageId,
+                              message: MongoMessageUpdateData,
+                              received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit] = {
 
     val filter: Bson = mEq(movementId.value)

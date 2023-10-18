@@ -16,7 +16,8 @@ object AppDependencies {
     "io.lemonlabs"            %% "scala-uri"                    % "3.6.0",
     "com.typesafe.akka"       %% "akka-slf4j"                   % PlayVersion.akkaVersion,
     "com.lightbend.akka"      %% "akka-stream-alpakka-xml"      % "3.0.4",
-    "uk.gov.hmrc"             %% "internal-auth-client-play-28" % "1.4.0"
+    "uk.gov.hmrc"             %% "internal-auth-client-play-28" % "1.4.0",
+    "uk.gov.hmrc"             %% "crypto-json-play-28"          % "7.3.0"
   )
 
   val test = Seq(
