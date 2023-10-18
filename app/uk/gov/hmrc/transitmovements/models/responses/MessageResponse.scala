@@ -16,8 +16,8 @@
 
 package uk.gov.hmrc.transitmovements.models.responses
 
-import org.mongodb.scala.bson.BsonDocument
-import org.mongodb.scala.bson.conversions.Bson
+import play.api.libs.json.Format
+import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
@@ -37,13 +37,7 @@ case class MessageResponse(
 
 object MessageResponse {
 
-  val projection: Bson =
-    BsonDocument(
-      "id"          -> 1,
-      "received"    -> 1,
-      "messageType" -> 1,
-      "status"      -> 1
-    )
+  implicit val format: Format[MessageResponse] = Json.format[MessageResponse]
 
   def fromMessageWithBody(message: Message) =
     MessageResponse(

@@ -16,15 +16,14 @@
 
 package uk.gov.hmrc.transitmovements.config
 
+import play.api.Configuration
+
 import javax.inject.Inject
 import javax.inject.Singleton
-import play.api.Configuration
-import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
 @Singleton
 class AppConfig @Inject() (
-  config: Configuration,
-  servicesConfig: ServicesConfig
+  config: Configuration
 ) {
   lazy val mongoRetryAttempts: Int = config.get[Int]("mongodb.retryAttempts")
   lazy val documentTtl: Long       = config.get[Long]("mongodb.timeToLiveInSeconds")
@@ -32,7 +31,7 @@ class AppConfig @Inject() (
   lazy val smallMessageSizeLimit: Long  = config.get[Long]("smallMessageSizeLimit")
   lazy val internalAuthEnabled: Boolean = config.get[Boolean]("microservice.services.internal-auth.enabled")
 
-  lazy val encryptionKey: String = config.get[String]("encryption.key")
+  lazy val encryptionKey: String           = config.get[String]("encryption.key")
   lazy val encryptionTolerantRead: Boolean = config.get[Boolean]("encryption.tolerant-read")
 
 }

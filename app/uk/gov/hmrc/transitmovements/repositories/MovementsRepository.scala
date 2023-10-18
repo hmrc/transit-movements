@@ -58,6 +58,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import scala.annotation.nowarn
 import scala.concurrent._
+import scala.reflect.ClassTag
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -68,28 +69,27 @@ trait MovementsRepository {
   def insert(movement: MongoMovement): EitherT[Future, MongoError, Unit]
 
   def updateMovement(
-                      movementId: MovementId,
-                      movementEORI: Option[EORINumber],
-                      mrn: Option[MovementReferenceNumber],
-                      lrn: Option[LocalReferenceNumber],
-                      messageSender: Option[MessageSender],
-                      received: OffsetDateTime
-                    ): EitherT[Future, MongoError, Unit]
+    movementId: MovementId,
+    movementEORI: Option[EORINumber],
+    mrn: Option[MovementReferenceNumber],
+    lrn: Option[LocalReferenceNumber],
+    messageSender: Option[MessageSender],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit]
 
   def attachMessage(
-                     movementId: MovementId,
-                     message: MongoMessage,
-                     mrn: Option[MovementReferenceNumber],
-                     received: OffsetDateTime
-                   ): EitherT[Future, MongoError, Unit]
+    movementId: MovementId,
+    message: MongoMessage,
+    mrn: Option[MovementReferenceNumber],
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit]
 
   def updateMessage(
-                     movementId: MovementId,
-                     messageId: MessageId,
-                     message: MongoMessageUpdateData,
-                     received: OffsetDateTime
-                   ): EitherT[Future, MongoError, Unit]
-
+    movementId: MovementId,
+    messageId: MessageId,
+    message: MongoMessageUpdateData,
+    received: OffsetDateTime
+  ): EitherT[Future, MongoError, Unit]
 
   def getMovementWithoutMessages(
     eoriNumber: EORINumber,
@@ -252,7 +252,7 @@ class MovementsRepositoryImpl @Inject() (
 
   }
 
-  private def filterPerPage[R](aggregates: Seq[Bson]): EitherT[Future, MongoError, Vector[R]] =
+  private def filterPerPage[R: ClassTag](aggregates: Seq[Bson]): EitherT[Future, MongoError, Vector[R]] =
     mongoRetry(Try(collection.aggregate[R](aggregates)) match {
       case Success(obs) =>
         obs
@@ -426,10 +426,10 @@ class MovementsRepositoryImpl @Inject() (
   }
 
   override def updateMessage(
-                              movementId: MovementId,
-                              messageId: MessageId,
-                              message: MongoMessageUpdateData,
-                              received: OffsetDateTime
+    movementId: MovementId,
+    messageId: MessageId,
+    message: MongoMessageUpdateData,
+    received: OffsetDateTime
   ): EitherT[Future, MongoError, Unit] = {
 
     val filter: Bson = mEq(movementId.value)

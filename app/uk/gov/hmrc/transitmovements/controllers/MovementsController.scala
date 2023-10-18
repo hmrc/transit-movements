@@ -40,12 +40,10 @@ import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.I
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models._
-import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.requests.UpdateStatus
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
-import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
 import uk.gov.hmrc.transitmovements.utils.StreamWithFile
 
@@ -76,7 +74,6 @@ class MovementsController @Inject() (
     with StreamWithFile
     with ConvertError
     with MessageTypeHeaderExtractor
-    with PresentationFormats
     with ContentTypeRouting
     with ObjectStoreURIHelpers {
 

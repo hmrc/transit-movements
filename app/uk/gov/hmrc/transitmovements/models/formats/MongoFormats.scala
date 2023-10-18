@@ -30,29 +30,29 @@ import uk.gov.hmrc.mongo.play.json.formats.MongoBinaryFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
-import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
-import uk.gov.hmrc.transitmovements.models.PaginationMovementSummary
 import uk.gov.hmrc.transitmovements.models.mongo.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.MongoMovement
 import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMessages
 import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMovements
-import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-class MongoFormats @Inject() (appConfig: AppConfig) extends CommonFormats with MongoBinaryFormats.Implicits with MongoJavatimeFormats.Implicits with MongoUuidFormats.Implicits {
+class MongoFormats @Inject() (appConfig: AppConfig)
+    extends CommonFormats
+    with MongoBinaryFormats.Implicits
+    with MongoJavatimeFormats.Implicits
+    with MongoUuidFormats.Implicits {
 
   implicit lazy val crypto: Encrypter with Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
 
   implicit lazy val writes: Writes[SensitiveString] =
     JsonEncryption.sensitiveEncrypter[String, SensitiveString]
 
-  implicit lazy val reads: Reads[SensitiveString] =
+  lazy val reads: Reads[SensitiveString] =
     JsonEncryption.sensitiveDecrypter(SensitiveString.apply)
 
-  implicit lazy val readsWithFallback: Reads[SensitiveString] =
+  lazy val readsWithFallback: Reads[SensitiveString] =
     reads.orElse(implicitly[Reads[String]].map(SensitiveString.apply))
 
   implicit lazy val sensitiveStringFormat: Format[SensitiveString] =
@@ -80,4 +80,3 @@ class MongoFormats @Inject() (appConfig: AppConfig) extends CommonFormats with M
   implicit val paginationMessageSummaryFormat: Format[MongoPaginatedMessages]   = Json.format[MongoPaginatedMessages]
 
 }
-

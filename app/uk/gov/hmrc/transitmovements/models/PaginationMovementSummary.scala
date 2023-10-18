@@ -22,6 +22,5 @@ import play.api.libs.json.OFormat
 case class PaginationMovementSummary(totalCount: TotalCount, movementSummary: Vector[MovementWithoutMessages])
 
 object PaginationMovementSummary {
-  implicit lazy val format: OFormat[PaginationMovementSummary]                      = Json.format[PaginationMovementSummary]
-  implicit lazy val movementWithoutMessagesFormat: OFormat[MovementWithoutMessages] = Json.format[MovementWithoutMessages]
+  implicit lazy val format: OFormat[PaginationMovementSummary] = Json.format[PaginationMovementSummary]
 }

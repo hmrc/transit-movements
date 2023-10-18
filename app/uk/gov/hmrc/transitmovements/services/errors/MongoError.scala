@@ -16,8 +16,6 @@
 
 package uk.gov.hmrc.transitmovements.services.errors
 
-import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
-
 sealed abstract class MongoError
 
 object MongoError {

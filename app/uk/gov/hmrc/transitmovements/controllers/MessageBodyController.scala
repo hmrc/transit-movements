@@ -45,7 +45,6 @@ import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
-import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageService
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
@@ -59,14 +58,14 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 class MessageBodyController @Inject() (
-                                        cc: ControllerComponents,
-                                        repo: PersistenceService,
-                                        objectStoreService: ObjectStoreService,
-                                        messagesXmlParsingService: MessagesXmlParsingService,
-                                        movementsXmlParsingService: MovementsXmlParsingService,
-                                        messageService: MessageService,
-                                        internalAuth: InternalAuthActionProvider,
-                                        clock: Clock
+  cc: ControllerComponents,
+  repo: PersistenceService,
+  objectStoreService: ObjectStoreService,
+  messagesXmlParsingService: MessagesXmlParsingService,
+  movementsXmlParsingService: MovementsXmlParsingService,
+  messageService: MessageService,
+  internalAuth: InternalAuthActionProvider,
+  clock: Clock
 )(implicit
   ec: ExecutionContext,
   val materializer: Materializer,
