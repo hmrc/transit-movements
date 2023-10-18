@@ -68,7 +68,6 @@ import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvid
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
 import uk.gov.hmrc.transitmovements.models._
-import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
@@ -98,7 +97,6 @@ class MovementsControllerSpec
     with OptionValues
     with ScalaFutures
     with BeforeAndAfterEach
-    with PresentationFormats
     with ModelGenerators
     with ScalaCheckDrivenPropertyChecks {
 
@@ -106,7 +104,7 @@ class MovementsControllerSpec
 
   val mockMessagesXmlParsingService: MessagesXmlParsingService   = mock[MessagesXmlParsingService]
   val mockMovementsXmlParsingService: MovementsXmlParsingService = mock[MovementsXmlParsingService]
-  val mockRepository: MovementsRepository                        = mock[MovementsRepository]
+  val mockPersistenceService: PersistenceService                 = mock[PersistenceService]
   val mockMessageFactory: MessageService                         = mock[MessageService]
   val mockMovementFactory: MovementFactory                       = mock[MovementFactory]
 
@@ -116,7 +114,7 @@ class MovementsControllerSpec
 
   val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
 
-  def resetInternalAuth() = {
+  private def resetInternalAuth() = {
     reset(mockInternalAuthActionProvider)
     // any here, verify specifics later.
     when(mockInternalAuthActionProvider.apply(any())(any())).thenReturn(DefaultActionBuilder(stubControllerComponents().parsers.defaultBodyParser))
@@ -131,7 +129,7 @@ class MovementsControllerSpec
     reset(mockTemporaryFileCreator)
     reset(mockMovementsXmlParsingService)
     reset(mockMessagesXmlParsingService)
-    reset(mockRepository)
+    reset(mockPersistenceService)
     reset(mockMessageFactory)
     reset(mockObjectStoreService)
     super.afterEach()
@@ -145,7 +143,7 @@ class MovementsControllerSpec
       stubControllerComponents(),
       mockMessageFactory,
       mockMovementFactory,
-      mockRepository,
+      mockPersistenceService,
       mockMovementsXmlParsingService,
       mockMessagesXmlParsingService,
       mockObjectStoreService,
@@ -256,7 +254,7 @@ class MovementsControllerSpec
       )
         .thenReturn(messageFactoryEither)
 
-      when(mockRepository.insert(any()))
+      when(mockPersistenceService.insertMovement(eqTo(movement)))
         .thenReturn(EitherT.rightT(Right(())))
       val request: Request[Source[ByteString, _]] =
         fakeRequest[Source[ByteString, _]](POST, validXmlStream, movementId, Some(triggerId), Some(MessageType.DeclarationData.code))
@@ -568,7 +566,7 @@ class MovementsControllerSpec
       )
         .thenReturn(messageFactoryEither)
 
-      when(mockRepository.insert(any()))
+      when(mockPersistenceService.insertMovement(eqTo(movement)))
         .thenReturn(EitherT.rightT(Right(())))
 
       //      val request = fakeRequest[Source[ByteString, _]](POST, validXmlStream, Some(MessageType.ArrivalNotification.code))
@@ -856,7 +854,7 @@ class MovementsControllerSpec
       when(mockMessageFactory.generateId()).thenReturn(messageId)
       when(mockMovementFactory.generateId()).thenReturn(movementId)
 
-      when(mockRepository.insert(any()))
+      when(mockPersistenceService.insertMovement(eqTo(movement)))
         .thenReturn(EitherT.rightT(Right((): Unit)))
 
       val result: Future[Result] =
@@ -889,7 +887,7 @@ class MovementsControllerSpec
       )
         .thenReturn(movement)
 
-      when(mockRepository.insert(any()))
+      when(mockPersistenceService.insertMovement(eqTo(movement)))
         .thenReturn(EitherT.leftT(MongoError.InsertNotAcknowledged(s"Insert failed")))
 
       val result: Future[Result] =
@@ -940,13 +938,13 @@ class MovementsControllerSpec
           when(mockMessageFactory.generateId()).thenReturn(triggerId)
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
-          when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
+          when(mockPersistenceService.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
             .thenReturn(EitherT.rightT(MovementWithoutMessages.fromMovement(movement)))
 
           val result: Future[Result] = controller.getMovementWithoutMessages(eoriNumber, movementType, movementId)(request)
 
           status(result) mustBe OK
-          contentAsJson(result) mustBe Json.toJson(MovementWithoutMessages.fromMovement(movement))(PresentationFormats.movementWithoutMessagesFormat)
+          contentAsJson(result) mustBe Json.toJson(MovementWithoutMessages.fromMovement(movement))
 
           verify(mockInternalAuthActionProvider, times(1)).apply(
             eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("READ")))
@@ -955,7 +953,7 @@ class MovementsControllerSpec
         }
 
         "must return NOT_FOUND if no departure found" in {
-          when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
+          when(mockPersistenceService.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
             .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
           val result: Future[Result] = controller.getMovementWithoutMessages(eoriNumber, movementType, movementId)(request)
@@ -969,7 +967,7 @@ class MovementsControllerSpec
         }
 
         "must return INTERNAL_SERVER_ERROR if repository has an error" in {
-          when(mockRepository.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
+          when(mockPersistenceService.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
             .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
           val result: Future[Result] = controller.getMovementWithoutMessages(eoriNumber, movementType, movementId)(request)
@@ -1013,7 +1011,7 @@ class MovementsControllerSpec
 
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
-          when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
+          when(mockPersistenceService.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
             .thenReturn(EitherT.rightT(messageResponse))
 
           val result: Future[Result] = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
@@ -1032,7 +1030,7 @@ class MovementsControllerSpec
 
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
-          when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
+          when(mockPersistenceService.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
             .thenReturn(EitherT.rightT(messageResponse))
 
           val result: Future[Result] = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
@@ -1049,7 +1047,7 @@ class MovementsControllerSpec
         "must return NOT_FOUND if no message found" in {
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
-          when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
+          when(mockPersistenceService.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
             .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
           val result: Future[Result] = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
@@ -1065,7 +1063,7 @@ class MovementsControllerSpec
         "must return INTERNAL_SERVICE_ERROR when a database error is thrown" in {
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
-          when(mockRepository.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
+          when(mockPersistenceService.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
             .thenReturn(EitherT.leftT(MongoError.UnexpectedError(Some(new Throwable("test")))))
 
           val result: Future[Result] = controller.getMessage(eoriNumber, movementType, movementId, messageId)(request)
@@ -1115,11 +1113,11 @@ class MovementsControllerSpec
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
           when(
-            mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
+            mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
             .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
-          when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
+          when(mockPersistenceService.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
             .thenReturn(EitherT.rightT(paginationMesssageSummary))
           val result: Future[Result] = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
 
@@ -1141,14 +1139,14 @@ class MovementsControllerSpec
           when(mockMovementFactory.generateId()).thenReturn(movementId)
 
           when(
-            mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
+            mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
             .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
           lazy val paginationMesssageSummary = PaginationMessageSummary(TotalCount(0), Vector.empty[MessageResponse])
 
           when(
-            mockRepository.getMessages(
+            mockPersistenceService.getMessages(
               EORINumber(eqTo(eoriNumber.value)),
               MovementId(eqTo(movementId.value)),
               eqTo(movementType),
@@ -1178,7 +1176,7 @@ class MovementsControllerSpec
           val request                = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
-          when(mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType)))
+          when(mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType)))
             .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
           val result: Future[Result] = controller.getMessages(eoriNumber, movementType, movementId, None)(request)
@@ -1199,11 +1197,11 @@ class MovementsControllerSpec
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
           when(
-            mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
+            mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
             .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
-          when(mockRepository.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
+          when(mockPersistenceService.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
             .thenReturn(EitherT.leftT(UnexpectedError(None)))
 
           val result: Future[Result] = controller.getMessages(eoriNumber, movementType, movementId, None, None, None, None)(request)
@@ -1257,7 +1255,7 @@ class MovementsControllerSpec
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
           when(
-            mockRepository.getMovements(
+            mockPersistenceService.getMovements(
               EORINumber(any()),
               eqTo(movementType),
               eqTo(None),
@@ -1319,7 +1317,7 @@ class MovementsControllerSpec
             when(mockMessageFactory.generateId()).thenReturn(messageId)
             when(mockMovementFactory.generateId()).thenReturn(movementId)
             when(
-              mockRepository.getMovements(
+              mockPersistenceService.getMovements(
                 EORINumber(any()),
                 eqTo(movementType),
                 eqTo(updatedSince),
@@ -1366,7 +1364,7 @@ class MovementsControllerSpec
 
             lazy val paginationMovementSummary = PaginationMovementSummary(TotalCount(0), Vector.empty[MovementWithoutMessages])
             when(
-              mockRepository.getMovements(
+              mockPersistenceService.getMovements(
                 EORINumber(any()),
                 eqTo(movementType),
                 eqTo(updatedSince),
@@ -1407,7 +1405,7 @@ class MovementsControllerSpec
           (updatedSince, movementEORI, movementReferenceNumber, localReferenceNumber) =>
             resetInternalAuth()
             when(
-              mockRepository.getMovements(
+              mockPersistenceService.getMovements(
                 EORINumber(any()),
                 any(),
                 eqTo(updatedSince),
@@ -1497,7 +1495,7 @@ class MovementsControllerSpec
       )
         .thenReturn(messageFactoryEither)
 
-      when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+      when(mockPersistenceService.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.rightT(()))
 
       //      val request = fakeRequest(POST, validXmlStream, Some(messageType.code))
@@ -1579,7 +1577,9 @@ class MovementsControllerSpec
           .thenReturn(messageFactoryEither)
         when(mockMessageFactory.generateId()).thenReturn(triggerId)
         when(mockMovementFactory.generateId()).thenReturn(movementId)
-        when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+        when(
+          mockPersistenceService.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime])
+        )
           .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(s"No departure found with the given id: ${movementId.value}")))
 
         //        val request = fakeRequest(POST, validXmlStream, Some(messageType.code))
@@ -1760,7 +1760,7 @@ class MovementsControllerSpec
       )
         .thenReturn(message)
 
-      when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+      when(mockPersistenceService.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.rightT(()))
 
       val result: Future[Result] =
@@ -1789,7 +1789,7 @@ class MovementsControllerSpec
 
       val errorMessage = s"Movement with id ${movementId.value} not found"
 
-      when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+      when(mockPersistenceService.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(errorMessage)))
 
       val result: Future[Result] =
@@ -1818,7 +1818,7 @@ class MovementsControllerSpec
       )
         .thenReturn(message)
 
-      when(mockRepository.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
+      when(mockPersistenceService.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.leftT(MongoError.UnexpectedError(None)))
 
       val result: Future[Result] =
@@ -1884,12 +1884,12 @@ class MovementsControllerSpec
             when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
             when(
-              mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
+              mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
             )
               .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
             when(
-              mockRepository.getSingleMessage(
+              mockPersistenceService.getSingleMessage(
                 EORINumber(eqTo(eori.value)),
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
@@ -1913,7 +1913,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
             when(
-              mockRepository.updateMessage(
+              mockPersistenceService.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
                 argThat(
@@ -1932,7 +1932,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(()))
 
             when(
-              mockRepository.updateMovement(
+              mockPersistenceService.updateMovement(
                 MovementId(eqTo(movementId.value)),
                 eqTo(eoriOption),
                 eqTo(None),
@@ -1960,13 +1960,13 @@ class MovementsControllerSpec
               controller.updateMessage(eori, MovementType.Departure, movementId, messageId)(request)
 
             status(result) mustBe OK
-            verify(mockRepository, times(1)).updateMessage(
+            verify(mockPersistenceService, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
               any[UpdateMessageData],
               any[OffsetDateTime]
             )
-            verify(mockRepository, times(1)).updateMovement(
+            verify(mockPersistenceService, times(1)).updateMovement(
               MovementId(eqTo(movementId.value)),
               eqTo(eoriOption),
               eqTo(None),
@@ -2002,12 +2002,12 @@ class MovementsControllerSpec
             when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
             when(
-              mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Arrival))
+              mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Arrival))
             )
               .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
             when(
-              mockRepository.getSingleMessage(
+              mockPersistenceService.getSingleMessage(
                 EORINumber(eqTo(eori.value)),
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
@@ -2031,7 +2031,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))
 
             when(
-              mockRepository.updateMessage(
+              mockPersistenceService.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
                 argThat(
@@ -2050,7 +2050,14 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(()))
 
             when(
-              mockRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(Some(eori)), eqTo(Some(mrn)), eqTo(None), eqTo(None), any[OffsetDateTime])
+              mockPersistenceService.updateMovement(
+                MovementId(eqTo(movementId.value)),
+                eqTo(Some(eori)),
+                eqTo(Some(mrn)),
+                eqTo(None),
+                eqTo(None),
+                any[OffsetDateTime]
+              )
             )
               .thenReturn(EitherT.rightT(()))
 
@@ -2071,13 +2078,13 @@ class MovementsControllerSpec
               controller.updateMessage(eori, MovementType.Arrival, movementId, messageId)(request)
 
             status(result) mustBe OK
-            verify(mockRepository, times(1)).updateMessage(
+            verify(mockPersistenceService, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
               any[UpdateMessageData],
               any[OffsetDateTime]
             )
-            verify(mockRepository, times(1)).updateMovement(
+            verify(mockPersistenceService, times(1)).updateMovement(
               MovementId(eqTo(movementId.value)),
               eqTo(Some(eori)),
               eqTo(Some(mrn)),
@@ -2115,7 +2122,7 @@ class MovementsControllerSpec
               else Gen.oneOf(MessageType.arrivalRequestValues)
             }.sample.get
             when(
-              mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
+              mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
             )
               .thenReturn(
                 EitherT.rightT(MovementWithoutMessages(movementId, eori, Some(eori), None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))
@@ -2128,7 +2135,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(Source.empty[ByteString]))
 
             when(
-              mockRepository.getSingleMessage(
+              mockPersistenceService.getSingleMessage(
                 EORINumber(eqTo(eori.value)),
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
@@ -2138,7 +2145,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None)))
 
             when(
-              mockRepository.updateMessage(
+              mockPersistenceService.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
                 any[UpdateMessageData],
@@ -2156,7 +2163,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(MessageData(generatedTime, None)))
 
             when(
-              mockRepository.updateMovement(
+              mockPersistenceService.updateMovement(
                 MovementId(eqTo(movementId.value)),
                 eqTo(None),
                 eqTo(None),
@@ -2184,13 +2191,13 @@ class MovementsControllerSpec
               controller.updateMessage(eori, movementType, movementId, messageId)(request)
 
             status(result) mustBe OK
-            verify(mockRepository, times(1)).updateMessage(
+            verify(mockPersistenceService, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
               any[UpdateMessageData],
               any[OffsetDateTime]
             )
-            verify(mockRepository, times(1)).updateMovement(
+            verify(mockPersistenceService, times(1)).updateMovement(
               MovementId(eqTo(movementId.value)),
               eqTo(None),
               eqTo(None),
@@ -2231,12 +2238,12 @@ class MovementsControllerSpec
             when(mockMovementFactory.generateId()).thenReturn(movementId)
 
             when(
-              mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
+              mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
             )
               .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
             when(
-              mockRepository.getSingleMessage(
+              mockPersistenceService.getSingleMessage(
                 EORINumber(eqTo(eori.value)),
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
@@ -2260,7 +2267,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))
 
             when(
-              mockRepository.updateMessage(
+              mockPersistenceService.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
                 any[UpdateMessageData],
@@ -2270,7 +2277,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(()))
 
             when(
-              mockRepository.updateMovement(
+              mockPersistenceService.updateMovement(
                 MovementId(eqTo(movementId.value)),
                 eqTo(Some(eori)),
                 eqTo(None),
@@ -2302,13 +2309,13 @@ class MovementsControllerSpec
               "code"    -> "BAD_REQUEST",
               "message" -> "Provided Object Store URI is not owned by transit-movements"
             )
-            verify(mockRepository, times(0)).updateMessage(
+            verify(mockPersistenceService, times(0)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
               any[UpdateMessageData],
               any[OffsetDateTime]
             )
-            verify(mockRepository, times(0)).updateMovement(
+            verify(mockPersistenceService, times(0)).updateMovement(
               MovementId(eqTo(movementId.value)),
               eqTo(Some(eori)),
               eqTo(None),
@@ -2332,7 +2339,7 @@ class MovementsControllerSpec
       ) {
         (eori, movementType, messageStatus, messageType) =>
           resetInternalAuth()
-          reset(mockRepository) // needed thanks to the generators running the test multiple times.
+          reset(mockPersistenceService) // needed thanks to the generators running the test multiple times.
           val expectedUpdateData     = UpdateMessageData(status = messageStatus)
           val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
           val messageId: MessageId   = arbitraryMessageId.arbitrary.sample.get
@@ -2341,14 +2348,14 @@ class MovementsControllerSpec
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
           when(
-            mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
+            mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
             .thenReturn(
               EitherT.rightT(MovementWithoutMessages(movementId, eori, Some(eori), None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))
             )
 
           when(
-            mockRepository.getSingleMessage(
+            mockPersistenceService.getSingleMessage(
               EORINumber(eqTo(eori.value)),
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
@@ -2358,7 +2365,7 @@ class MovementsControllerSpec
             .thenReturn(EitherT.rightT(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None)))
 
           when(
-            mockRepository.updateMessage(
+            mockPersistenceService.updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
               eqTo(expectedUpdateData),
@@ -2382,13 +2389,13 @@ class MovementsControllerSpec
             controller.updateMessage(eori, movementType, movementId, messageId)(request)
 
           status(result) mustBe OK
-          verify(mockRepository, times(1)).updateMessage(
+          verify(mockPersistenceService, times(1)).updateMessage(
             MovementId(eqTo(movementId.value)),
             MessageId(eqTo(messageId.value)),
             any[UpdateMessageData],
             any[OffsetDateTime]
           )
-          verify(mockRepository, times(0)).updateMovement(
+          verify(mockPersistenceService, times(0)).updateMovement(
             MovementId(eqTo(movementId.value)),
             eqTo(Some(eori)),
             eqTo(None),
@@ -2446,7 +2453,7 @@ class MovementsControllerSpec
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
           when(
-            mockRepository.updateMessage(
+            mockPersistenceService.updateMessage(
               any[String].asInstanceOf[MovementId],
               any[String].asInstanceOf[MessageId],
               any[UpdateMessageData],
@@ -2496,12 +2503,12 @@ class MovementsControllerSpec
             when(mockMessageFactory.generateId()).thenReturn(messageId)
             when(mockMovementFactory.generateId()).thenReturn(movementId)
             when(
-              mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
+              mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
             )
               .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
             when(
-              mockRepository.getSingleMessage(
+              mockPersistenceService.getSingleMessage(
                 EORINumber(eqTo(eori.value)),
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
@@ -2519,7 +2526,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))
 
             when(
-              mockRepository.updateMessage(
+              mockPersistenceService.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
                 any[UpdateMessageData],
@@ -2543,13 +2550,13 @@ class MovementsControllerSpec
             val result: Future[Result] = controller.updateMessage(eori, MovementType.Departure, movementId, messageId)(request)
 
             status(result) mustBe OK
-            verify(mockRepository, times(1)).updateMessage(
+            verify(mockPersistenceService, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
               any[UpdateMessageData],
               any[OffsetDateTime]
             )
-            verify(mockRepository, times(0)).updateMovement(
+            verify(mockPersistenceService, times(0)).updateMovement(
               MovementId(eqTo(movementId.value)),
               eqTo(Some(eori)),
               eqTo(None),
@@ -2579,12 +2586,12 @@ class MovementsControllerSpec
             when(mockMessageFactory.generateId()).thenReturn(messageId)
             when(mockMovementFactory.generateId()).thenReturn(movementId)
             when(
-              mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Arrival))
+              mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Arrival))
             )
               .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
             when(
-              mockRepository.getSingleMessage(
+              mockPersistenceService.getSingleMessage(
                 EORINumber(eqTo(eori.value)),
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
@@ -2594,7 +2601,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT(MessageResponse(messageId, now, Some(messageType), None, Some(MessageStatus.Pending), None)))
 
             when(
-              mockRepository.updateMessage(
+              mockPersistenceService.updateMessage(
                 MovementId(eqTo(movementId.value)),
                 MessageId(eqTo(messageId.value)),
                 any[UpdateMessageData],
@@ -2619,13 +2626,13 @@ class MovementsControllerSpec
               controller.updateMessage(eori, MovementType.Arrival, movementId, messageId)(request)
 
             status(result) mustBe OK
-            verify(mockRepository, times(1)).updateMessage(
+            verify(mockPersistenceService, times(1)).updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
               any[UpdateMessageData],
               any[OffsetDateTime]
             )
-            verify(mockRepository, times(0)).updateMovement(
+            verify(mockPersistenceService, times(0)).updateMovement(
               MovementId(eqTo(movementId.value)),
               eqTo(Some(eori)),
               eqTo(Some(mrn)),
@@ -2697,12 +2704,12 @@ class MovementsControllerSpec
           when(mockMovementFactory.generateId()).thenReturn(movementId)
 
           when(
-            mockRepository.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
+            mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
           )
             .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
 
           when(
-            mockRepository.getSingleMessage(
+            mockPersistenceService.getSingleMessage(
               EORINumber(eqTo(eori.value)),
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
@@ -2720,7 +2727,7 @@ class MovementsControllerSpec
             .thenReturn(EitherT.rightT(MessageData(generatedTime, Some(mrn))))
 
           when(
-            mockRepository.updateMessage(
+            mockPersistenceService.updateMessage(
               MovementId(eqTo(movementId.value)),
               MessageId(eqTo(messageId.value)),
               any[UpdateMessageData],
@@ -2749,13 +2756,13 @@ class MovementsControllerSpec
             "code"    -> "BAD_REQUEST",
             "message" -> "Message type does not match"
           )
-          verify(mockRepository, times(0)).updateMessage(
+          verify(mockPersistenceService, times(0)).updateMessage(
             MovementId(eqTo(movementId.value)),
             MessageId(eqTo(messageId.value)),
             any[UpdateMessageData],
             any[OffsetDateTime]
           )
-          verify(mockRepository, times(0)).updateMovement(
+          verify(mockPersistenceService, times(0)).updateMovement(
             MovementId(eqTo(movementId.value)),
             eqTo(Some(eori)),
             eqTo(None),
@@ -2815,13 +2822,13 @@ class MovementsControllerSpec
     ) {
       (movementId, messageId, messageStatus) =>
         resetInternalAuth()
-        reset(mockRepository) // needed thanks to the generators running the test multiple times.
+        reset(mockPersistenceService) // needed thanks to the generators running the test multiple times.
         val expectedUpdateMessageMetadata = UpdateMessageData(status = messageStatus)
 
         when(mockMessageFactory.generateId()).thenReturn(messageId)
         when(mockMovementFactory.generateId()).thenReturn(movementId)
         when(
-          mockRepository.updateMessage(
+          mockPersistenceService.updateMessage(
             MovementId(eqTo(movementId.value)),
             MessageId(eqTo(messageId.value)),
             eqTo(expectedUpdateMessageMetadata),
@@ -2845,7 +2852,7 @@ class MovementsControllerSpec
           controller.updateMessageStatus(movementId, messageId)(request)
 
         status(result) mustBe OK
-        verify(mockRepository, times(1)).updateMessage(
+        verify(mockPersistenceService, times(1)).updateMessage(
           MovementId(eqTo(movementId.value)),
           MessageId(eqTo(messageId.value)),
           any[UpdateMessageData],
@@ -2893,13 +2900,13 @@ class MovementsControllerSpec
     "must return NOT_FOUND when an incorrect message is specified" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[MessageStatus]) {
       (movementId, messageId, messageStatus) =>
         resetInternalAuth()
-        reset(mockRepository) // needed thanks to the generators running the test multiple times.
+        reset(mockPersistenceService) // needed thanks to the generators running the test multiple times.
         val expectedUpdateMessageMetadata = UpdateMessageData(status = messageStatus)
 
         when(mockMessageFactory.generateId()).thenReturn(messageId)
         when(mockMovementFactory.generateId()).thenReturn(movementId)
         when(
-          mockRepository.updateMessage(
+          mockPersistenceService.updateMessage(
             MovementId(eqTo(movementId.value)),
             MessageId(eqTo(messageId.value)),
             eqTo(expectedUpdateMessageMetadata),

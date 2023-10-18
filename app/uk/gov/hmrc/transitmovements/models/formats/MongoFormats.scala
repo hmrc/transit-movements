@@ -18,6 +18,8 @@ package uk.gov.hmrc.transitmovements.models.formats
 
 import com.google.inject.Inject
 import play.api.libs.json.Format
+import play.api.libs.json.JsError
+import play.api.libs.json.JsString
 import play.api.libs.json.Json
 import play.api.libs.json.Reads
 import play.api.libs.json.Writes
@@ -37,6 +39,8 @@ import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMovements
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import scala.util.Try
+import scala.util.control.NonFatal
 
 class MongoFormats @Inject() (appConfig: AppConfig)
     extends CommonFormats
@@ -47,16 +51,37 @@ class MongoFormats @Inject() (appConfig: AppConfig)
   implicit lazy val crypto: Encrypter with Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
 
   implicit lazy val writes: Writes[SensitiveString] =
-    JsonEncryption.sensitiveEncrypter[String, SensitiveString]
+    JsonEncryption.stringEncrypter.contramap(_.decryptedValue)
 
-  lazy val reads: Reads[SensitiveString] =
-    JsonEncryption.sensitiveDecrypter(SensitiveString.apply)
+  lazy val baseReads: Reads[SensitiveString] =
+    JsonEncryption.stringDecrypter.map(SensitiveString.apply)
 
-  lazy val readsWithFallback: Reads[SensitiveString] =
-    reads.orElse(implicitly[Reads[String]].map(SensitiveString.apply))
+  lazy val readsWithNoFallback: Reads[SensitiveString] = Reads {
+    value =>
+      Try {
+        baseReads.reads(value)
+      }.recover {
+        case NonFatal(err) =>
+          JsError(s"Failed to decrypt: ${err.getMessage}")
+      }.get // if it blows up here, that's fine, because the error was fatal anyway
+  }
+
+  lazy val readsWithFallback: Reads[SensitiveString] = Reads {
+    value =>
+      Try {
+        baseReads.reads(value)
+      }.recover {
+        case NonFatal(_) =>
+          value
+            .validate[JsString]
+            .map(
+              x => SensitiveString(x.value)
+            )
+      }.get // if it blows up here, that's fine, because the error was fatal anyway
+  }
 
   implicit lazy val sensitiveStringFormat: Format[SensitiveString] =
-    Format(if (appConfig.encryptionTolerantRead) readsWithFallback else reads, writes)
+    Format(if (appConfig.encryptionTolerantRead) readsWithFallback else readsWithNoFallback, writes)
 
   implicit val offsetDateTimeReads: Reads[OffsetDateTime] = Reads {
     value =>

@@ -20,9 +20,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsString
 import play.api.libs.json.Json
-import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 
-class MessageStatusSpec extends AnyFlatSpec with Matchers with PresentationFormats {
+class MessageStatusSpec extends AnyFlatSpec with Matchers {
 
   "MessageStatus" should "serialise correctly" in {
     Json.toJson[MessageStatus](MessageStatus.Processing) should be(JsString("Processing"))
