@@ -36,6 +36,7 @@ import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.PageNumber
+import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
@@ -198,5 +199,24 @@ trait ModelGenerators extends BaseGenerators {
   implicit lazy val arbitraryMessageSender: Arbitrary[MessageSender] =
     Arbitrary {
       Gen.alphaNumStr.map(MessageSender(_))
+    }
+
+  implicit lazy val arbitraryUpdateMessageData: Arbitrary[UpdateMessageData] =
+    Arbitrary {
+      for {
+        objectStoreUri <- Gen.option(arbitrary[ObjectStoreURI])
+        body           <- Gen.option(Gen.stringOfN(20, Gen.alphaNumChar))
+        size           <- Gen.option(Gen.choose(0, Long.MaxValue))
+        status         <- arbitrary[MessageStatus]
+        messageType    <- Gen.option(arbitrary[MessageType])
+        generationDate <- Gen.option(arbitrary[OffsetDateTime])
+      } yield UpdateMessageData(
+        objectStoreUri,
+        body,
+        size,
+        status,
+        messageType,
+        generationDate
+      )
     }
 }
