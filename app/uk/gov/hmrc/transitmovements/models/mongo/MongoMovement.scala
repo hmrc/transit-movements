@@ -45,9 +45,10 @@ object MongoMovement {
       Some(movement.messages.map(MongoMessage.from))
     )
 
-  val withoutMovementsProjection: Bson =
+  val withoutMessagesProjection: Bson =
     BsonDocument(
       "_id"                     -> 1,
+      "movementType"            -> 1,
       "enrollmentEORINumber"    -> 1,
       "movementEORINumber"      -> 1,
       "movementReferenceNumber" -> 1,

@@ -31,6 +31,8 @@ import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
+import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
+import uk.gov.hmrc.transitmovements.models.mongo.MongoMovement
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -41,13 +43,15 @@ class TestOnlyControllerSpec
     with ScalaCheckPropertyChecks
     with FutureAwaits
     with DefaultAwaitTimeout
-    with DefaultPlayMongoRepositorySupport[Movement]
+    with DefaultPlayMongoRepositorySupport[MongoMovement]
     with ModelGenerators
     with OptionValues
     with MockitoSugar {
 
   val appConfig: AppConfig = mock[AppConfig]
   when(appConfig.documentTtl).thenReturn(1000000) // doesn't matter, just something will do
+  when(appConfig.encryptionTolerantRead).thenReturn(true)
+  when(appConfig.encryptionKey).thenReturn("7CYXDDh/UbNDY1UV8bkxvTzur3pCUzsAvMVH+HsRWbY=")
 
   override lazy val mongoComponent: MongoComponent = {
     val databaseName: String = "test-movements-testonly"
@@ -55,14 +59,15 @@ class TestOnlyControllerSpec
     MongoComponent(mongoUri)
   }
 
-  override lazy val repository: MovementsRepositoryImpl =
-    new MovementsRepositoryImpl(appConfig, mongoComponent)
+  val mongoFormats: MongoFormats = new MongoFormats(appConfig)
+
+  override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, mongoFormats)
 
   lazy val controller = new TestOnlyController(stubControllerComponents(), repository)
 
   private def documentCount: Long = await(count())
 
-  "dropCollection" should "drop the movements collection and return OK" in forAll(arbitrary[Movement]) {
+  "dropCollection" should "drop the movements collection and return OK" in forAll(arbitrary[MongoMovement]) {
     movement =>
       await(insert(movement))
       documentCount shouldBe 1

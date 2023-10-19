@@ -144,6 +144,7 @@ class MovementsRepositoryImpl @Inject() (
       domainFormat = mongoFormats.movementFormat,
       indexes = Seq(
         IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS)),
+        IndexModel(Indexes.ascending("localReferenceNumber"), IndexOptions().background(true)),
         IndexModel(Indexes.ascending("movementReferenceNumber"), IndexOptions().background(true))
       ),
       extraCodecs = Seq(
@@ -189,7 +190,7 @@ class MovementsRepositoryImpl @Inject() (
       mEq("enrollmentEORINumber", eoriNumber.value),
       mEq("movementType", movementType.value)
     )
-    val projection = MongoMovement.withoutMovementsProjection
+    val projection = MongoMovement.withoutMessagesProjection
 
     val aggregates = Seq(
       Aggregates.filter(selector),
@@ -336,7 +337,7 @@ class MovementsRepositoryImpl @Inject() (
       Aggregates.sort(descending("updated")),
       Aggregates.skip(from),
       Aggregates.limit(itemCount),
-      Aggregates.project(MongoMessage.simpleMetadataProjection)
+      Aggregates.project(MongoMovement.withoutMessagesProjection)
     )
     for {
       perPageMovements <- filterPerPage[MongoMovement](aggregates)
