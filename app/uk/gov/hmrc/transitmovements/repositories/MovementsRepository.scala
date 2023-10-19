@@ -163,7 +163,8 @@ class MovementsRepositoryImpl @Inject() (
         Codecs.playFormatCodec(mongoFormats.lrnFormat),
         Codecs.playFormatCodec(mongoFormats.messageSenderFormat),
         Codecs.playFormatCodec(mongoFormats.paginationMovementSummaryFormat),
-        Codecs.playFormatCodec(mongoFormats.paginationMessageSummaryFormat)
+        Codecs.playFormatCodec(mongoFormats.paginationMessageSummaryFormat),
+        Codecs.playFormatCodec(mongoFormats.sensitiveStringFormat)
       )
     )
     with MovementsRepository
