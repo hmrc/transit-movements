@@ -42,11 +42,14 @@ import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
 import uk.gov.hmrc.transitmovements.models.PaginationMovementSummary
 import uk.gov.hmrc.transitmovements.models.TotalCount
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMessage
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMessageUpdateData
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMovement
-import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMessages
-import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMovements
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMessages
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMovements
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
@@ -312,48 +315,51 @@ class PersistenceServiceSpec
 
   "getMovementWithoutMessages" - {
 
-    "getting a movement back from Mongo will perform the correct transformation" in forAll(arbitrary[Movement].map(MongoMovement.from)) {
-      mongoMovement =>
+    "getting a movement back from Mongo will perform the correct transformation" in forAll(arbitrary[MongoMovementSummary], arbitrary[MovementType]) {
+      (mongoMovement, movementType) =>
         val (sut, movementsRepository) = createService()
         when(
           movementsRepository.getMovementWithoutMessages(
             EORINumber(eqTo(mongoMovement.enrollmentEORINumber.value)),
             MovementId(eqTo(mongoMovement._id.value)),
-            eqTo(mongoMovement.movementType)
+            eqTo(movementType)
           )
         ).thenReturn(EitherT.rightT[Future, MongoError](mongoMovement))
 
-        whenReady(sut.getMovementWithoutMessages(mongoMovement.enrollmentEORINumber, mongoMovement._id, mongoMovement.movementType).value) {
+        whenReady(sut.getMovementWithoutMessages(mongoMovement.enrollmentEORINumber, mongoMovement._id, movementType).value) {
           result =>
             result mustBe Right(mongoMovement.asMovementWithoutMessages)
             verify(movementsRepository, times(1)).getMovementWithoutMessages(
               EORINumber(eqTo(mongoMovement.enrollmentEORINumber.value)),
               MovementId(eqTo(mongoMovement._id.value)),
-              eqTo(mongoMovement.movementType)
+              eqTo(movementType)
             )
             verifyNoMoreInteractions(movementsRepository)
         }
     }
 
-    "failing to get a movement back from Mongo will return the error from the repository layer" in forAll(arbitrary[Movement].map(MongoMovement.from)) {
-      mongoMovement =>
+    "failing to get a movement back from Mongo will return the error from the repository layer" in forAll(
+      arbitrary[MongoMovementSummary],
+      arbitrary[MovementType]
+    ) {
+      (mongoMovement, movementType) =>
         val (sut, movementsRepository) = createService()
         val error                      = MongoError.UnexpectedError(Some(new IllegalStateException()))
         when(
           movementsRepository.getMovementWithoutMessages(
             EORINumber(eqTo(mongoMovement.enrollmentEORINumber.value)),
             MovementId(eqTo(mongoMovement._id.value)),
-            eqTo(mongoMovement.movementType)
+            eqTo(movementType)
           )
-        ).thenReturn(EitherT.leftT[Future, MongoMovement](error))
+        ).thenReturn(EitherT.leftT[Future, MongoMovementSummary](error))
 
-        whenReady(sut.getMovementWithoutMessages(mongoMovement.enrollmentEORINumber, mongoMovement._id, mongoMovement.movementType).value) {
+        whenReady(sut.getMovementWithoutMessages(mongoMovement.enrollmentEORINumber, mongoMovement._id, movementType).value) {
           case Left(actual: MongoError.UnexpectedError) =>
             actual must be theSameInstanceAs error
             verify(movementsRepository, times(1)).getMovementWithoutMessages(
               EORINumber(eqTo(mongoMovement.enrollmentEORINumber.value)),
               MovementId(eqTo(mongoMovement._id.value)),
-              eqTo(mongoMovement.movementType)
+              eqTo(movementType)
             )
             verifyNoMoreInteractions(movementsRepository)
           case value => fail(s"Expected a Left of MongoError.UnexpectedError, got $value")
@@ -367,7 +373,7 @@ class PersistenceServiceSpec
       arbitrary[MovementId],
       arbitrary[EORINumber],
       arbitrary[MovementType],
-      arbitrary[Message].map(MongoMessage.from)
+      arbitrary[MongoMessageMetadataAndBody]
     ) {
       (movementId, eori, movementType, mongoMessage) =>
         val (sut, movementsRepository) = createService()
@@ -397,7 +403,7 @@ class PersistenceServiceSpec
       arbitrary[MovementId],
       arbitrary[EORINumber],
       arbitrary[MovementType],
-      arbitrary[Message].map(MongoMessage.from)
+      arbitrary[MongoMessageMetadataAndBody]
     ) {
       (movementId, eori, movementType, mongoMessage) =>
         val (sut, movementsRepository) = createService()
@@ -409,7 +415,7 @@ class PersistenceServiceSpec
             MessageId(eqTo(mongoMessage.id.value)),
             eqTo(movementType)
           )
-        ).thenReturn(EitherT.leftT[Future, MongoMessage](error))
+        ).thenReturn(EitherT.leftT[Future, MongoMessageMetadataAndBody](error))
 
         whenReady(sut.getSingleMessage(eori, movementId, mongoMessage.id, movementType).value) {
           case Left(actual: MongoError.UnexpectedError) =>
@@ -436,7 +442,7 @@ class PersistenceServiceSpec
       Gen
         .choose(1, 5)
         .flatMap(
-          count => Gen.listOfN(count, arbitrary[Message].map(MongoMessage.from))
+          count => Gen.listOfN(count, arbitrary[MongoMessageMetadata])
         )
         .map(
           x => Vector(x: _*)
@@ -542,7 +548,7 @@ class PersistenceServiceSpec
       Gen
         .choose(1, 5)
         .flatMap(
-          count => Gen.listOfN(count, arbitrary[Movement].map(MongoMovement.from))
+          count => Gen.listOfN(count, arbitrary[MongoMovementSummary])
         )
         .map(
           x => Vector(x: _*)

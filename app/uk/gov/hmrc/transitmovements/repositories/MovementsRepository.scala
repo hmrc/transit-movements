@@ -40,11 +40,14 @@ import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMessage
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMessageUpdateData
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMovement
-import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMessages
-import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMovements
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMessages
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMovements
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError._
@@ -95,14 +98,14 @@ trait MovementsRepository {
     eoriNumber: EORINumber,
     movementId: MovementId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, MongoMovement]
+  ): EitherT[Future, MongoError, MongoMovementSummary]
 
   def getSingleMessage(
     eoriNumber: EORINumber,
     movementId: MovementId,
     messageId: MessageId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, MongoMessage]
+  ): EitherT[Future, MongoError, MongoMessageMetadataAndBody]
 
   def getMessages(
     eoriNumber: EORINumber,
@@ -149,7 +152,10 @@ class MovementsRepositoryImpl @Inject() (
       ),
       extraCodecs = Seq(
         Codecs.playFormatCodec(mongoFormats.movementFormat),
+        Codecs.playFormatCodec(mongoFormats.movementSummaryFormat),
         Codecs.playFormatCodec(mongoFormats.messageFormat),
+        Codecs.playFormatCodec(mongoFormats.messageMetadataFormat),
+        Codecs.playFormatCodec(mongoFormats.messageMetadataAndBodyFormat),
         Codecs.playFormatCodec(mongoFormats.movementIdFormat),
         Codecs.playFormatCodec(mongoFormats.mrnFormat),
         Codecs.playFormatCodec(mongoFormats.offsetDateTimeFormat),
@@ -183,21 +189,21 @@ class MovementsRepositoryImpl @Inject() (
     eoriNumber: EORINumber,
     movementId: MovementId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, MongoMovement] = {
+  ): EitherT[Future, MongoError, MongoMovementSummary] = {
 
     val selector = mAnd(
       mEq("_id", movementId.value),
       mEq("enrollmentEORINumber", eoriNumber.value),
       mEq("movementType", movementType.value)
     )
-    val projection = MongoMovement.withoutMessagesProjection
+    val projection = MongoMovementSummary.withoutMessagesProjection
 
     val aggregates = Seq(
       Aggregates.filter(selector),
       Aggregates.project(projection)
     )
 
-    mongoRetry(Try(collection.aggregate[MongoMovement](aggregates)) match {
+    mongoRetry(Try(collection.aggregate[MongoMovementSummary](aggregates)) match {
       case Success(obs) =>
         obs
           .headOption()
@@ -243,11 +249,11 @@ class MovementsRepositoryImpl @Inject() (
         Aggregates.sort(descending("received")),
         Aggregates.skip(from),
         Aggregates.limit(countNumber),
-        Aggregates.project(MongoMessage.simpleMetadataProjection)
+        Aggregates.project(MongoMessageMetadata.simpleMetadataProjection)
       )
 
     for {
-      perPageMessages <- filterPerPage[MongoMessage](aggregates)
+      perPageMessages <- filterPerPage[MongoMessageMetadata](aggregates)
       totalCount      <- countItems(filterAggregates)
     } yield MongoPaginatedMessages(TotalCount(totalCount), perPageMessages)
 
@@ -271,7 +277,7 @@ class MovementsRepositoryImpl @Inject() (
     movementId: MovementId,
     messageId: MessageId,
     movementType: MovementType
-  ): EitherT[Future, MongoError, MongoMessage] = {
+  ): EitherT[Future, MongoError, MongoMessageMetadataAndBody] = {
 
     val selector = mAnd(
       mEq("_id", movementId.value),
@@ -285,10 +291,11 @@ class MovementsRepositoryImpl @Inject() (
         Aggregates.filter(selector),
         Aggregates.unwind("$messages"),
         Aggregates.filter(secondarySelector),
-        Aggregates.replaceRoot("$messages")
+        Aggregates.replaceRoot("$messages"),
+        Aggregates.project(MongoMessageMetadataAndBody.simpleMetadataProjection)
       )
 
-    mongoRetry(Try(collection.aggregate[MongoMessage](aggregates)) match {
+    mongoRetry(Try(collection.aggregate[MongoMessageMetadataAndBody](aggregates)) match {
       case Success(obs) =>
         obs.headOption().map {
           case Some(opt) => Right(opt)
@@ -337,10 +344,10 @@ class MovementsRepositoryImpl @Inject() (
       Aggregates.sort(descending("updated")),
       Aggregates.skip(from),
       Aggregates.limit(itemCount),
-      Aggregates.project(MongoMovement.withoutMessagesProjection)
+      Aggregates.project(MongoMovementSummary.withoutMessagesProjection)
     )
     for {
-      perPageMovements <- filterPerPage[MongoMovement](aggregates)
+      perPageMovements <- filterPerPage[MongoMovementSummary](aggregates)
       totalCount       <- countItems(filterAggregates)
     } yield MongoPaginatedMovements(TotalCount(totalCount), perPageMovements)
 

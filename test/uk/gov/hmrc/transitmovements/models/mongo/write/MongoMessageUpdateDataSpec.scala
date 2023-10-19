@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.mongo
+package uk.gov.hmrc.transitmovements.models.mongo.write
 
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen

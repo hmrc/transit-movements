@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.mongo
+package uk.gov.hmrc.transitmovements.models.mongo.write
 
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.freespec.AnyFreeSpec
@@ -22,7 +22,6 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.Movement
-import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 
 class MongoMovementSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPropertyChecks with ModelGenerators {
 
@@ -40,24 +39,7 @@ class MongoMovementSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenP
           movement.messageSender,
           movement.created,
           movement.updated,
-          Some(movement.messages.map(MongoMessage.from)) // MongoMessage is tested elsewhere
-        )
-    }
-  }
-
-  "MongoMovement#asMovementWithoutMessages" - {
-    "should convert to an appropriate MovementWithoutMessages" in forAll(arbitrary[Movement]) {
-      movement =>
-        val sut = MongoMovement.from(movement)
-
-        sut.asMovementWithoutMessages mustBe MovementWithoutMessages(
-          movement._id,
-          movement.enrollmentEORINumber,
-          movement.movementEORINumber,
-          movement.movementReferenceNumber,
-          movement.localReferenceNumber,
-          movement.created,
-          movement.updated
+          movement.messages.map(MongoMessage.from) // MongoMessage is tested elsewhere
         )
     }
   }

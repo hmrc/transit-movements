@@ -32,10 +32,13 @@ import uk.gov.hmrc.mongo.play.json.formats.MongoBinaryFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMessage
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMovement
-import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMessages
-import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMovements
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMessages
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMovements
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -99,9 +102,12 @@ class MongoFormats @Inject() (appConfig: AppConfig)
   implicit val offsetDateTimeFormat: Format[OffsetDateTime] = Format.apply(offsetDateTimeReads, offsetDateTimeWrites)
 
   // these use the dates above, so need to be here for compile-time macro expansion
-  implicit val messageFormat: Format[MongoMessage]                              = Json.format[MongoMessage]
-  implicit val movementFormat: Format[MongoMovement]                            = Json.format[MongoMovement]
-  implicit val paginationMovementSummaryFormat: Format[MongoPaginatedMovements] = Json.format[MongoPaginatedMovements]
-  implicit val paginationMessageSummaryFormat: Format[MongoPaginatedMessages]   = Json.format[MongoPaginatedMessages]
+  implicit val messageFormat: Format[MongoMessage]                               = Json.format[MongoMessage]
+  implicit val movementFormat: Format[MongoMovement]                             = Json.format[MongoMovement]
+  implicit val movementSummaryFormat: Format[MongoMovementSummary]               = Json.format[MongoMovementSummary]
+  implicit val messageMetadataFormat: Format[MongoMessageMetadata]               = Json.format[MongoMessageMetadata]
+  implicit val messageMetadataAndBodyFormat: Format[MongoMessageMetadataAndBody] = Json.format[MongoMessageMetadataAndBody]
+  implicit val paginationMovementSummaryFormat: Format[MongoPaginatedMovements]  = Json.format[MongoPaginatedMovements]
+  implicit val paginationMessageSummaryFormat: Format[MongoPaginatedMessages]    = Json.format[MongoPaginatedMessages]
 
 }

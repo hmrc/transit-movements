@@ -29,8 +29,8 @@ import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMessage
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMovement
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 
 import java.net.URI
 import java.time.Instant
@@ -122,7 +122,7 @@ trait ModelGenerators extends BaseGenerators {
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
         messages                <- arbitrary[Vector[MongoMessage]]
-      } yield MongoMovement(id, movementType, eori, Some(eori), movementReferenceNumber, movementLRN, messageSender, created, updated, Some(messages))
+      } yield MongoMovement(id, movementType, eori, Some(eori), movementReferenceNumber, movementLRN, messageSender, created, updated, messages)
     }
 
   implicit lazy val arbitraryMessageSender: Arbitrary[MessageSender] =

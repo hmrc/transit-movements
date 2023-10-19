@@ -34,9 +34,9 @@ import uk.gov.hmrc.transitmovements.models.PageNumber
 import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
 import uk.gov.hmrc.transitmovements.models.PaginationMovementSummary
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMessage
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMessageUpdateData
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMovement
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.errors.MongoError

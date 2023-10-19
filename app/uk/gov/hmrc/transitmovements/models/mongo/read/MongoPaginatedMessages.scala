@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.mongo
+package uk.gov.hmrc.transitmovements.models.mongo.read
 
 import uk.gov.hmrc.transitmovements.models.TotalCount
 
-case class MongoPaginatedMovements(totalCount: TotalCount, movementSummary: Vector[MongoMovement])
+case class MongoPaginatedMessages(totalCount: TotalCount, messageSummary: Vector[MongoMessageMetadata])

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.mongo
+package uk.gov.hmrc.transitmovements.models.mongo.write
 
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
@@ -24,8 +24,6 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.Movement
-import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
 class MongoMessageSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPropertyChecks with ModelGenerators {
 
@@ -59,34 +57,6 @@ class MongoMessageSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPr
           message.status
         )
     }
-  }
-
-  "MongoMessage#asMessageResponse" - {
-
-    "should convert to a MessageResponse with the body as a String if there is a body" in forAll(arbitrary[Message], Gen.alphaNumStr) {
-      (message, body) =>
-        MongoMessage.from(message.copy(body = Some(body))).asMessageResponse mustBe MessageResponse(
-          message.id,
-          message.received,
-          message.messageType,
-          Some(body),
-          message.status,
-          message.uri
-        )
-    }
-
-    "should convert to a MessageResponse without the body if there is no body" in forAll(arbitrary[Message]) {
-      message =>
-        MongoMessage.from(message.copy(body = None)).asMessageResponse mustBe MessageResponse(
-          message.id,
-          message.received,
-          message.messageType,
-          None,
-          message.status,
-          message.uri
-        )
-    }
-
   }
 
 }

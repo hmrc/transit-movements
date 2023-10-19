@@ -37,9 +37,12 @@ import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMessage
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMessageUpdateData
-import uk.gov.hmrc.transitmovements.models.mongo.MongoMovement
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.time.OffsetDateTime
@@ -81,31 +84,33 @@ class MovementsRepositorySpec
   override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, mongoFormats)
 
   // helper methods
-  def expectedMessageSummaryProjection(original: MongoMessage): MongoMessage =
-    MongoMessage(
+  def expectedMessageMetadata(original: MongoMessage): MongoMessageMetadata =
+    MongoMessageMetadata(
       original.id,
       original.received,
-      None,
       original.messageType,
-      None,
-      None,
-      None,
-      None,
       original.status
     )
 
-  def expectedMovementWithoutMessagesProjection(original: MongoMovement): MongoMovement =
-    MongoMovement(
+  def expectedMessageSummaryWithBody(original: MongoMessage): MongoMessageMetadataAndBody =
+    MongoMessageMetadataAndBody(
+      original.id,
+      original.received,
+      original.messageType,
+      original.uri,
+      original.body,
+      original.status
+    )
+
+  def expectedMovementSummary(original: MongoMovement): MongoMovementSummary =
+    MongoMovementSummary(
       original._id,
-      original.movementType,
       original.enrollmentEORINumber,
       original.movementEORINumber,
       original.movementReferenceNumber,
       original.localReferenceNumber,
-      None,
       original.created,
-      original.updated,
-      None
+      original.updated
     )
 
   "DepartureMovementRepository" should "have the correct name" in {
@@ -150,7 +155,7 @@ class MovementsRepositorySpec
       _id = MovementId("2"),
       movementEORINumber = None,
       movementReferenceNumber = None,
-      messages = Some(Vector.empty[MongoMessage])
+      messages = Vector.empty[MongoMessage]
     )
 
     await(
@@ -163,7 +168,7 @@ class MovementsRepositorySpec
 
     firstItem._id.value should be(emptyMovement._id.value)
     firstItem.movementEORINumber should be(None)
-    firstItem.messages.get.isEmpty should be(true)
+    firstItem.messages.isEmpty should be(true)
   }
 
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists" in {
@@ -172,7 +177,7 @@ class MovementsRepositorySpec
     await(repository.insert(movement).value)
 
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
-    result.toOption.get should be(movement.copy(messages = None, messageSender = None))
+    result.toOption.get should be(expectedMovementSummary(movement))
   }
 
   "getMovementWithoutMessages" should "return none if the movement doesn't exist" in {
@@ -200,13 +205,13 @@ class MovementsRepositorySpec
         .copy(
           created = instant,
           updated = instant,
-          messages = Some(Vector(message1))
+          messages = Vector(message1)
         )
 
     await(repository.insert(departure).value)
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, message1.id, departure.movementType).value)
-    result.toOption.get should be(message1)
+    result.toOption.get should be(expectedMessageSummaryWithBody(message1))
   }
 
   "getSingleMessage" should "return message response with Body if it exists" in {
@@ -225,13 +230,13 @@ class MovementsRepositorySpec
         .copy(
           created = instant,
           updated = instant,
-          messages = Some(Vector(message1))
+          messages = Vector(message1)
         )
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.get.head.id, departure.movementType).value)
-    result.toOption.get should be(departure.messages.get.head)
+    val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id, departure.movementType).value)
+    result.toOption.get should be(expectedMessageSummaryWithBody(departure.messages.head))
   }
 
   "getSingleMessage" should "return none if the message doesn't exist" in {
@@ -251,7 +256,7 @@ class MovementsRepositorySpec
       .sortBy(_.received)
       .reverse
 
-    val departure = arbitrary[MongoMovement].sample.value.copy(messages = Some(messages))
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -262,7 +267,7 @@ class MovementsRepositorySpec
     paginationMessageSummary.totalCount should be(TotalCount(7))
 
     paginationMessageSummary.messageSummary should be(
-      departure.messages.get.map(expectedMessageSummaryProjection)
+      departure.messages.map(expectedMessageMetadata)
     )
   }
 
@@ -271,7 +276,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[MongoMovement].sample.value.copy(messages = Some(messages))
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -282,9 +287,9 @@ class MovementsRepositorySpec
     paginationMessageSummary.totalCount should be(TotalCount(4))
 
     paginationMessageSummary.messageSummary should be(
-      departure.messages.get
+      departure.messages
         .slice(0, 4)
-        .map(expectedMessageSummaryProjection)
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -293,7 +298,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[MongoMovement].sample.value.copy(messages = Some(messages))
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -304,9 +309,9 @@ class MovementsRepositorySpec
     paginationMessageSummary.totalCount should be(TotalCount(4))
 
     paginationMessageSummary.messageSummary should be(
-      departure.messages.get
+      departure.messages
         .slice(3, 7)
-        .map(expectedMessageSummaryProjection)
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -315,7 +320,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[MongoMovement].sample.value.copy(messages = Some(messages))
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -328,9 +333,9 @@ class MovementsRepositorySpec
     paginationMessageSummary.totalCount should be(TotalCount(7))
 
     paginationMessageSummary.messageSummary should be(
-      departure.messages.get
+      departure.messages
         .slice(0, 2)
-        .map(expectedMessageSummaryProjection)
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -339,7 +344,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[MongoMovement].sample.value.copy(messages = Some(messages))
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -352,9 +357,9 @@ class MovementsRepositorySpec
     paginationMessageSummary.totalCount should be(TotalCount(7))
 
     paginationMessageSummary.messageSummary should be(
-      departure.messages.get
+      departure.messages
         .slice(2, 4)
-        .map(expectedMessageSummaryProjection)
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -363,7 +368,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[MongoMovement].sample.value.copy(messages = Some(messages))
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -376,9 +381,9 @@ class MovementsRepositorySpec
     paginationMessageSummary.totalCount should be(TotalCount(7))
 
     paginationMessageSummary.messageSummary should be(
-      departure.messages.get
+      departure.messages
         .slice(4, 6)
-        .map(expectedMessageSummaryProjection)
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -387,7 +392,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[MongoMovement].sample.value.copy(messages = Some(messages))
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -400,9 +405,9 @@ class MovementsRepositorySpec
     paginationMessageSummary.totalCount should be(TotalCount(7))
 
     paginationMessageSummary.messageSummary should be(
-      departure.messages.get
+      departure.messages
         .slice(6, 8)
-        .map(expectedMessageSummaryProjection)
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -411,7 +416,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessages(dateTime)
 
-    val departure = arbitrary[MongoMovement].sample.value.copy(messages = Some(messages))
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -432,7 +437,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[MongoMovement].sample.value.copy(messages = Some(messages))
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -456,9 +461,9 @@ class MovementsRepositorySpec
     paginationMessageSummary.totalCount should be(TotalCount(5))
 
     paginationMessageSummary.messageSummary should be(
-      departure.messages.get
+      departure.messages
         .slice(1, 6)
-        .map(expectedMessageSummaryProjection)
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -467,7 +472,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessages(dateTime)
 
-    val departure = arbitrary[MongoMovement].sample.value.copy(messages = Some(messages))
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -509,8 +514,8 @@ class MovementsRepositorySpec
 
       paginationMovementSummary.movementSummary should be(
         Vector(
-          expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB2),
-          expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB1)
+          expectedMovementSummary(GetMovementsSetup.departureGB2),
+          expectedMovementSummary(GetMovementsSetup.departureGB1)
         )
       )
     }
@@ -527,8 +532,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB2),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB1)
+        expectedMovementSummary(GetMovementsSetup.departureGB2),
+        expectedMovementSummary(GetMovementsSetup.departureGB1)
       )
     )
   }
@@ -545,8 +550,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB1),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB3)
+        expectedMovementSummary(GetMovementsSetup.departureGB1),
+        expectedMovementSummary(GetMovementsSetup.departureGB3)
       )
     )
   }
@@ -581,10 +586,10 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB10),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB2),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB1),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB3)
+        expectedMovementSummary(GetMovementsSetup.departureGB10),
+        expectedMovementSummary(GetMovementsSetup.departureGB2),
+        expectedMovementSummary(GetMovementsSetup.departureGB1),
+        expectedMovementSummary(GetMovementsSetup.departureGB3)
       )
     )
   }
@@ -635,8 +640,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB2),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB1)
+        expectedMovementSummary(GetMovementsSetup.departureGB2),
+        expectedMovementSummary(GetMovementsSetup.departureGB1)
       )
     )
   }
@@ -667,10 +672,10 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB31),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB30),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB29),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB28)
+        expectedMovementSummary(GetMovementsSetup.departureGB31),
+        expectedMovementSummary(GetMovementsSetup.departureGB30),
+        expectedMovementSummary(GetMovementsSetup.departureGB29),
+        expectedMovementSummary(GetMovementsSetup.departureGB28)
       )
     )
 
@@ -702,10 +707,10 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB27),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB26),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB25),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB24)
+        expectedMovementSummary(GetMovementsSetup.departureGB27),
+        expectedMovementSummary(GetMovementsSetup.departureGB26),
+        expectedMovementSummary(GetMovementsSetup.departureGB25),
+        expectedMovementSummary(GetMovementsSetup.departureGB24)
       )
     )
 
@@ -738,10 +743,10 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB23),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB22),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB21),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB20)
+        expectedMovementSummary(GetMovementsSetup.departureGB23),
+        expectedMovementSummary(GetMovementsSetup.departureGB22),
+        expectedMovementSummary(GetMovementsSetup.departureGB21),
+        expectedMovementSummary(GetMovementsSetup.departureGB20)
       )
     )
 
@@ -773,7 +778,7 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB19)
+        expectedMovementSummary(GetMovementsSetup.departureGB19)
       )
     )
   }
@@ -825,8 +830,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB2),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB1)
+        expectedMovementSummary(GetMovementsSetup.departureGB2),
+        expectedMovementSummary(GetMovementsSetup.departureGB1)
       )
     )
   }
@@ -850,8 +855,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB1),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB3)
+        expectedMovementSummary(GetMovementsSetup.departureGB1),
+        expectedMovementSummary(GetMovementsSetup.departureGB3)
       )
     )
   }
@@ -885,10 +890,10 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB10),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB2),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB1),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB3)
+        expectedMovementSummary(GetMovementsSetup.departureGB10),
+        expectedMovementSummary(GetMovementsSetup.departureGB2),
+        expectedMovementSummary(GetMovementsSetup.departureGB1),
+        expectedMovementSummary(GetMovementsSetup.departureGB3)
       )
     )
   }
@@ -918,7 +923,7 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB4)
+        expectedMovementSummary(GetMovementsSetup.departureGB4)
       )
     )
   }
@@ -939,8 +944,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB6),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB5)
+        expectedMovementSummary(GetMovementsSetup.departureGB6),
+        expectedMovementSummary(GetMovementsSetup.departureGB5)
       )
     )
   }
@@ -967,7 +972,7 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB4)
+        expectedMovementSummary(GetMovementsSetup.departureGB4)
       )
     )
   }
@@ -988,8 +993,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB6),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.departureGB5)
+        expectedMovementSummary(GetMovementsSetup.departureGB6),
+        expectedMovementSummary(GetMovementsSetup.departureGB5)
       )
     )
   }
@@ -1036,8 +1041,8 @@ class MovementsRepositorySpec
 
       paginationMovementSummary.movementSummary should be(
         Vector(
-          expectedMovementWithoutMessagesProjection(GetMovementsSetup.arrivalGB2),
-          expectedMovementWithoutMessagesProjection(GetMovementsSetup.arrivalGB1)
+          expectedMovementSummary(GetMovementsSetup.arrivalGB2),
+          expectedMovementSummary(GetMovementsSetup.arrivalGB1)
         )
       )
     }
@@ -1054,8 +1059,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.arrivalGB2),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.arrivalGB1)
+        expectedMovementSummary(GetMovementsSetup.arrivalGB2),
+        expectedMovementSummary(GetMovementsSetup.arrivalGB1)
       )
     )
   }
@@ -1075,8 +1080,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.arrivalGB2),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.arrivalGB1)
+        expectedMovementSummary(GetMovementsSetup.arrivalGB2),
+        expectedMovementSummary(GetMovementsSetup.arrivalGB1)
       )
     )
   }
@@ -1098,8 +1103,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.arrivalGB2),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.arrivalGB1)
+        expectedMovementSummary(GetMovementsSetup.arrivalGB2),
+        expectedMovementSummary(GetMovementsSetup.arrivalGB1)
       )
     )
   }
@@ -1129,7 +1134,7 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.arrivalGB3)
+        expectedMovementSummary(GetMovementsSetup.arrivalGB3)
       )
     )
   }
@@ -1150,8 +1155,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.arrivalGB6),
-        expectedMovementWithoutMessagesProjection(GetMovementsSetup.arrivalGB5)
+        expectedMovementSummary(GetMovementsSetup.arrivalGB6),
+        expectedMovementSummary(GetMovementsSetup.arrivalGB5)
       )
     )
   }
@@ -1204,7 +1209,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Departure,
         created = instant,
         updated = instant,
-        messages = Some(Vector(message)),
+        messages = Vector(message),
         localReferenceNumber = Some(lrn)
       )
 
@@ -1215,7 +1220,7 @@ class MovementsRepositorySpec
         movementType = MovementType.Arrival,
         created = instant,
         updated = instant,
-        messages = Some(Vector(message))
+        messages = Vector(message)
       )
 
     val mrnGen: Gen[MovementReferenceNumber] = arbitrary[MovementReferenceNumber]
@@ -1635,7 +1640,7 @@ class MovementsRepositorySpec
           _id = departureID,
           created = instant,
           updated = instant,
-          messages = Some(Vector(message1))
+          messages = Vector(message1)
         )
 
     await(
@@ -1660,7 +1665,7 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureID.value)).first().toFuture()
     }
 
-    val messages = movement.messages.get
+    val messages = movement.messages
     movement.updated shouldEqual receivedInstant
     messages.length should be(2)
     messages.toList should contain(message1)
@@ -1680,7 +1685,7 @@ class MovementsRepositorySpec
           created = instant,
           updated = instant,
           movementReferenceNumber = None,
-          messages = Some(Vector(message1))
+          messages = Vector(message1)
         )
 
     await(
@@ -1706,7 +1711,7 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureId.value)).first().toFuture()
     }
 
-    val messages = movement.messages.get
+    val messages = movement.messages
     movement.updated shouldEqual receivedInstant
     messages.length should be(2)
     messages.toList should contain(message1)
@@ -1746,7 +1751,7 @@ class MovementsRepositorySpec
         .copy(
           created = instant,
           updated = instant,
-          messages = Some(Vector(message1))
+          messages = Vector(message1)
         )
 
     await(
@@ -1772,7 +1777,7 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
     }
 
-    val messages = movement.messages.get
+    val messages = movement.messages
     movement.updated shouldEqual receivedInstant
     messages.length should be(1)
     messages.head.status shouldBe Some(updateData.status)
@@ -1794,7 +1799,7 @@ class MovementsRepositorySpec
         .copy(
           created = instant,
           updated = instant,
-          messages = Some(Vector(message1))
+          messages = Vector(message1)
         )
 
     await(
@@ -1820,7 +1825,7 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
     }
 
-    val messages = movement.messages.get
+    val messages = movement.messages
     movement.updated shouldEqual receivedInstant
     messages.length should be(1)
     messages.head.status shouldBe Some(updateMessageData.status)
@@ -1842,7 +1847,7 @@ class MovementsRepositorySpec
         .copy(
           created = instant,
           updated = instant,
-          messages = Some(Vector(message1))
+          messages = Vector(message1)
         )
 
     await(
@@ -1868,7 +1873,7 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
     }
 
-    val messages = movement.messages.get
+    val messages = movement.messages
     movement.updated shouldEqual receivedInstant
     messages.length should be(1)
     messages.head.status shouldBe Some(updateMessageData.status)
@@ -1890,7 +1895,7 @@ class MovementsRepositorySpec
         .copy(
           created = instant,
           updated = instant,
-          messages = Some(Vector(message1))
+          messages = Vector(message1)
         )
 
     await(
@@ -1916,7 +1921,7 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
     ) {
       movement =>
-        val messages = movement.messages.get
+        val messages = movement.messages
         movement.updated shouldEqual receivedInstant
         messages.length should be(1)
 
@@ -1943,7 +1948,7 @@ class MovementsRepositorySpec
         .copy(
           created = instant,
           updated = instant,
-          messages = Some(Vector(message1))
+          messages = Vector(message1)
         )
 
     await(
@@ -1972,9 +1977,9 @@ class MovementsRepositorySpec
     ) {
       movement =>
         movement.updated shouldEqual receivedInstant
-        movement.messages.get.length should be(1)
+        movement.messages.length should be(1)
 
-        val message = movement.messages.get.head
+        val message = movement.messages.head
         message.status shouldBe Some(updateMessageData.status)
         message.uri.value.toString shouldBe updateMessageData.objectStoreURI.get.value
         message.messageType.get.code shouldBe updateMessageData.messageType.get.code
