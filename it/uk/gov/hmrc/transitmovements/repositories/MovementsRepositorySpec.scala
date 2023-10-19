@@ -17,6 +17,8 @@
 package uk.gov.hmrc.transitmovements.repositories
 
 import org.mockito.Mockito
+import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.model.Aggregates
 import org.mongodb.scala.model.Filters
 import org.mongodb.scala.model.Indexes
 import org.scalacheck.Arbitrary.arbitrary
@@ -30,7 +32,10 @@ import play.api.Logging
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.DefaultAwaitTimeout
 import play.api.test.FutureAwaits
+import uk.gov.hmrc.crypto.Decrypter
+import uk.gov.hmrc.crypto.Encrypter
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
+import uk.gov.hmrc.crypto.SymmetricCryptoFactory
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
@@ -79,7 +84,8 @@ class MovementsRepositorySpec
     .build()
   private val appConfig = Mockito.spy(app.injector.instanceOf[AppConfig])
 
-  val mongoFormats: MongoFormats = new MongoFormats(appConfig)
+  implicit val crypto: Encrypter with Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
+  val mongoFormats: MongoFormats                = new MongoFormats(appConfig)
 
   override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, mongoFormats)
 
@@ -135,9 +141,11 @@ class MovementsRepositorySpec
       .contains(Indexes.ascending("localReferenceNumber")) shouldBe true
   }
 
-  "insert" should "add the given movement to the database" in {
+  "insert" should "add the given movement to the database and encrypt the message body" in {
 
-    val departure = arbitrary[MongoMovement].sample.value.copy(_id = MovementId("2"))
+    val body      = Gen.stringOfN(20, Gen.alphaNumChar).sample.get
+    val message   = arbitrary[MongoMessage].sample.get.copy(body = Some(SensitiveString(body)))
+    val departure = arbitrary[MongoMovement].sample.value.copy(_id = MovementId("2"), messages = Vector(message))
     await(
       repository.insert(departure).value
     )
@@ -147,6 +155,27 @@ class MovementsRepositorySpec
     }
 
     firstItem._id.value should be(departure._id.value)
+
+    // now get the body, but get the raw string rather than the model.
+    import com.mongodb.client.model.Filters.{eq => mEq}
+
+    val findResult = repository.collection
+      .aggregate[BsonDocument](
+        Seq(
+          Aggregates.filter(mEq("_id", departure._id.value)),
+          Aggregates.unwind("$messages"),
+          Aggregates.limit(1),
+          Aggregates.project(BsonDocument("_id" -> 0, "body" -> "$messages.body"))
+        )
+      )
+      .first()
+      .toFuture()
+
+    whenReady(findResult) {
+      result =>
+        // If unencrypted this will fail.
+        result.getString("body").getValue should not be body
+    }
   }
 
   "insert" should "add an empty movement to the database" in {

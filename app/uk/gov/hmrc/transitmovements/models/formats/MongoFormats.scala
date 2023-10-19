@@ -26,7 +26,6 @@ import play.api.libs.json.Writes
 import uk.gov.hmrc.crypto.Decrypter
 import uk.gov.hmrc.crypto.Encrypter
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
-import uk.gov.hmrc.crypto.SymmetricCryptoFactory
 import uk.gov.hmrc.crypto.json.JsonEncryption
 import uk.gov.hmrc.mongo.play.json.formats.MongoBinaryFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
@@ -45,13 +44,11 @@ import java.time.ZoneOffset
 import scala.util.Try
 import scala.util.control.NonFatal
 
-class MongoFormats @Inject() (appConfig: AppConfig)
+class MongoFormats @Inject() (appConfig: AppConfig)(implicit crypto: Encrypter with Decrypter)
     extends CommonFormats
     with MongoBinaryFormats.Implicits
     with MongoJavatimeFormats.Implicits
     with MongoUuidFormats.Implicits {
-
-  implicit lazy val crypto: Encrypter with Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
 
   implicit lazy val writes: Writes[SensitiveString] =
     JsonEncryption.stringEncrypter.contramap(_.decryptedValue)

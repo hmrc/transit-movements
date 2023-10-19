@@ -31,7 +31,7 @@ import play.api.libs.json.Json
 import uk.gov.hmrc.crypto.Decrypter
 import uk.gov.hmrc.crypto.Encrypter
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
-import uk.gov.hmrc.transitmovements.base.TestEncrypters
+import uk.gov.hmrc.transitmovements.base.TestEncrypters.AddEncEncrypter
 import uk.gov.hmrc.transitmovements.base.TestEncrypters.NoEncryption
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
@@ -43,12 +43,11 @@ import java.time.ZoneOffset
 class MongoFormatsSpec extends AnyFreeSpec with Matchers with ModelGenerators with OptionValues with ScalaCheckDrivenPropertyChecks {
 
   "OffsetDateTime" - {
-    val appConfig: AppConfig = mock[AppConfig]
+    implicit val crypto: Encrypter with Decrypter = NoEncryption
+    val appConfig: AppConfig                      = mock[AppConfig]
     when(appConfig.encryptionTolerantRead).thenReturn(true)
 
-    val sut: MongoFormats = new MongoFormats(appConfig) {
-      override lazy val crypto: Encrypter with Decrypter = NoEncryption
-    }
+    val sut: MongoFormats = new MongoFormats(appConfig)
 
     "OffsetDateTime, when written to Json, must be in a format Mongo can consume" in {
 
@@ -76,12 +75,11 @@ class MongoFormatsSpec extends AnyFreeSpec with Matchers with ModelGenerators wi
   }
 
   "Sensitive String with fallback" - {
-    val appConfig: AppConfig = mock[AppConfig]
+    implicit val crypto: Encrypter with Decrypter = AddEncEncrypter
+    val appConfig: AppConfig                      = mock[AppConfig]
     when(appConfig.encryptionTolerantRead).thenReturn(true)
 
-    val sut: MongoFormats = new MongoFormats(appConfig) {
-      override lazy val crypto: Encrypter with Decrypter = TestEncrypters.AddEncEncrypter
-    }
+    val sut: MongoFormats = new MongoFormats(appConfig)
 
     "writing a SensitiveString returns the expected result" in forAll(
       Gen
@@ -106,12 +104,11 @@ class MongoFormatsSpec extends AnyFreeSpec with Matchers with ModelGenerators wi
   }
 
   "Sensitive String without fallback" - {
-    val appConfig: AppConfig = mock[AppConfig]
+    implicit val crypto: Encrypter with Decrypter = AddEncEncrypter
+    val appConfig: AppConfig                      = mock[AppConfig]
     when(appConfig.encryptionTolerantRead).thenReturn(false)
 
-    val sut: MongoFormats = new MongoFormats(appConfig) {
-      override lazy val crypto: Encrypter with Decrypter = TestEncrypters.AddEncEncrypter
-    }
+    val sut: MongoFormats = new MongoFormats(appConfig)
 
     "writing a SensitiveString returns the expected result" in forAll(
       Gen

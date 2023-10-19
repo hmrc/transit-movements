@@ -26,6 +26,9 @@ import play.api.test.DefaultAwaitTimeout
 import play.api.test.FakeRequest
 import play.api.test.FutureAwaits
 import play.api.test.Helpers._
+import uk.gov.hmrc.crypto.Decrypter
+import uk.gov.hmrc.crypto.Encrypter
+import uk.gov.hmrc.crypto.SymmetricCryptoFactory
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
@@ -58,7 +61,8 @@ class TestOnlyControllerSpec
     MongoComponent(mongoUri)
   }
 
-  val mongoFormats: MongoFormats = new MongoFormats(appConfig)
+  implicit val crypto: Encrypter with Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
+  val mongoFormats: MongoFormats                = new MongoFormats(appConfig)
 
   override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, mongoFormats)
 
