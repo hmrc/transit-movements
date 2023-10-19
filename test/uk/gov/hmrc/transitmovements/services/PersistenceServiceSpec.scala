@@ -28,6 +28,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.ItemCount
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
@@ -35,17 +36,26 @@ import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.PageNumber
+import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
+import uk.gov.hmrc.transitmovements.models.PaginationMovementSummary
+import uk.gov.hmrc.transitmovements.models.TotalCount
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 import uk.gov.hmrc.transitmovements.models.mongo.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.MongoMessageUpdateData
 import uk.gov.hmrc.transitmovements.models.mongo.MongoMovement
+import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMessages
+import uk.gov.hmrc.transitmovements.models.mongo.MongoPaginatedMovements
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.time.OffsetDateTime
+import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
+@nowarn("msg=implicit numeric widening")
 class PersistenceServiceSpec
     extends AnyFreeSpec
     with Matchers
@@ -300,12 +310,353 @@ class PersistenceServiceSpec
 
   // GET -- data from Mongo is transformed
 
-  "getMovementWithoutMessages" - {}
+  "getMovementWithoutMessages" - {
 
-  "getSingleMessage" - {}
+    "getting a movement back from Mongo will perform the correct transformation" in forAll(arbitrary[Movement].map(MongoMovement.from)) {
+      mongoMovement =>
+        val (sut, movementsRepository) = createService()
+        when(
+          movementsRepository.getMovementWithoutMessages(
+            EORINumber(eqTo(mongoMovement.enrollmentEORINumber.value)),
+            MovementId(eqTo(mongoMovement._id.value)),
+            eqTo(mongoMovement.movementType)
+          )
+        ).thenReturn(EitherT.rightT[Future, MongoError](mongoMovement))
 
-  "getMessages" - {}
+        whenReady(sut.getMovementWithoutMessages(mongoMovement.enrollmentEORINumber, mongoMovement._id, mongoMovement.movementType).value) {
+          result =>
+            result mustBe Right(mongoMovement.asMovementWithoutMessages)
+            verify(movementsRepository, times(1)).getMovementWithoutMessages(
+              EORINumber(eqTo(mongoMovement.enrollmentEORINumber.value)),
+              MovementId(eqTo(mongoMovement._id.value)),
+              eqTo(mongoMovement.movementType)
+            )
+            verifyNoMoreInteractions(movementsRepository)
+        }
+    }
 
-  "getMovements" - {}
+    "failing to get a movement back from Mongo will return the error from the repository layer" in forAll(arbitrary[Movement].map(MongoMovement.from)) {
+      mongoMovement =>
+        val (sut, movementsRepository) = createService()
+        val error                      = MongoError.UnexpectedError(Some(new IllegalStateException()))
+        when(
+          movementsRepository.getMovementWithoutMessages(
+            EORINumber(eqTo(mongoMovement.enrollmentEORINumber.value)),
+            MovementId(eqTo(mongoMovement._id.value)),
+            eqTo(mongoMovement.movementType)
+          )
+        ).thenReturn(EitherT.leftT[Future, MongoMovement](error))
+
+        whenReady(sut.getMovementWithoutMessages(mongoMovement.enrollmentEORINumber, mongoMovement._id, mongoMovement.movementType).value) {
+          case Left(actual: MongoError.UnexpectedError) =>
+            actual must be theSameInstanceAs error
+            verify(movementsRepository, times(1)).getMovementWithoutMessages(
+              EORINumber(eqTo(mongoMovement.enrollmentEORINumber.value)),
+              MovementId(eqTo(mongoMovement._id.value)),
+              eqTo(mongoMovement.movementType)
+            )
+            verifyNoMoreInteractions(movementsRepository)
+          case value => fail(s"Expected a Left of MongoError.UnexpectedError, got $value")
+        }
+    }
+  }
+
+  "getSingleMessage" - {
+
+    "getting a movement back from Mongo will perform the correct transformation" in forAll(
+      arbitrary[MovementId],
+      arbitrary[EORINumber],
+      arbitrary[MovementType],
+      arbitrary[Message].map(MongoMessage.from)
+    ) {
+      (movementId, eori, movementType, mongoMessage) =>
+        val (sut, movementsRepository) = createService()
+        when(
+          movementsRepository.getSingleMessage(
+            EORINumber(eqTo(eori.value)),
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(mongoMessage.id.value)),
+            eqTo(movementType)
+          )
+        ).thenReturn(EitherT.rightT[Future, MongoError](mongoMessage))
+
+        whenReady(sut.getSingleMessage(eori, movementId, mongoMessage.id, movementType).value) {
+          result =>
+            result mustBe Right(mongoMessage.asMessageResponse)
+            verify(movementsRepository, times(1)).getSingleMessage(
+              EORINumber(eqTo(eori.value)),
+              MovementId(eqTo(movementId.value)),
+              MessageId(eqTo(mongoMessage.id.value)),
+              eqTo(movementType)
+            )
+            verifyNoMoreInteractions(movementsRepository)
+        }
+    }
+
+    "failing to get a movement back from Mongo will return the error from the repository layer" in forAll(
+      arbitrary[MovementId],
+      arbitrary[EORINumber],
+      arbitrary[MovementType],
+      arbitrary[Message].map(MongoMessage.from)
+    ) {
+      (movementId, eori, movementType, mongoMessage) =>
+        val (sut, movementsRepository) = createService()
+        val error                      = MongoError.UnexpectedError(Some(new IllegalStateException()))
+        when(
+          movementsRepository.getSingleMessage(
+            EORINumber(eqTo(eori.value)),
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(mongoMessage.id.value)),
+            eqTo(movementType)
+          )
+        ).thenReturn(EitherT.leftT[Future, MongoMessage](error))
+
+        whenReady(sut.getSingleMessage(eori, movementId, mongoMessage.id, movementType).value) {
+          case Left(actual: MongoError.UnexpectedError) =>
+            actual must be theSameInstanceAs error
+            verify(movementsRepository, times(1)).getSingleMessage(
+              EORINumber(eqTo(eori.value)),
+              MovementId(eqTo(movementId.value)),
+              MessageId(eqTo(mongoMessage.id.value)),
+              eqTo(movementType)
+            )
+            verifyNoMoreInteractions(movementsRepository)
+          case value => fail(s"Expected a Left of MongoError.UnexpectedError, got $value")
+        }
+    }
+
+  }
+
+  "getMessages" - {
+
+    "getting a series of messages back from Mongo will perform the correct transformation" in forAll(
+      arbitrary[EORINumber],
+      arbitrary[MovementId],
+      arbitrary[MovementType],
+      Gen
+        .choose(1, 5)
+        .flatMap(
+          count => Gen.listOfN(count, arbitrary[Message].map(MongoMessage.from))
+        )
+        .map(
+          x => Vector(x: _*)
+        )
+    ) {
+      (eori, movementId, movementType, messageList) =>
+        // filters
+        val page: Option[PageNumber]              = Gen.option(Gen.choose(1, 5).map(PageNumber.apply)).sample.get
+        val count: Option[ItemCount]              = Gen.option(Gen.choose(25, 500).map(ItemCount.apply)).sample.get
+        val received: Option[OffsetDateTime]      = Gen.option(arbitrary[OffsetDateTime]).sample.get
+        val receivedUntil: Option[OffsetDateTime] = Gen.option(arbitrary[OffsetDateTime]).sample.get
+
+        val (sut, movementsRepository) = createService()
+        when(
+          movementsRepository.getMessages(
+            EORINumber(eqTo(eori.value)),
+            MovementId(eqTo(movementId.value)),
+            eqTo(movementType),
+            eqTo(received),
+            eqTo(page),
+            eqTo(count),
+            eqTo(receivedUntil)
+          )
+        ).thenReturn(
+          EitherT.rightT[Future, MongoError](
+            MongoPaginatedMessages(
+              TotalCount(messageList.length),
+              messageList
+            )
+          )
+        )
+
+        whenReady(sut.getMessages(eori, movementId, movementType, received, page, count, receivedUntil).value) {
+          result =>
+            result mustBe Right(
+              PaginationMessageSummary(
+                TotalCount(messageList.length),
+                messageList.map(_.asMessageResponse)
+              )
+            )
+            verify(movementsRepository, times(1)).getMessages(
+              EORINumber(eqTo(eori.value)),
+              MovementId(eqTo(movementId.value)),
+              eqTo(movementType),
+              eqTo(received),
+              eqTo(page),
+              eqTo(count),
+              eqTo(receivedUntil)
+            )
+            verifyNoMoreInteractions(movementsRepository)
+        }
+    }
+
+    "failing to get the list of messages from Mongo will return the error from the repository layer" in forAll(
+      arbitrary[EORINumber],
+      arbitrary[MovementId],
+      arbitrary[MovementType]
+    ) {
+      (eori, movementId, movementType) =>
+        // filters
+        val page: Option[PageNumber]              = Gen.option(Gen.choose(1, 5).map(PageNumber.apply)).sample.get
+        val count: Option[ItemCount]              = Gen.option(Gen.choose(25, 500).map(ItemCount.apply)).sample.get
+        val received: Option[OffsetDateTime]      = Gen.option(arbitrary[OffsetDateTime]).sample.get
+        val receivedUntil: Option[OffsetDateTime] = Gen.option(arbitrary[OffsetDateTime]).sample.get
+        val error                                 = MongoError.UnexpectedError(Some(new IllegalStateException()))
+
+        val (sut, movementsRepository) = createService()
+        when(
+          movementsRepository.getMessages(
+            EORINumber(eqTo(eori.value)),
+            MovementId(eqTo(movementId.value)),
+            eqTo(movementType),
+            eqTo(received),
+            eqTo(page),
+            eqTo(count),
+            eqTo(receivedUntil)
+          )
+        ).thenReturn(EitherT.leftT[Future, MongoPaginatedMessages](error))
+
+        whenReady(sut.getMessages(eori, movementId, movementType, received, page, count, receivedUntil).value) {
+          case Left(actual: MongoError.UnexpectedError) =>
+            actual must be theSameInstanceAs error
+            verify(movementsRepository, times(1)).getMessages(
+              EORINumber(eqTo(eori.value)),
+              MovementId(eqTo(movementId.value)),
+              eqTo(movementType),
+              eqTo(received),
+              eqTo(page),
+              eqTo(count),
+              eqTo(receivedUntil)
+            )
+            verifyNoMoreInteractions(movementsRepository)
+          case value => fail(s"Expected a Left of MongoError.UnexpectedError, got $value")
+        }
+    }
+  }
+
+  "getMovements" - {
+
+    "getting a series of movements back from Mongo will perform the correct transformation" in forAll(
+      arbitrary[EORINumber],
+      arbitrary[MovementType],
+      Gen
+        .choose(1, 5)
+        .flatMap(
+          count => Gen.listOfN(count, arbitrary[Movement].map(MongoMovement.from))
+        )
+        .map(
+          x => Vector(x: _*)
+        )
+    ) {
+      (enrolmentEORI, movementType, movementList) =>
+        // filters
+        val page: Option[PageNumber]                                 = Gen.option(Gen.choose(1, 5).map(PageNumber.apply)).sample.get
+        val count: Option[ItemCount]                                 = Gen.option(Gen.choose(25, 500).map(ItemCount.apply)).sample.get
+        val received: Option[OffsetDateTime]                         = Gen.option(arbitrary[OffsetDateTime]).sample.get
+        val receivedUntil: Option[OffsetDateTime]                    = Gen.option(arbitrary[OffsetDateTime]).sample.get
+        val movementEori: Option[EORINumber]                         = Gen.option(arbitrary[EORINumber]).sample.get
+        val localReferenceNumber: Option[LocalReferenceNumber]       = Gen.option(arbitrary[LocalReferenceNumber]).sample.get
+        val movementReferenceNumber: Option[MovementReferenceNumber] = Gen.option(arbitrary[MovementReferenceNumber]).sample.get
+
+        val (sut, movementsRepository) = createService()
+        when(
+          movementsRepository.getMovements(
+            EORINumber(eqTo(enrolmentEORI.value)),
+            eqTo(movementType),
+            eqTo(received),
+            eqTo(movementEori),
+            eqTo(movementReferenceNumber),
+            eqTo(page),
+            eqTo(count),
+            eqTo(receivedUntil),
+            eqTo(localReferenceNumber)
+          )
+        ).thenReturn(
+          EitherT.rightT[Future, MongoError](
+            MongoPaginatedMovements(
+              TotalCount(movementList.length),
+              movementList
+            )
+          )
+        )
+
+        whenReady(
+          sut.getMovements(enrolmentEORI, movementType, received, movementEori, movementReferenceNumber, page, count, receivedUntil, localReferenceNumber).value
+        ) {
+          result =>
+            result mustBe Right(
+              PaginationMovementSummary(
+                TotalCount(movementList.length),
+                movementList.map(_.asMovementWithoutMessages)
+              )
+            )
+            verify(movementsRepository, times(1)).getMovements(
+              EORINumber(eqTo(enrolmentEORI.value)),
+              eqTo(movementType),
+              eqTo(received),
+              eqTo(movementEori),
+              eqTo(movementReferenceNumber),
+              eqTo(page),
+              eqTo(count),
+              eqTo(receivedUntil),
+              eqTo(localReferenceNumber)
+            )
+            verifyNoMoreInteractions(movementsRepository)
+        }
+    }
+
+    "failing to get the list of movements from Mongo will return the error from the repository layer" in forAll(
+      arbitrary[EORINumber],
+      arbitrary[MovementType]
+    ) {
+      (enrolmentEORI, movementType) =>
+        // filters
+        val page: Option[PageNumber]                                 = Gen.option(Gen.choose(1, 5).map(PageNumber.apply)).sample.get
+        val count: Option[ItemCount]                                 = Gen.option(Gen.choose(25, 500).map(ItemCount.apply)).sample.get
+        val received: Option[OffsetDateTime]                         = Gen.option(arbitrary[OffsetDateTime]).sample.get
+        val receivedUntil: Option[OffsetDateTime]                    = Gen.option(arbitrary[OffsetDateTime]).sample.get
+        val movementEori: Option[EORINumber]                         = Gen.option(arbitrary[EORINumber]).sample.get
+        val localReferenceNumber: Option[LocalReferenceNumber]       = Gen.option(arbitrary[LocalReferenceNumber]).sample.get
+        val movementReferenceNumber: Option[MovementReferenceNumber] = Gen.option(arbitrary[MovementReferenceNumber]).sample.get
+
+        val error = MongoError.UnexpectedError(Some(new IllegalStateException()))
+
+        val (sut, movementsRepository) = createService()
+        when(
+          movementsRepository.getMovements(
+            EORINumber(eqTo(enrolmentEORI.value)),
+            eqTo(movementType),
+            eqTo(received),
+            eqTo(movementEori),
+            eqTo(movementReferenceNumber),
+            eqTo(page),
+            eqTo(count),
+            eqTo(receivedUntil),
+            eqTo(localReferenceNumber)
+          )
+        ).thenReturn(EitherT.leftT[Future, MongoPaginatedMovements](error))
+
+        whenReady(
+          sut.getMovements(enrolmentEORI, movementType, received, movementEori, movementReferenceNumber, page, count, receivedUntil, localReferenceNumber).value
+        ) {
+          case Left(actual: MongoError.UnexpectedError) =>
+            actual must be theSameInstanceAs error
+            verify(movementsRepository, times(1)).getMovements(
+              EORINumber(eqTo(enrolmentEORI.value)),
+              eqTo(movementType),
+              eqTo(received),
+              eqTo(movementEori),
+              eqTo(movementReferenceNumber),
+              eqTo(page),
+              eqTo(count),
+              eqTo(receivedUntil),
+              eqTo(localReferenceNumber)
+            )
+            verifyNoMoreInteractions(movementsRepository)
+          case value => fail(s"Expected a Left of MongoError.UnexpectedError, got $value")
+        }
+    }
+
+  }
 
 }
