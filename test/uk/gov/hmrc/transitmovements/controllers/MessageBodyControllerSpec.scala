@@ -77,13 +77,12 @@ import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
-import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
-import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageService
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 import uk.gov.hmrc.transitmovements.services.ObjectStoreService
+import uk.gov.hmrc.transitmovements.services.PersistenceService
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
@@ -103,7 +102,6 @@ class MessageBodyControllerSpec
     with OptionValues
     with ScalaFutures
     with BeforeAndAfterEach
-    with PresentationFormats
     with ModelGenerators
     with ScalaCheckDrivenPropertyChecks {
 
@@ -128,7 +126,7 @@ class MessageBodyControllerSpec
           )
           .sample
           .get
-        val mockMovementsRepo = mock[MovementsRepository]
+        val mockMovementsRepo = mock[PersistenceService]
         val expectedResponse: EitherT[Future, MongoError, MessageResponse] = EitherT.rightT[Future, MongoError](
           MessageResponse(
             messageId,
@@ -203,7 +201,7 @@ class MessageBodyControllerSpec
           )
           .sample
           .get
-        val mockMovementsRepo = mock[MovementsRepository]
+        val mockMovementsRepo = mock[PersistenceService]
         when(
           mockMovementsRepo.getSingleMessage(
             EORINumber(eqTo(eori.value)),
@@ -277,7 +275,7 @@ class MessageBodyControllerSpec
       arbitrary[MessageType]
     ) {
       (eori, movementType, movementId, messageId, messageType) =>
-        val mockMovementsRepo = mock[MovementsRepository]
+        val mockMovementsRepo = mock[PersistenceService]
         when(
           mockMovementsRepo.getSingleMessage(
             EORINumber(eqTo(eori.value)),
@@ -347,7 +345,7 @@ class MessageBodyControllerSpec
       arbitrary[MessageId]
     ) {
       (eori, movementType, movementId, messageId) =>
-        val mockMovementsRepo = mock[MovementsRepository]
+        val mockMovementsRepo = mock[PersistenceService]
         when(
           mockMovementsRepo.getSingleMessage(
             EORINumber(eqTo(eori.value)),
@@ -407,7 +405,7 @@ class MessageBodyControllerSpec
       arbitrary[MessageId]
     ) {
       (eori, movementType, movementId, messageId) =>
-        val mockMovementsRepo = mock[MovementsRepository]
+        val mockMovementsRepo = mock[PersistenceService]
         when(
           mockMovementsRepo.getSingleMessage(
             EORINumber(eqTo(eori.value)),
@@ -470,7 +468,7 @@ class MessageBodyControllerSpec
       (eori, movementType, movementId, messageId, messageType) =>
         val objectStoreUri = testObjectStoreURI(movementId, messageId, now)
 
-        val mockMovementsRepo = mock[MovementsRepository]
+        val mockMovementsRepo = mock[PersistenceService]
         when(
           mockMovementsRepo.getSingleMessage(
             EORINumber(eqTo(eori.value)),
@@ -1328,7 +1326,7 @@ class MessageBodyControllerSpec
     def createController(): ControllerAndMocks = {
       implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
 
-      val mockRepository: MovementsRepository                        = mock[MovementsRepository]
+      val mockPersistenceService: PersistenceService                 = mock[PersistenceService]
       val mockObjectStoreService: ObjectStoreService                 = mock[ObjectStoreService]
       val mockMessagesXmlParsingService: MessagesXmlParsingService   = mock[MessagesXmlParsingService]
       val mockMovementsXmlParsingService: MovementsXmlParsingService = mock[MovementsXmlParsingService]
@@ -1342,7 +1340,7 @@ class MessageBodyControllerSpec
 
       val controller = new MessageBodyController(
         stubControllerComponents(),
-        mockRepository,
+        mockPersistenceService,
         mockObjectStoreService,
         mockMessagesXmlParsingService,
         mockMovementsXmlParsingService,
@@ -1351,12 +1349,19 @@ class MessageBodyControllerSpec
         clock
       )
 
-      ControllerAndMocks(controller, mockRepository, mockObjectStoreService, mockMessagesXmlParsingService, mockMovementsXmlParsingService, mockMessageService)
+      ControllerAndMocks(
+        controller,
+        mockPersistenceService,
+        mockObjectStoreService,
+        mockMessagesXmlParsingService,
+        mockMovementsXmlParsingService,
+        mockMessageService
+      )
     }
 
     case class ControllerAndMocks(
       controller: MessageBodyController,
-      mockRepository: MovementsRepository,
+      mockPersistenceService: PersistenceService,
       mockObjectStoreService: ObjectStoreService,
       mockMessagesXmlParsingService: MessagesXmlParsingService,
       mockMovementsXmlParsingService: MovementsXmlParsingService,

@@ -23,7 +23,5 @@ import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 case class PaginationMessageSummary(totalCount: TotalCount, messageSummary: Vector[MessageResponse])
 
 object PaginationMessageSummary {
-  implicit lazy val format: OFormat[PaginationMessageSummary]       = Json.format[PaginationMessageSummary]
-  implicit lazy val messageResponseFormat: OFormat[MessageResponse] = Json.format[MessageResponse]
-
+  implicit lazy val format: OFormat[PaginationMessageSummary] = Json.format[PaginationMessageSummary]
 }

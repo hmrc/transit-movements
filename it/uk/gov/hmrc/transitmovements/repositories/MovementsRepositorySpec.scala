@@ -17,10 +17,12 @@
 package uk.gov.hmrc.transitmovements.repositories
 
 import org.mockito.Mockito
-import org.mockito.Mockito.when
+import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.model.Aggregates
 import org.mongodb.scala.model.Filters
 import org.mongodb.scala.model.Indexes
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -30,13 +32,22 @@ import play.api.Logging
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.DefaultAwaitTimeout
 import play.api.test.FutureAwaits
+import uk.gov.hmrc.crypto.Decrypter
+import uk.gov.hmrc.crypto.Encrypter
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
+import uk.gov.hmrc.crypto.SymmetricCryptoFactory
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.time.OffsetDateTime
@@ -52,7 +63,7 @@ class MovementsRepositorySpec
     with FutureAwaits
     with DefaultAwaitTimeout
     with Logging
-    with DefaultPlayMongoRepositorySupport[Movement]
+    with DefaultPlayMongoRepositorySupport[MongoMovement]
     with ModelGenerators
     with OptionValues {
 
@@ -67,12 +78,46 @@ class MovementsRepositorySpec
 
   implicit lazy val app: Application = GuiceApplicationBuilder()
     .configure(
-      "checkDuplicateLRN" -> true
+      "encryption.key"           -> "7CYXDDh/UbNDY1UV8bkxvTzur3pCUzsAvMVH+HsRWbY=",
+      "encryption.tolerant-read" -> false
     )
     .build()
   private val appConfig = Mockito.spy(app.injector.instanceOf[AppConfig])
 
-  override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent)
+  implicit val crypto: Encrypter with Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
+  val mongoFormats: MongoFormats                = new MongoFormats(appConfig)
+
+  override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, mongoFormats)
+
+  // helper methods
+  def expectedMessageMetadata(original: MongoMessage): MongoMessageMetadata =
+    MongoMessageMetadata(
+      original.id,
+      original.received,
+      original.messageType,
+      original.status
+    )
+
+  def expectedMessageSummaryWithBody(original: MongoMessage): MongoMessageMetadataAndBody =
+    MongoMessageMetadataAndBody(
+      original.id,
+      original.received,
+      original.messageType,
+      original.uri,
+      original.body,
+      original.status
+    )
+
+  def expectedMovementSummary(original: MongoMovement): MongoMovementSummary =
+    MongoMovementSummary(
+      original._id,
+      original.enrollmentEORINumber,
+      original.movementEORINumber,
+      original.movementReferenceNumber,
+      original.localReferenceNumber,
+      original.created,
+      original.updated
+    )
 
   "DepartureMovementRepository" should "have the correct name" in {
     repository.collectionName shouldBe "movements"
@@ -85,7 +130,7 @@ class MovementsRepositorySpec
   }
 
   "DepartureMovementRepository" should "have the correct domain format" in {
-    repository.domainFormat shouldEqual MongoFormats.movementFormat
+    repository.domainFormat shouldEqual mongoFormats.movementFormat
   }
 
   "DepartureMovementRepository" should "have the index for localReferenceNumber" in {
@@ -93,12 +138,14 @@ class MovementsRepositorySpec
       .map(
         item => item.getKeys
       )
-      .contains(Indexes.ascending("localReferenceNumber", "messageSender")) shouldBe true
+      .contains(Indexes.ascending("localReferenceNumber")) shouldBe true
   }
 
-  "insert" should "add the given movement to the database" in {
+  "insert" should "add the given movement to the database and encrypt the message body" in {
 
-    val departure = arbitrary[Movement].sample.value.copy(_id = MovementId("2"))
+    val body      = Gen.stringOfN(20, Gen.alphaNumChar).sample.get
+    val message   = arbitrary[MongoMessage].sample.get.copy(body = Some(SensitiveString(body)))
+    val departure = arbitrary[MongoMovement].sample.value.copy(_id = MovementId("2"), messages = Vector(message))
     await(
       repository.insert(departure).value
     )
@@ -108,15 +155,36 @@ class MovementsRepositorySpec
     }
 
     firstItem._id.value should be(departure._id.value)
+
+    // now get the body, but get the raw string rather than the model.
+    import com.mongodb.client.model.Filters.{eq => mEq}
+
+    val findResult = repository.collection
+      .aggregate[BsonDocument](
+        Seq(
+          Aggregates.filter(mEq("_id", departure._id.value)),
+          Aggregates.unwind("$messages"),
+          Aggregates.limit(1),
+          Aggregates.project(BsonDocument("_id" -> 0, "body" -> "$messages.body"))
+        )
+      )
+      .first()
+      .toFuture()
+
+    whenReady(findResult) {
+      result =>
+        // If unencrypted this will fail.
+        result.getString("body").getValue should not be body
+    }
   }
 
   "insert" should "add an empty movement to the database" in {
 
-    lazy val emptyMovement = arbitrary[Movement].sample.value.copy(
+    lazy val emptyMovement = arbitrary[MongoMovement].sample.value.copy(
       _id = MovementId("2"),
       movementEORINumber = None,
       movementReferenceNumber = None,
-      messages = Vector.empty[Message]
+      messages = Vector.empty[MongoMessage]
     )
 
     await(
@@ -133,16 +201,16 @@ class MovementsRepositorySpec
   }
 
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists" in {
-    val movement = arbitrary[Movement].sample.value
+    val movement = arbitrary[MongoMovement].sample.value
 
     await(repository.insert(movement).value)
 
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
-    result.toOption.get should be(MovementWithoutMessages.fromMovement(movement))
+    result.toOption.get should be(expectedMovementSummary(movement))
   }
 
   "getMovementWithoutMessages" should "return none if the movement doesn't exist" in {
-    val movement = arbitrary[Movement].sample.value.copy(_id = MovementId("1"))
+    val movement = arbitrary[MongoMovement].sample.value.copy(_id = MovementId("1"))
 
     await(repository.insert(movement).value)
 
@@ -154,10 +222,15 @@ class MovementsRepositorySpec
   "getSingleMessage" should "return message response with uri if it exists" in {
 
     val message1 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
+      arbitrary[MongoMessage].sample.value.copy(
+        body = None,
+        messageType = Some(MessageType.DeclarationData),
+        triggerId = None,
+        status = Some(MessageStatus.Pending)
+      )
 
     val departure =
-      arbitrary[Movement].sample.value
+      arbitrary[MongoMovement].sample.value
         .copy(
           created = instant,
           updated = instant,
@@ -166,15 +239,15 @@ class MovementsRepositorySpec
 
     await(repository.insert(departure).value)
 
-    val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id, departure.movementType).value)
-    result.toOption.get should be(MessageResponse.fromMessageWithoutBody(departure.messages.head))
+    val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, message1.id, departure.movementType).value)
+    result.toOption.get should be(expectedMessageSummaryWithBody(message1))
   }
 
   "getSingleMessage" should "return message response with Body if it exists" in {
 
     val message1 =
-      arbitrary[Message].sample.value.copy(
-        body = Some("body"),
+      arbitrary[MongoMessage].sample.value.copy(
+        body = Some(SensitiveString("body")),
         messageType = Some(MessageType.DeclarationData),
         triggerId = None,
         status = Some(MessageStatus.Pending),
@@ -182,7 +255,7 @@ class MovementsRepositorySpec
       )
 
     val departure =
-      arbitrary[Movement].sample.value
+      arbitrary[MongoMovement].sample.value
         .copy(
           created = instant,
           updated = instant,
@@ -192,11 +265,11 @@ class MovementsRepositorySpec
     await(repository.insert(departure).value)
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id, departure.movementType).value)
-    result.toOption.get should be(MessageResponse.fromMessageWithBody(departure.messages.head))
+    result.toOption.get should be(expectedMessageSummaryWithBody(departure.messages.head))
   }
 
   "getSingleMessage" should "return none if the message doesn't exist" in {
-    val departure = arbitrary[Movement].sample.value
+    val departure = arbitrary[MongoMovement].sample.value
 
     await(repository.insert(departure).value)
 
@@ -212,7 +285,7 @@ class MovementsRepositorySpec
       .sortBy(_.received)
       .reverse
 
-    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -223,9 +296,7 @@ class MovementsRepositorySpec
     paginationMessageSummary.totalCount should be(TotalCount(7))
 
     paginationMessageSummary.messageSummary should be(
-      departure.messages.map(
-        message => MessageResponse.fromMessageWithoutBody(message)
-      )
+      departure.messages.map(expectedMessageMetadata)
     )
   }
 
@@ -234,7 +305,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -247,9 +318,7 @@ class MovementsRepositorySpec
     paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(0, 4)
-        .map(
-          message => MessageResponse.fromMessageWithoutBody(message)
-        )
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -258,7 +327,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -271,9 +340,7 @@ class MovementsRepositorySpec
     paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(3, 7)
-        .map(
-          message => MessageResponse.fromMessageWithoutBody(message)
-        )
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -282,7 +349,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -297,9 +364,7 @@ class MovementsRepositorySpec
     paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(0, 2)
-        .map(
-          message => MessageResponse.fromMessageWithoutBody(message)
-        )
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -308,7 +373,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -323,9 +388,7 @@ class MovementsRepositorySpec
     paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(2, 4)
-        .map(
-          message => MessageResponse.fromMessageWithoutBody(message)
-        )
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -334,7 +397,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -349,9 +412,7 @@ class MovementsRepositorySpec
     paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(4, 6)
-        .map(
-          message => MessageResponse.fromMessageWithoutBody(message)
-        )
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -360,7 +421,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -375,9 +436,7 @@ class MovementsRepositorySpec
     paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(6, 8)
-        .map(
-          message => MessageResponse.fromMessageWithoutBody(message)
-        )
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -386,7 +445,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessages(dateTime)
 
-    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -407,7 +466,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessagesWithOutBody(dateTime)
 
-    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -433,9 +492,7 @@ class MovementsRepositorySpec
     paginationMessageSummary.messageSummary should be(
       departure.messages
         .slice(1, 6)
-        .map(
-          message => MessageResponse.fromMessageWithoutBody(message)
-        )
+        .map(expectedMessageMetadata)
     )
   }
 
@@ -444,7 +501,7 @@ class MovementsRepositorySpec
 
     val messages = GetMovementsSetup.setupMessages(dateTime)
 
-    val departure = arbitrary[Movement].sample.value.copy(messages = messages)
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
     await(repository.insert(departure).value)
 
@@ -475,7 +532,7 @@ class MovementsRepositorySpec
     result.toOption.get.totalCount should be(TotalCount(0))
   }
 
-  "getDepartures" should
+  "getMovements (Departures)" should
     "return a list of departure movement responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()
       val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, None, None, None, None).value)
@@ -486,8 +543,8 @@ class MovementsRepositorySpec
 
       paginationMovementSummary.movementSummary should be(
         Vector(
-          MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
-          MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
+          expectedMovementSummary(GetMovementsSetup.departureGB2),
+          expectedMovementSummary(GetMovementsSetup.departureGB1)
         )
       )
     }
@@ -504,8 +561,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
+        expectedMovementSummary(GetMovementsSetup.departureGB2),
+        expectedMovementSummary(GetMovementsSetup.departureGB1)
       )
     )
   }
@@ -522,8 +579,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB3)
+        expectedMovementSummary(GetMovementsSetup.departureGB1),
+        expectedMovementSummary(GetMovementsSetup.departureGB3)
       )
     )
   }
@@ -558,10 +615,10 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB10),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB3)
+        expectedMovementSummary(GetMovementsSetup.departureGB10),
+        expectedMovementSummary(GetMovementsSetup.departureGB2),
+        expectedMovementSummary(GetMovementsSetup.departureGB1),
+        expectedMovementSummary(GetMovementsSetup.departureGB3)
       )
     )
   }
@@ -612,8 +669,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
+        expectedMovementSummary(GetMovementsSetup.departureGB2),
+        expectedMovementSummary(GetMovementsSetup.departureGB1)
       )
     )
   }
@@ -644,10 +701,10 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB31),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB30),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB29),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB28)
+        expectedMovementSummary(GetMovementsSetup.departureGB31),
+        expectedMovementSummary(GetMovementsSetup.departureGB30),
+        expectedMovementSummary(GetMovementsSetup.departureGB29),
+        expectedMovementSummary(GetMovementsSetup.departureGB28)
       )
     )
 
@@ -679,10 +736,10 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB27),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB26),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB25),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB24)
+        expectedMovementSummary(GetMovementsSetup.departureGB27),
+        expectedMovementSummary(GetMovementsSetup.departureGB26),
+        expectedMovementSummary(GetMovementsSetup.departureGB25),
+        expectedMovementSummary(GetMovementsSetup.departureGB24)
       )
     )
 
@@ -715,10 +772,10 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB23),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB22),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB21),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB20)
+        expectedMovementSummary(GetMovementsSetup.departureGB23),
+        expectedMovementSummary(GetMovementsSetup.departureGB22),
+        expectedMovementSummary(GetMovementsSetup.departureGB21),
+        expectedMovementSummary(GetMovementsSetup.departureGB20)
       )
     )
 
@@ -750,7 +807,7 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB19)
+        expectedMovementSummary(GetMovementsSetup.departureGB19)
       )
     )
   }
@@ -802,8 +859,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1)
+        expectedMovementSummary(GetMovementsSetup.departureGB2),
+        expectedMovementSummary(GetMovementsSetup.departureGB1)
       )
     )
   }
@@ -827,8 +884,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB3)
+        expectedMovementSummary(GetMovementsSetup.departureGB1),
+        expectedMovementSummary(GetMovementsSetup.departureGB3)
       )
     )
   }
@@ -862,10 +919,10 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB10),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB2),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB1),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB3)
+        expectedMovementSummary(GetMovementsSetup.departureGB10),
+        expectedMovementSummary(GetMovementsSetup.departureGB2),
+        expectedMovementSummary(GetMovementsSetup.departureGB1),
+        expectedMovementSummary(GetMovementsSetup.departureGB3)
       )
     )
   }
@@ -895,7 +952,7 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB4)
+        expectedMovementSummary(GetMovementsSetup.departureGB4)
       )
     )
   }
@@ -916,8 +973,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB6),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB5)
+        expectedMovementSummary(GetMovementsSetup.departureGB6),
+        expectedMovementSummary(GetMovementsSetup.departureGB5)
       )
     )
   }
@@ -944,7 +1001,7 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB4)
+        expectedMovementSummary(GetMovementsSetup.departureGB4)
       )
     )
   }
@@ -965,8 +1022,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB6),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.departureGB5)
+        expectedMovementSummary(GetMovementsSetup.departureGB6),
+        expectedMovementSummary(GetMovementsSetup.departureGB5)
       )
     )
   }
@@ -1013,8 +1070,8 @@ class MovementsRepositorySpec
 
       paginationMovementSummary.movementSummary should be(
         Vector(
-          MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
-          MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
+          expectedMovementSummary(GetMovementsSetup.arrivalGB2),
+          expectedMovementSummary(GetMovementsSetup.arrivalGB1)
         )
       )
     }
@@ -1031,8 +1088,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
+        expectedMovementSummary(GetMovementsSetup.arrivalGB2),
+        expectedMovementSummary(GetMovementsSetup.arrivalGB1)
       )
     )
   }
@@ -1052,8 +1109,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
+        expectedMovementSummary(GetMovementsSetup.arrivalGB2),
+        expectedMovementSummary(GetMovementsSetup.arrivalGB1)
       )
     )
   }
@@ -1075,8 +1132,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB2),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB1)
+        expectedMovementSummary(GetMovementsSetup.arrivalGB2),
+        expectedMovementSummary(GetMovementsSetup.arrivalGB1)
       )
     )
   }
@@ -1106,7 +1163,7 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB3)
+        expectedMovementSummary(GetMovementsSetup.arrivalGB3)
       )
     )
   }
@@ -1127,8 +1184,8 @@ class MovementsRepositorySpec
 
     paginationMovementSummary.movementSummary should be(
       Vector(
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB6),
-        MovementWithoutMessages.fromMovement(GetMovementsSetup.arrivalGB5)
+        expectedMovementSummary(GetMovementsSetup.arrivalGB6),
+        expectedMovementSummary(GetMovementsSetup.arrivalGB5)
       )
     )
   }
@@ -1168,14 +1225,14 @@ class MovementsRepositorySpec
 
   object GetMovementsSetup {
 
-    val eoriGB       = arbitrary[EORINumber].sample.value
-    val eoriXI       = arbitrary[EORINumber].sample.value
-    val movementEORI = arbitrary[EORINumber].sample.value
-    val message      = arbitrary[Message].sample.value
-    val lrn          = arbitrary[LocalReferenceNumber].sample.value
+    val eoriGB: EORINumber        = arbitrary[EORINumber].sample.value
+    val eoriXI: EORINumber        = arbitrary[EORINumber].sample.value
+    val movementEORI: EORINumber  = arbitrary[EORINumber].sample.value
+    val message: MongoMessage     = arbitrary[MongoMessage].sample.value
+    val lrn: LocalReferenceNumber = arbitrary[LocalReferenceNumber].sample.value
 
-    val departureGB1 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB1: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
@@ -1185,8 +1242,8 @@ class MovementsRepositorySpec
         localReferenceNumber = Some(lrn)
       )
 
-    val arrivalGB1 =
-      arbitrary[Movement].sample.value.copy(
+    val arrivalGB1: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
@@ -1195,18 +1252,18 @@ class MovementsRepositorySpec
         messages = Vector(message)
       )
 
-    val mrnGen = arbitrary[MovementReferenceNumber]
+    val mrnGen: Gen[MovementReferenceNumber] = arbitrary[MovementReferenceNumber]
 
-    val departureXi1 =
-      arbitrary[Movement].sample.value.copy(
+    val departureXi1: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriXI,
         movementEORINumber = Some(movementEORI),
         updated = instant.plusMinutes(1),
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureXi2 =
-      arbitrary[Movement].sample.value.copy(
+    val departureXi2: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriXI,
         movementEORINumber = Some(movementEORI),
         updated = instant.minusMinutes(3),
@@ -1214,8 +1271,8 @@ class MovementsRepositorySpec
         localReferenceNumber = Some(lrn)
       )
 
-    val departureGB2 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB2: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
@@ -1224,8 +1281,8 @@ class MovementsRepositorySpec
         localReferenceNumber = Some(lrn)
       )
 
-    val departureGB3 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB3: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Departure,
@@ -1234,8 +1291,8 @@ class MovementsRepositorySpec
         localReferenceNumber = Some(lrn)
       )
 
-    val departureGB4 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB4: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Departure,
@@ -1244,8 +1301,8 @@ class MovementsRepositorySpec
         localReferenceNumber = Some(lrn)
       )
 
-    val departureGB5 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB5: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Departure,
@@ -1254,8 +1311,8 @@ class MovementsRepositorySpec
         localReferenceNumber = Some(LocalReferenceNumber("3CnsTh79I7hyOy6"))
       )
 
-    val departureGB6 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB6: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Departure,
@@ -1264,8 +1321,8 @@ class MovementsRepositorySpec
         localReferenceNumber = Some(LocalReferenceNumber("3CnsTh79I7hyOy7"))
       )
 
-    val departureGB7 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB7: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Departure,
@@ -1273,8 +1330,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = Some(MovementReferenceNumber("27wF9X1FQ9RCKN0TM3"))
       )
 
-    val arrivalGB2 =
-      arbitrary[Movement].sample.value.copy(
+    val arrivalGB2: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
@@ -1283,8 +1340,8 @@ class MovementsRepositorySpec
         localReferenceNumber = None
       )
 
-    val arrivalGB3 =
-      arbitrary[Movement].sample.value.copy(
+    val arrivalGB3: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
@@ -1293,8 +1350,8 @@ class MovementsRepositorySpec
         localReferenceNumber = None
       )
 
-    val arrivalGB4 =
-      arbitrary[Movement].sample.value.copy(
+    val arrivalGB4: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Arrival,
@@ -1303,8 +1360,8 @@ class MovementsRepositorySpec
         localReferenceNumber = None
       )
 
-    val arrivalGB5 =
-      arbitrary[Movement].sample.value.copy(
+    val arrivalGB5: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
@@ -1312,8 +1369,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5"))
       )
 
-    val arrivalGB6 =
-      arbitrary[Movement].sample.value.copy(
+    val arrivalGB6: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
@@ -1323,8 +1380,8 @@ class MovementsRepositorySpec
 
     // For Pagination
 
-    val departureGB10 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB10: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("10"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1333,8 +1390,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB11 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB11: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("11"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1343,8 +1400,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB12 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB12: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("12"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1353,8 +1410,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB13 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB13: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("13"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1363,8 +1420,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB14 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB14: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("14"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1373,8 +1430,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB15 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB15: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("15"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1383,8 +1440,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB16 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB16: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("16"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1393,8 +1450,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB17 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB17: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("17"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1403,8 +1460,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB18 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB18: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("18"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1413,8 +1470,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB19 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB19: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("19"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1423,8 +1480,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB20 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB20: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("20"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1433,8 +1490,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB21 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB21: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("21"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1443,8 +1500,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB22 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB22: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("22"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1453,8 +1510,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB23 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB23: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("23"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1463,8 +1520,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB24 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB24: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("24"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1473,8 +1530,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB25 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB25: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("25"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1483,8 +1540,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB26 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB26: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("26"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1493,8 +1550,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB27 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB27: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("27"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1503,8 +1560,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB28 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB28: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("28"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1513,8 +1570,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB29 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB29: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("29"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1523,8 +1580,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB30 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB30: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("30"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1533,8 +1590,8 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    val departureGB31 =
-      arbitrary[Movement].sample.value.copy(
+    val departureGB31: MongoMovement =
+      arbitrary[MongoMovement].sample.value.copy(
         _id = MovementId("31"),
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
@@ -1543,7 +1600,7 @@ class MovementsRepositorySpec
         movementReferenceNumber = mrnGen.sample
       )
 
-    def setup() = {
+    def setup(): Either[MongoError, Unit] = {
       //populate db in non-time order
       await(repository.insert(departureXi2).value)
       await(repository.insert(departureGB2).value)
@@ -1554,7 +1611,7 @@ class MovementsRepositorySpec
       await(repository.insert(arrivalGB1).value)
     }
 
-    def setupMessages(dateTime: OffsetDateTime) =
+    def setupMessages(dateTime: OffsetDateTime): Vector[MongoMessage] =
       Vector(
         arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None),
         arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None),
@@ -1565,7 +1622,7 @@ class MovementsRepositorySpec
         arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None)
       )
 
-    def setupMessagesWithOutBody(dateTime: OffsetDateTime) =
+    def setupMessagesWithOutBody(dateTime: OffsetDateTime): Vector[MongoMessage] =
       Vector(
         arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None, body = None),
         arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None, body = None),
@@ -1576,7 +1633,7 @@ class MovementsRepositorySpec
         arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None, body = None)
       )
 
-    def setupPagination() = {
+    def setupPagination(): Either[MongoError, Unit] = {
       // for each GBXX, the XX represents both the id and the plus minutes, so expected order can be determined in tests.
       // add various non-departure and non-GB movements; populate db in non-time order
 
@@ -1603,11 +1660,11 @@ class MovementsRepositorySpec
   }
 
   "updateMessages" should "if not MrnAllocated, add a message to the matching movement and set updated parameter to when the latest message was received" in {
-    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None)
+    val message1 = arbitrary[MongoMessage].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None)
 
     val departureID = arbitrary[MovementId].sample.value
     val departure =
-      arbitrary[Movement].sample.value
+      arbitrary[MongoMovement].sample.value
         .copy(
           _id = departureID,
           created = instant,
@@ -1620,7 +1677,7 @@ class MovementsRepositorySpec
     )
 
     val message2 =
-      arbitrary[Message].sample.value.copy(
+      arbitrary[MongoMessage].sample.value.copy(
         body = None,
         messageType = Some(MessageType.DepartureOfficeRejection),
         triggerId = Some(MessageId(departureID.value)),
@@ -1637,20 +1694,21 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureID.value)).first().toFuture()
     }
 
+    val messages = movement.messages
     movement.updated shouldEqual receivedInstant
-    movement.messages.length should be(2)
-    movement.messages.toList should contain(message1)
-    movement.messages.toList should contain(message2)
+    messages.length should be(2)
+    messages.toList should contain(message1)
+    messages.toList should contain(message2)
 
   }
 
   "updateMessages" should "if MrnAllocated, update MRN field when message type is MRNAllocated, as well as messages and set updated parameter to when the latest message was received" in {
 
-    val message1 = arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.MrnAllocated), triggerId = None)
+    val message1 = arbitrary[MongoMessage].sample.value.copy(body = None, messageType = Some(MessageType.MrnAllocated), triggerId = None)
 
     val departureId = arbitrary[MovementId].sample.value
     val departure =
-      arbitrary[Movement].sample.value
+      arbitrary[MongoMovement].sample.value
         .copy(
           _id = departureId,
           created = instant,
@@ -1664,7 +1722,7 @@ class MovementsRepositorySpec
     )
 
     val message2 =
-      arbitrary[Message].sample.value.copy(
+      arbitrary[MongoMessage].sample.value.copy(
         body = None,
         messageType = Some(MessageType.MrnAllocated),
         triggerId = Some(MessageId(departureId.value)),
@@ -1682,10 +1740,11 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureId.value)).first().toFuture()
     }
 
+    val messages = movement.messages
     movement.updated shouldEqual receivedInstant
-    movement.messages.length should be(2)
-    movement.messages.toList should contain(message1)
-    movement.messages.toList should contain(message2)
+    messages.length should be(2)
+    messages.toList should contain(message1)
+    messages.toList should contain(message2)
     movement.movementReferenceNumber should be(Some(mrn))
 
   }
@@ -1695,7 +1754,8 @@ class MovementsRepositorySpec
     val movementId = arbitrary[MovementId].sample.value
 
     val message =
-      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DepartureOfficeRejection), triggerId = Some(MessageId(movementId.value)))
+      arbitrary[MongoMessage].sample.value
+        .copy(body = None, messageType = Some(MessageType.DepartureOfficeRejection), triggerId = Some(MessageId(movementId.value)))
 
     val result = await(
       repository.attachMessage(movementId, message, Some(arbitrary[MovementReferenceNumber].sample.get), instant).value
@@ -1708,10 +1768,15 @@ class MovementsRepositorySpec
   "updateMessage" should "update the existing message with both status and object store url" in {
 
     val message1 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
+      arbitrary[MongoMessage].sample.value.copy(
+        body = None,
+        messageType = Some(MessageType.DeclarationData),
+        triggerId = None,
+        status = Some(MessageStatus.Pending)
+      )
 
     val departureMovement =
-      arbitrary[Movement].sample.value
+      arbitrary[MongoMovement].sample.value
         .copy(
           created = instant,
           updated = instant,
@@ -1722,10 +1787,17 @@ class MovementsRepositorySpec
       repository.insert(departureMovement).value
     )
 
-    val message2 = UpdateMessageData(objectStoreURI = Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")), status = MessageStatus.Success)
+    val updateData = MongoMessageUpdateData(
+      Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")),
+      None,
+      None,
+      MessageStatus.Success,
+      None,
+      None
+    )
 
     val result = await(
-      repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
+      repository.updateMessage(departureMovement._id, message1.id, updateData, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -1734,19 +1806,25 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
     }
 
+    val messages = movement.messages
     movement.updated shouldEqual receivedInstant
-    movement.messages.length should be(1)
-    movement.messages.head.status shouldBe Some(message2.status)
-    movement.messages.head.uri.value.toString shouldBe message2.objectStoreURI.get.value
+    messages.length should be(1)
+    messages.head.status shouldBe Some(updateData.status)
+    messages.head.uri.value.toString shouldBe updateData.objectStoreURI.get.value
 
   }
 
   "updateMessage" should "update an existing message with status only" in {
     val message1 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
+      arbitrary[MongoMessage].sample.value.copy(
+        body = None,
+        messageType = Some(MessageType.DeclarationData),
+        triggerId = None,
+        status = Some(MessageStatus.Pending)
+      )
 
     val departureMovement =
-      arbitrary[Movement].sample.value
+      arbitrary[MongoMovement].sample.value
         .copy(
           created = instant,
           updated = instant,
@@ -1757,10 +1835,17 @@ class MovementsRepositorySpec
       repository.insert(departureMovement).value
     )
 
-    val message2 = UpdateMessageData(status = MessageStatus.Failed)
+    val updateMessageData = MongoMessageUpdateData(
+      None,
+      None,
+      None,
+      MessageStatus.Failed,
+      None,
+      None
+    )
 
     val result = await(
-      repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
+      repository.updateMessage(departureMovement._id, message1.id, updateMessageData, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -1769,19 +1854,25 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
     }
 
+    val messages = movement.messages
     movement.updated shouldEqual receivedInstant
-    movement.messages.length should be(1)
-    movement.messages.head.status shouldBe Some(message2.status)
+    messages.length should be(1)
+    messages.head.status shouldBe Some(updateMessageData.status)
 
   }
 
   "updateMessage" should "update the existing message with both status and messageType" in {
 
     val message1 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
+      arbitrary[MongoMessage].sample.value.copy(
+        body = None,
+        messageType = Some(MessageType.DeclarationData),
+        triggerId = None,
+        status = Some(MessageStatus.Pending)
+      )
 
     val departureMovement =
-      arbitrary[Movement].sample.value
+      arbitrary[MongoMovement].sample.value
         .copy(
           created = instant,
           updated = instant,
@@ -1792,10 +1883,17 @@ class MovementsRepositorySpec
       repository.insert(departureMovement).value
     )
 
-    val message2 = UpdateMessageData(objectStoreURI = None, status = MessageStatus.Success, messageType = Some(MessageType.DeclarationAmendment))
+    val updateMessageData = MongoMessageUpdateData(
+      None,
+      None,
+      None,
+      MessageStatus.Success,
+      Some(MessageType.DeclarationAmendment),
+      None
+    )
 
     val result = await(
-      repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
+      repository.updateMessage(departureMovement._id, message1.id, updateMessageData, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -1804,19 +1902,25 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
     }
 
+    val messages = movement.messages
     movement.updated shouldEqual receivedInstant
-    movement.messages.length should be(1)
-    movement.messages.head.status shouldBe Some(message2.status)
-    movement.messages.head.messageType.get.code shouldBe message2.messageType.get.code
+    messages.length should be(1)
+    messages.head.status shouldBe Some(updateMessageData.status)
+    messages.head.messageType.get.code shouldBe updateMessageData.messageType.get.code
   }
 
   "updateMessage" should "update the existing message with status, object store url, size, and messageType" in {
 
     val message1 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
+      arbitrary[MongoMessage].sample.value.copy(
+        body = None,
+        messageType = Some(MessageType.DeclarationData),
+        triggerId = None,
+        status = Some(MessageStatus.Pending)
+      )
 
     val departureMovement =
-      arbitrary[Movement].sample.value
+      arbitrary[MongoMovement].sample.value
         .copy(
           created = instant,
           updated = instant,
@@ -1827,15 +1931,17 @@ class MovementsRepositorySpec
       repository.insert(departureMovement).value
     )
 
-    val message2 = UpdateMessageData(
-      objectStoreURI = Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")),
-      status = MessageStatus.Success,
-      size = Option(4L),
-      messageType = Some(MessageType.DeclarationAmendment)
+    val updateMessageData = MongoMessageUpdateData(
+      Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")),
+      None,
+      Option(4L),
+      MessageStatus.Success,
+      Some(MessageType.DeclarationAmendment),
+      None
     )
 
     val result = await(
-      repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
+      repository.updateMessage(departureMovement._id, message1.id, updateMessageData, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -1844,13 +1950,14 @@ class MovementsRepositorySpec
       repository.collection.find(Filters.eq("_id", departureMovement._id.value)).first().toFuture()
     ) {
       movement =>
+        val messages = movement.messages
         movement.updated shouldEqual receivedInstant
-        movement.messages.length should be(1)
+        messages.length should be(1)
 
-        val message = movement.messages.head
-        message.status shouldBe Some(message2.status)
-        message.uri.value.toString shouldBe message2.objectStoreURI.get.value
-        message.messageType.get.code shouldBe message2.messageType.get.code
+        val message = messages.head
+        message.status shouldBe Some(updateMessageData.status)
+        message.uri.value.toString shouldBe updateMessageData.objectStoreURI.get.value
+        message.messageType.get.code shouldBe updateMessageData.messageType.get.code
         message.size shouldBe Some(4L)
     }
   }
@@ -1858,10 +1965,15 @@ class MovementsRepositorySpec
   "updateMessage" should "update the existing message with status, object store url, size, messageType and generationDate" in {
 
     val message1 =
-      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None, status = Some(MessageStatus.Pending))
+      arbitrary[MongoMessage].sample.value.copy(
+        body = None,
+        messageType = Some(MessageType.DeclarationData),
+        triggerId = None,
+        status = Some(MessageStatus.Pending)
+      )
 
     val departureMovement =
-      arbitrary[Movement].sample.value
+      arbitrary[MongoMovement].sample.value
         .copy(
           created = instant,
           updated = instant,
@@ -1874,8 +1986,9 @@ class MovementsRepositorySpec
 
     val now = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS)
 
-    val message2 = UpdateMessageData(
+    val updateMessageData = MongoMessageUpdateData(
       objectStoreURI = Some(ObjectStoreURI("common-transit-convention-traders/some-url.xml")),
+      body = None,
       status = MessageStatus.Success,
       size = Option(4L),
       messageType = Some(MessageType.DeclarationAmendment),
@@ -1883,7 +1996,7 @@ class MovementsRepositorySpec
     )
 
     val result = await(
-      repository.updateMessage(departureMovement._id, message1.id, message2, receivedInstant).value
+      repository.updateMessage(departureMovement._id, message1.id, updateMessageData, receivedInstant).value
     )
 
     result should be(Right(()))
@@ -1896,9 +2009,9 @@ class MovementsRepositorySpec
         movement.messages.length should be(1)
 
         val message = movement.messages.head
-        message.status shouldBe Some(message2.status)
-        message.uri.value.toString shouldBe message2.objectStoreURI.get.value
-        message.messageType.get.code shouldBe message2.messageType.get.code
+        message.status shouldBe Some(updateMessageData.status)
+        message.uri.value.toString shouldBe updateMessageData.objectStoreURI.get.value
+        message.messageType.get.code shouldBe updateMessageData.messageType.get.code
         message.size shouldBe Some(4L)
         message.generated shouldBe Some(now)
     }
@@ -1909,10 +2022,20 @@ class MovementsRepositorySpec
     val movementId = arbitrary[MovementId].sample.value
 
     val message =
-      arbitrary[Message].sample.value.copy(body = None, messageType = Some(MessageType.DepartureOfficeRejection), triggerId = Some(MessageId(movementId.value)))
+      arbitrary[MongoMessage].sample.value
+        .copy(body = None, messageType = Some(MessageType.DepartureOfficeRejection), triggerId = Some(MessageId(movementId.value)))
+
+    val updateMessageData = MongoMessageUpdateData(
+      None,
+      None,
+      None,
+      MessageStatus.Failed,
+      None,
+      None
+    )
 
     val result = await(
-      repository.updateMessage(movementId, message.id, UpdateMessageData(status = MessageStatus.Failed), instant).value
+      repository.updateMessage(movementId, message.id, updateMessageData, instant).value
     )
 
     result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))

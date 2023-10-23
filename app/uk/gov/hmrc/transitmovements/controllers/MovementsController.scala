@@ -40,12 +40,10 @@ import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.I
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models._
-import uk.gov.hmrc.transitmovements.models.formats.PresentationFormats
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.requests.UpdateStatus
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
-import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services._
 import uk.gov.hmrc.transitmovements.utils.StreamWithFile
 
@@ -61,7 +59,7 @@ class MovementsController @Inject() (
   cc: ControllerComponents,
   messageService: MessageService,
   movementFactory: MovementFactory,
-  repo: MovementsRepository,
+  repo: PersistenceService,
   movementsXmlParsingService: MovementsXmlParsingService,
   messagesXmlParsingService: MessagesXmlParsingService,
   objectStoreService: ObjectStoreService,
@@ -76,7 +74,6 @@ class MovementsController @Inject() (
     with StreamWithFile
     with ConvertError
     with MessageTypeHeaderExtractor
-    with PresentationFormats
     with ContentTypeRouting
     with ObjectStoreURIHelpers {
 
@@ -101,7 +98,7 @@ class MovementsController @Inject() (
             .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, request.body, MessageStatus.Processing)
             .asPresentation
           movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
-          _ <- repo.insert(movement).asPresentation
+          _ <- repo.insertMovement(movement).asPresentation
         } yield MovementResponse(movement._id, Some(movement.messages.head.id))
       }.fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), response => Ok(Json.toJson(response)))
   }
@@ -118,7 +115,7 @@ class MovementsController @Inject() (
             .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, request.body, MessageStatus.Processing)
             .asPresentation
           movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
-          _ <- repo.insert(movement).asPresentation
+          _ <- repo.insertMovement(movement).asPresentation
         } yield MovementResponse(movement._id, Some(movement.messages.head.id))
       }.fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
@@ -138,7 +135,7 @@ class MovementsController @Inject() (
       val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received)
 
       (for {
-        _ <- repo.insert(movement).asPresentation
+        _ <- repo.insertMovement(movement).asPresentation
       } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         response => Ok(Json.toJson(response))

@@ -17,19 +17,20 @@
 package uk.gov.hmrc.transitmovements.it.generators
 
 import org.scalacheck.Arbitrary
-import org.scalacheck.Gen
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 
 import java.net.URI
 import java.time.Instant
@@ -94,7 +95,7 @@ trait ModelGenerators extends BaseGenerators {
       } yield OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
     }
 
-  implicit lazy val arbitraryMessage: Arbitrary[Message] =
+  implicit lazy val arbitraryMessage: Arbitrary[MongoMessage] =
     Arbitrary {
       for {
         id          <- arbitrary[MessageId]
@@ -103,13 +104,13 @@ trait ModelGenerators extends BaseGenerators {
         messageType <- arbitrary[MessageType]
         triggerId   <- arbitrary[Option[MessageId]]
         url         <- arbitrary[Option[URI]]
-        body        <- arbitrary[Option[String]]
+        body        <- arbitrary[Option[String]].map(_.map(SensitiveString.apply))
         size        <- Gen.chooseNum(1L, 250000L)
         status      <- Gen.oneOf(MessageStatus.statusValues)
-      } yield Message(id, received, generated, Some(messageType), triggerId, url, body, Some(size), Some(status))
+      } yield MongoMessage(id, received, generated, Some(messageType), triggerId, url, body, Some(size), Some(status))
     }
 
-  implicit lazy val arbitraryMovement: Arbitrary[Movement] =
+  implicit lazy val arbitraryMovement: Arbitrary[MongoMovement] =
     Arbitrary {
       for {
         id                      <- arbitrary[MovementId]
@@ -120,11 +121,11 @@ trait ModelGenerators extends BaseGenerators {
         messageSender           <- arbitrary[Option[MessageSender]]
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
-        messages                <- arbitrary[Vector[Message]]
-      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, movementLRN, messageSender, created, updated, messages)
+        messages                <- arbitrary[Vector[MongoMessage]]
+      } yield MongoMovement(id, movementType, eori, Some(eori), movementReferenceNumber, movementLRN, messageSender, created, updated, messages)
     }
 
-  implicit lazy val arbitraryMessagaSender: Arbitrary[MessageSender] =
+  implicit lazy val arbitraryMessageSender: Arbitrary[MessageSender] =
     Arbitrary {
       Gen.alphaNumStr.map(MessageSender(_))
     }

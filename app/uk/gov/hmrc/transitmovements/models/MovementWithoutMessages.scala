@@ -16,8 +16,8 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import org.mongodb.scala.bson.BsonDocument
-import org.mongodb.scala.bson.conversions.Bson
+import play.api.libs.json.Json
+import play.api.libs.json.OFormat
 
 import java.time.OffsetDateTime
 
@@ -32,17 +32,7 @@ case class MovementWithoutMessages(
 )
 
 object MovementWithoutMessages {
-
-  val projection: Bson =
-    BsonDocument(
-      "_id"                     -> 1,
-      "enrollmentEORINumber"    -> 1,
-      "movementEORINumber"      -> 1,
-      "movementReferenceNumber" -> 1,
-      "localReferenceNumber"    -> 1,
-      "created"                 -> 1,
-      "updated"                 -> 1
-    )
+  implicit val format: OFormat[MovementWithoutMessages] = Json.format[MovementWithoutMessages]
 
   def fromMovement(movement: Movement) =
     MovementWithoutMessages(

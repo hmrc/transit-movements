@@ -14,13 +14,8 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.models.mongo.read
 
-import play.api.libs.json.Json
-import play.api.libs.json.OFormat
+import uk.gov.hmrc.transitmovements.models.TotalCount
 
-case class PaginationMovementSummary(totalCount: TotalCount, movementSummary: Vector[MovementWithoutMessages])
-
-object PaginationMovementSummary {
-  implicit lazy val format: OFormat[PaginationMovementSummary] = Json.format[PaginationMovementSummary]
-}
+case class MongoPaginatedMessages(totalCount: TotalCount, messageSummary: Vector[MongoMessageMetadata])

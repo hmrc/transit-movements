@@ -21,6 +21,7 @@ import play.api.inject.bind
 
 import java.time.Clock
 
+//noinspection ScalaUnusedSymbol
 class SystemClockModule
     extends SimpleModule(
       (_, _) => Seq(bind[Clock].toInstance(Clock.systemUTC()))

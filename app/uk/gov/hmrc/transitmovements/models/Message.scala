@@ -16,8 +16,15 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import play.api.libs.json.Json
+import play.api.libs.json.OFormat
+
 import java.net.URI
 import java.time.OffsetDateTime
+
+object Message {
+  implicit val format: OFormat[Message] = Json.format[Message]
+}
 
 case class Message(
   id: MessageId,

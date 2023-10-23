@@ -45,11 +45,11 @@ import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
-import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.MessageService
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 import uk.gov.hmrc.transitmovements.services.ObjectStoreService
+import uk.gov.hmrc.transitmovements.services.PersistenceService
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -59,7 +59,7 @@ import scala.concurrent.Future
 
 class MessageBodyController @Inject() (
   cc: ControllerComponents,
-  repo: MovementsRepository,
+  persistenceService: PersistenceService,
   objectStoreService: ObjectStoreService,
   messagesXmlParsingService: MessagesXmlParsingService,
   movementsXmlParsingService: MovementsXmlParsingService,
@@ -81,7 +81,7 @@ class MessageBodyController @Inject() (
     internalAuth(READ_MESSAGE).async {
       implicit request =>
         (for {
-          message <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
+          message <- persistenceService.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
           stream  <- body(message, messageId, movementId)
         } yield Ok.chunked(stream, Some(MimeTypes.XML)))
           .valueOrF(
@@ -94,13 +94,13 @@ class MessageBodyController @Inject() (
       implicit request => size =>
         val received = OffsetDateTime.now(clock)
         (for {
-          message       <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
+          message       <- persistenceService.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
           _             <- ensureNoMessageBody(message)
           messageType   <- extract(request.headers).asPresentation
           messageData   <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
           extractedData <- movementsXmlParsingService.extractData(messageType, request.body).asPresentation
           bodyStorage   <- messageService.storeIfLarge(movementId, messageId, size, request.body).asPresentation
-          _ <- repo
+          _ <- persistenceService
             .updateMessage(
               movementId,
               messageId,
@@ -150,7 +150,7 @@ class MessageBodyController @Inject() (
     messageData: MessageData,
     received: OffsetDateTime
   ): EitherT[Future, PresentationError, Unit] =
-    repo
+    persistenceService
       .updateMovement(
         movementId,
         extractedData.flatMap(_.movementEoriNumber),

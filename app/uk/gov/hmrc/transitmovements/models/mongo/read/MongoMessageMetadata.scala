@@ -14,48 +14,43 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.responses
+package uk.gov.hmrc.transitmovements.models.mongo.read
 
-import play.api.libs.json.Format
-import play.api.libs.json.Json
-import uk.gov.hmrc.transitmovements.models.Message
+import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.bson.conversions.Bson
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
-import java.net.URI
 import java.time.OffsetDateTime
 
-case class MessageResponse(
+object MongoMessageMetadata {
+
+  val simpleMetadataProjection: Bson =
+    BsonDocument(
+      "id"          -> 1,
+      "received"    -> 1,
+      "messageType" -> 1,
+      "status"      -> 1
+    )
+
+}
+
+case class MongoMessageMetadata(
   id: MessageId,
   received: OffsetDateTime,
   messageType: Option[MessageType],
-  body: Option[String],
-  status: Option[MessageStatus],
-  uri: Option[URI] = None
-)
+  status: Option[MessageStatus]
+) {
 
-object MessageResponse {
-
-  implicit val format: Format[MessageResponse] = Json.format[MessageResponse]
-
-  def fromMessageWithBody(message: Message) =
+  @transient lazy val asMessageResponse: MessageResponse =
     MessageResponse(
-      message.id,
-      message.received,
-      message.messageType,
-      message.body,
-      message.status,
-      None
-    )
-
-  def fromMessageWithoutBody(message: Message) =
-    MessageResponse(
-      message.id,
-      message.received,
-      message.messageType,
+      id,
+      received,
+      messageType,
       None,
-      message.status,
-      message.uri
+      status,
+      None
     )
 }

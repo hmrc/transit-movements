@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovements.generators
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
@@ -36,6 +37,10 @@ import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.PageNumber
+import uk.gov.hmrc.transitmovements.models.UpdateMessageData
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
@@ -198,5 +203,59 @@ trait ModelGenerators extends BaseGenerators {
   implicit lazy val arbitraryMessageSender: Arbitrary[MessageSender] =
     Arbitrary {
       Gen.alphaNumStr.map(MessageSender(_))
+    }
+
+  implicit lazy val arbitraryUpdateMessageData: Arbitrary[UpdateMessageData] =
+    Arbitrary {
+      for {
+        objectStoreUri <- Gen.option(arbitrary[ObjectStoreURI])
+        body           <- Gen.option(Gen.stringOfN(20, Gen.alphaNumChar))
+        size           <- Gen.option(Gen.choose(0, Long.MaxValue))
+        status         <- arbitrary[MessageStatus]
+        messageType    <- Gen.option(arbitrary[MessageType])
+        generationDate <- Gen.option(arbitrary[OffsetDateTime])
+      } yield UpdateMessageData(
+        objectStoreUri,
+        body,
+        size,
+        status,
+        messageType,
+        generationDate
+      )
+    }
+
+  implicit lazy val arbitraryMongoMessageMetadata: Arbitrary[MongoMessageMetadata] =
+    Arbitrary {
+      for {
+        id             <- arbitrary[MessageId]
+        offsetDateTime <- arbitrary[OffsetDateTime]
+        messageType    <- Gen.option(arbitrary[MessageType])
+        status         <- Gen.oneOf(MessageStatus.statusValues)
+      } yield MongoMessageMetadata(id, offsetDateTime, messageType, Some(status))
+    }
+
+  implicit lazy val arbitraryMongoMessageMetadataAndBody: Arbitrary[MongoMessageMetadataAndBody] =
+    Arbitrary {
+      for {
+        id             <- arbitrary[MessageId]
+        offsetDateTime <- arbitrary[OffsetDateTime]
+        messageType    <- Gen.option(arbitrary[MessageType])
+        status         <- Gen.oneOf(MessageStatus.statusValues)
+        osUrl          <- Gen.option(arbitrary[URI])
+        body           <- Gen.option(Gen.alphaNumStr.map(SensitiveString.apply))
+      } yield MongoMessageMetadataAndBody(id, offsetDateTime, messageType, osUrl, body, Some(status))
+    }
+
+  implicit lazy val arbitraryMongoMovementSummary: Arbitrary[MongoMovementSummary] =
+    Arbitrary {
+      for {
+        id                      <- arbitrary[MovementId]
+        eori                    <- arbitrary[EORINumber]
+        movementEori            <- Gen.option(arbitrary[EORINumber])
+        movementReferenceNumber <- arbitrary[Option[MovementReferenceNumber]]
+        lrn                     <- arbitrary[Option[LocalReferenceNumber]]
+        created                 <- arbitrary[OffsetDateTime]
+        updated                 <- arbitrary[OffsetDateTime]
+      } yield MongoMovementSummary(id, eori, movementEori, movementReferenceNumber, lrn, created, updated)
     }
 }

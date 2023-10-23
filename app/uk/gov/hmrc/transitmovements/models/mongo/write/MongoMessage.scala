@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.responses
+package uk.gov.hmrc.transitmovements.models.mongo.write
 
-import play.api.libs.json.Format
-import play.api.libs.json.Json
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
@@ -26,36 +25,30 @@ import uk.gov.hmrc.transitmovements.models.MessageType
 import java.net.URI
 import java.time.OffsetDateTime
 
-case class MessageResponse(
-  id: MessageId,
-  received: OffsetDateTime,
-  messageType: Option[MessageType],
-  body: Option[String],
-  status: Option[MessageStatus],
-  uri: Option[URI] = None
-)
+object MongoMessage {
 
-object MessageResponse {
-
-  implicit val format: Format[MessageResponse] = Json.format[MessageResponse]
-
-  def fromMessageWithBody(message: Message) =
-    MessageResponse(
+  def from(message: Message): MongoMessage =
+    MongoMessage(
       message.id,
       message.received,
+      message.generated,
       message.messageType,
-      message.body,
-      message.status,
-      None
-    )
-
-  def fromMessageWithoutBody(message: Message) =
-    MessageResponse(
-      message.id,
-      message.received,
-      message.messageType,
-      None,
-      message.status,
-      message.uri
+      message.triggerId,
+      message.uri,
+      message.body.map(SensitiveString),
+      message.size,
+      message.status
     )
 }
+
+case class MongoMessage(
+  id: MessageId,
+  received: OffsetDateTime,
+  generated: Option[OffsetDateTime],
+  messageType: Option[MessageType],
+  triggerId: Option[MessageId],
+  uri: Option[URI],
+  body: Option[SensitiveString],
+  size: Option[Long],
+  status: Option[MessageStatus]
+)
