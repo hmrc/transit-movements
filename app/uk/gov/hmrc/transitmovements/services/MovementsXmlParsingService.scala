@@ -16,18 +16,18 @@
 
 package uk.gov.hmrc.transitmovements.services
 
-import akka.NotUsed
-import akka.stream.FlowShape
-import akka.stream.Materializer
-import akka.stream.alpakka.xml.ParseEvent
-import akka.stream.alpakka.xml.scaladsl.XmlParsing
-import akka.stream.scaladsl.Broadcast
-import akka.stream.scaladsl.Flow
-import akka.stream.scaladsl.GraphDSL
-import akka.stream.scaladsl.Sink
-import akka.stream.scaladsl.Source
-import akka.stream.scaladsl.ZipWith
-import akka.util.ByteString
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.FlowShape
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.connectors.xml.ParseEvent
+import org.apache.pekko.stream.connectors.xml.scaladsl.XmlParsing
+import org.apache.pekko.stream.scaladsl.Broadcast
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.stream.scaladsl.GraphDSL
+import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.stream.scaladsl.ZipWith
+import org.apache.pekko.util.ByteString
 import cats.data.EitherT
 import cats.implicits._
 import com.google.inject.ImplementedBy

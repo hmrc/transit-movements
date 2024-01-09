@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.services
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.google.inject.ImplementedBy
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.models.ArrivalData

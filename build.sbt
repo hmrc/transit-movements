@@ -1,16 +1,15 @@
 import play.sbt.routes.RoutesKeys
 import scoverage.ScoverageKeys
-import uk.gov.hmrc.DefaultBuildSettings.integrationTestSettings
-import uk.gov.hmrc.sbtdistributables.SbtDistributablesPlugin.publishingSettings
+import uk.gov.hmrc.DefaultBuildSettings
 
 val appName = "transit-movements"
+ThisBuild / majorVersion := 0
+ThisBuild / scalaVersion := "2.13.12"
 
 lazy val microservice = Project(appName, file("."))
-  .enablePlugins(play.sbt.PlayScala, SbtAutoBuildPlugin, SbtGitVersioning, SbtDistributablesPlugin)
+  .enablePlugins(PlayScala, SbtAutoBuildPlugin, SbtGitVersioning, SbtDistributablesPlugin)
   .disablePlugins(JUnitXmlReportPlugin) //Required to prevent https://github.com/scalatest/scalatest/issues/1427
   .settings(
-    majorVersion := 0,
-    scalaVersion := "2.13.8",
     libraryDependencies ++= AppDependencies.compile ++ AppDependencies.test,
     PlayKeys.playDefaultPort := 9520,
     // Import models by default in route files
@@ -20,12 +19,20 @@ lazy val microservice = Project(appName, file("."))
       "java.time.OffsetDateTime"
     )
   )
-  .configs(IntegrationTest)
   .settings(scoverageSettings)
   .settings(scalacSettings)
-  .settings(integrationTestSettings(): _*)
   .settings(resolvers += Resolver.jcenterRepo)
   .settings(inThisBuild(buildSettings))
+
+lazy val it = project
+  .enablePlugins(PlayScala)
+  .dependsOn(microservice % "test->test") // the "test->test" allows reusing test code and test dependencies
+  .settings(DefaultBuildSettings.itSettings())
+  .settings(
+    libraryDependencies ++= AppDependencies.test
+  )
+  .settings(scalacSettings)
+  .settings(scoverageSettings)
 
 // Scalac options
 lazy val scalacSettings = Def.settings(
@@ -66,15 +73,6 @@ lazy val scoverageSettings = Def.settings(
     ".*GuiceInjector",
     ".*Test.*"
   ).mkString(";")
-)
-
-lazy val itSettings = Seq(
-  // Must fork so that config system properties are set
-  fork := true,
-  unmanagedResourceDirectories += (baseDirectory.value / "it" / "resources"),
-  javaOptions ++= Seq(
-    "-Dlogger.resource=it.logback.xml"
-  )
 )
 
 lazy val buildSettings = Def.settings(

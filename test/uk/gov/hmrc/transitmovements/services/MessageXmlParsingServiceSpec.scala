@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.services
 
-import akka.stream.scaladsl.Sink
+import org.apache.pekko.stream.scaladsl.Sink
 import com.fasterxml.aalto.WFCException
 import org.scalacheck.Gen
 import org.scalatest.concurrent.ScalaFutures

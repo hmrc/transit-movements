@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.repositories
 
-import akka.pattern.retry
+import org.apache.pekko.pattern.retry
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.empty
@@ -347,6 +347,7 @@ class MovementsRepositoryImpl @Inject() (
       Aggregates.limit(itemCount),
       Aggregates.project(MongoMovementSummary.withoutMessagesProjection)
     )
+
     for {
       perPageMovements <- filterPerPage[MongoMovementSummary](aggregates)
       totalCount       <- countItems(filterAggregates)

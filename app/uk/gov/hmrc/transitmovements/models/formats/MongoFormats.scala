@@ -17,28 +17,20 @@
 package uk.gov.hmrc.transitmovements.models.formats
 
 import com.google.inject.Inject
-import play.api.libs.json.Format
-import play.api.libs.json.JsError
-import play.api.libs.json.JsString
-import play.api.libs.json.Json
-import play.api.libs.json.Reads
-import play.api.libs.json.Writes
+import play.api.libs.json._
 import uk.gov.hmrc.crypto.Decrypter
 import uk.gov.hmrc.crypto.Encrypter
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption
 import uk.gov.hmrc.mongo.play.json.formats.MongoBinaryFormats
-import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
-import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
-import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
-import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMessages
-import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMovements
+import uk.gov.hmrc.transitmovements.models.mongo.read._
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 
+import java.time.Instant
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import scala.util.Try
@@ -47,7 +39,6 @@ import scala.util.control.NonFatal
 class MongoFormats @Inject() (appConfig: AppConfig)(implicit crypto: Encrypter with Decrypter)
     extends CommonFormats
     with MongoBinaryFormats.Implicits
-    with MongoJavatimeFormats.Implicits
     with MongoUuidFormats.Implicits {
 
   implicit lazy val writes: Writes[SensitiveString] =
@@ -83,17 +74,29 @@ class MongoFormats @Inject() (appConfig: AppConfig)(implicit crypto: Encrypter w
   implicit lazy val sensitiveStringFormat: Format[SensitiveString] =
     Format(if (appConfig.encryptionTolerantRead) readsWithFallback else readsWithNoFallback, writes)
 
+  final val localDateTimeReads: Reads[LocalDateTime] =
+    Reads
+      .at[String](__ \ "$date" \ "$numberLong")
+      .map(
+        dateTime => Instant.ofEpochMilli(dateTime.toLong).atZone(ZoneOffset.UTC).toLocalDateTime
+      )
+
   implicit val offsetDateTimeReads: Reads[OffsetDateTime] = Reads {
     value =>
-      jatLocalDateTimeFormat
+      localDateTimeReads
         .reads(value)
         .map(
           localDateTime => localDateTime.atOffset(ZoneOffset.UTC)
         )
   }
 
+  final val localDateTimeWrites: Writes[LocalDateTime] =
+    Writes
+      .at[String](__ \ "$date" \ "$numberLong")
+      .contramap(_.toInstant(ZoneOffset.UTC).toEpochMilli.toString)
+
   implicit val offsetDateTimeWrites: Writes[OffsetDateTime] = Writes {
-    value => jatLocalDateTimeFormat.writes(value.toLocalDateTime)
+    value => localDateTimeWrites.writes(value.toLocalDateTime)
   }
 
   implicit val offsetDateTimeFormat: Format[OffsetDateTime] = Format.apply(offsetDateTimeReads, offsetDateTimeWrites)
