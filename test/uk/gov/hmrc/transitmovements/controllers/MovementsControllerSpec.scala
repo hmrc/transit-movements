@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.transitmovements.controllers
 
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
-import akka.util.Timeout
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
+import org.apache.pekko.util.Timeout
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.argThat
@@ -421,8 +421,6 @@ class MovementsControllerSpec
 
         val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Departure)(request)
-
-        println(s"Olas result : ${contentAsJson(result).toString()}")
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(

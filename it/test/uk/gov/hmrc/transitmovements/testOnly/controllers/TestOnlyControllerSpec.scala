@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.testOnly.controllers
+package test.uk.gov.hmrc.transitmovements.testOnly.controllers
 
 import org.mockito.scalatest.MockitoSugar
 import org.scalacheck.Arbitrary.arbitrary
@@ -26,16 +26,17 @@ import play.api.test.DefaultAwaitTimeout
 import play.api.test.FakeRequest
 import play.api.test.FutureAwaits
 import play.api.test.Helpers._
+import test.uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.crypto.Decrypter
 import uk.gov.hmrc.crypto.Encrypter
 import uk.gov.hmrc.crypto.SymmetricCryptoFactory
 import uk.gov.hmrc.mongo.MongoComponent
-import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
+import uk.gov.hmrc.mongo.test.PlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl
+import uk.gov.hmrc.transitmovements.testOnly.controllers.TestOnlyController
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -45,7 +46,7 @@ class TestOnlyControllerSpec
     with ScalaCheckPropertyChecks
     with FutureAwaits
     with DefaultAwaitTimeout
-    with DefaultPlayMongoRepositorySupport[MongoMovement]
+    with PlayMongoRepositorySupport[MongoMovement]
     with ModelGenerators
     with OptionValues
     with MockitoSugar {

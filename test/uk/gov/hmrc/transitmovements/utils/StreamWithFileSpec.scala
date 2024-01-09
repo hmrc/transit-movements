@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.utils
 
-import akka.stream.scaladsl.Sink
+import org.apache.pekko.stream.scaladsl.Sink
 import cats.data.EitherT
 import org.scalacheck.Gen
 import org.scalatest.OptionValues

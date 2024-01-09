@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.transitmovements.services
 
-import akka.NotUsed
-import akka.stream.alpakka.xml.ParseEvent
-import akka.stream.scaladsl.Flow
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.connectors.xml.ParseEvent
+import org.apache.pekko.stream.scaladsl.Flow
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 trait XmlParsingServiceHelpers {

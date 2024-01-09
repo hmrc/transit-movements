@@ -16,8 +16,8 @@
 
 package uk.gov.hmrc.transitmovements.models.values
 
-import akka.util
-import akka.util.ByteString
+import org.apache.pekko.util
+import org.apache.pekko.util.ByteString
 import java.nio.ByteBuffer
 import java.time.Clock
 import java.util.Random
