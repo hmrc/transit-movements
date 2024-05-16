@@ -27,6 +27,7 @@ class AppConfig @Inject() (
 ) {
   lazy val mongoRetryAttempts: Int = config.get[Int]("mongodb.retryAttempts")
   lazy val documentTtl: Long       = config.get[Long]("mongodb.timeToLiveInSeconds")
+  lazy val replaceIndexes: Boolean = config.get[Boolean]("mongodb.replaceIndexes")
 
   lazy val smallMessageSizeLimit: Long  = config.get[Long]("smallMessageSizeLimit")
   lazy val internalAuthEnabled: Boolean = config.get[Boolean]("microservice.services.internal-auth.enabled")
