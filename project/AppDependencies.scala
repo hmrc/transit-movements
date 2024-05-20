@@ -3,8 +3,8 @@ import sbt._
 object AppDependencies {
 
   private val catsVersion          = "2.9.0"
-  private val hmrcMongoVersion     = "1.4.0"
-  private val hmrcBootstrapVersion = "8.4.0"
+  private val hmrcMongoVersion     = "1.9.0"
+  private val hmrcBootstrapVersion = "8.6.0"
 
   val compile = Seq(
     "uk.gov.hmrc"             %% "bootstrap-backend-play-30"    % hmrcBootstrapVersion,
@@ -16,7 +16,7 @@ object AppDependencies {
     "org.apache.pekko"        %% "pekko-slf4j"                  % "1.0.1",
     "org.apache.pekko"        %% "pekko-connectors-xml"         % "1.0.1",
     "uk.gov.hmrc"             %% "internal-auth-client-play-30" % "1.8.0",
-    "uk.gov.hmrc"             %% "crypto-json-play-30"          % "7.6.0"
+    "uk.gov.hmrc"             %% "crypto-json-play-30"          % "8.0.0"
   )
 
   val test = Seq(
