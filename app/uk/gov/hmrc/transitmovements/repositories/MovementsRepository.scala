@@ -165,7 +165,8 @@ class MovementsRepositoryImpl @Inject() (
         Codecs.playFormatCodec(mongoFormats.paginationMovementSummaryFormat),
         Codecs.playFormatCodec(mongoFormats.paginationMessageSummaryFormat),
         Codecs.playFormatCodec(mongoFormats.sensitiveStringFormat)
-      )
+      ),
+      replaceIndexes = appConfig.replaceIndexes
     )
     with MovementsRepository
     with Logging
