@@ -9,7 +9,7 @@ object AppDependencies {
   val compile = Seq(
     "uk.gov.hmrc"             %% "bootstrap-backend-play-30"    % hmrcBootstrapVersion,
     "uk.gov.hmrc.mongo"       %% "hmrc-mongo-play-30"           % hmrcMongoVersion,
-    "uk.gov.hmrc.objectstore" %% "object-store-client-play-30"  % "1.3.0",
+    "uk.gov.hmrc.objectstore" %% "object-store-client-play-30"  % "1.4.0",
     "org.typelevel"           %% "cats-core"                    % catsVersion,
     "org.json"                 % "json"                         % "20230227",
     "io.lemonlabs"            %% "scala-uri"                    % "3.6.0",
