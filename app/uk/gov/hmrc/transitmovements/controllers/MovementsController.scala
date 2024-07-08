@@ -17,6 +17,7 @@
 package uk.gov.hmrc.transitmovements.controllers
 
 import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Sink
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 import cats.data.EitherT
@@ -28,6 +29,7 @@ import play.api.libs.json.Reads
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
+import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -87,15 +89,17 @@ class MovementsController @Inject() (
       case None => createEmptyMovement(eori, movementType)
     }
 
-  private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
-    implicit request => size =>
+  private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).async(streamFromMemory) {
+    implicit request =>
       {
         for {
-          arrivalData <- movementsXmlParsingService.extractArrivalData(request.body).asPresentation
+          source      <- reUsableSourceRequest(request)
+          arrivalData <- movementsXmlParsingService.extractArrivalData(source.lift(1).get).asPresentation
           received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
           movementId = movementFactory.generateId()
+          size <- calculateSize(source.lift(2).get)
           message <- messageService
-            .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, request.body, MessageStatus.Processing)
+            .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, source.lift(3).get, MessageStatus.Processing)
             .asPresentation
           movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
           _ <- repo.insertMovement(movement).asPresentation
@@ -108,11 +112,13 @@ class MovementsController @Inject() (
       {
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         for {
-          declarationData <- movementsXmlParsingService.extractDeclarationData(request.body).asPresentation
+          source          <- reUsableSourceRequest(request)
+          declarationData <- movementsXmlParsingService.extractDeclarationData(source.lift(1).get).asPresentation
           received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
           movementId = movementFactory.generateId()
+          size <- calculateSize(source.lift(2).get)
           message <- messageService
-            .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, request.body, MessageStatus.Processing)
+            .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, source.lift(3).get, MessageStatus.Processing)
             .asPresentation
           movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
           _ <- repo.insertMovement(movement).asPresentation
@@ -224,14 +230,16 @@ class MovementsController @Inject() (
   }
 
   private def updateMovementWithStream(movementId: MovementId, triggerId: Option[MessageId]): Action[Source[ByteString, _]] =
-    internalAuth(WRITE_MESSAGE).streamWithSize {
-      implicit request => size =>
+    internalAuth(WRITE_MESSAGE).async(streamFromMemory) {
+      implicit request =>
         {
           implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
           for {
             messageType <- extract(request.headers).asPresentation
-            messageData <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
+            source      <- reUsableSourceRequest(request)
+            messageData <- messagesXmlParsingService.extractMessageData(source.lift(1).get, messageType).asPresentation
             received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+            size <- calculateSize(source.lift(2).get)
             message <- messageService
               .create(
                 movementId,
@@ -240,7 +248,7 @@ class MovementsController @Inject() (
                 received,
                 triggerId,
                 size,
-                request.body,
+                source.lift(3).get,
                 messageType.statusOnAttach
               )
               .asPresentation
@@ -321,27 +329,25 @@ class MovementsController @Inject() (
   )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, OffsetDateTime] = {
 
     def extractAndUpdate(source: Source[ByteString, _]): EitherT[Future, PresentationError, OffsetDateTime] =
-      withReusableSource(source) {
-        fileSource =>
-          for {
-            extractedData        <- movementsXmlParsingService.extractData(messageType, fileSource).asPresentation
-            extractedMessageData <- messagesXmlParsingService.extractMessageData(fileSource, messageType).asPresentation
-            _ <- repo
-              .updateMovement(
-                movementId,
-                extractedData
-                  .filterNot(
-                    _ => hasEoriAlready
-                  )
-                  .flatMap(_.movementEoriNumber),
-                extractedData.flatMap(_.movementReferenceNumber),
-                extractedData.flatMap(_.localReferenceNumber),
-                extractedData.flatMap(_.messageSender),
-                received
+      for {
+        source               <- reUsableSource(source)
+        extractedData        <- movementsXmlParsingService.extractData(messageType, source.lift(1).get).asPresentation
+        extractedMessageData <- messagesXmlParsingService.extractMessageData(source.lift(2).get, messageType).asPresentation
+        _ <- repo
+          .updateMovement(
+            movementId,
+            extractedData
+              .filterNot(
+                _ => hasEoriAlready
               )
-              .asPresentation
-          } yield extractedMessageData.generationDate
-      }
+              .flatMap(_.movementEoriNumber),
+            extractedData.flatMap(_.movementReferenceNumber),
+            extractedData.flatMap(_.localReferenceNumber),
+            extractedData.flatMap(_.messageSender),
+            received
+          )
+          .asPresentation
+      } yield extractedMessageData.generationDate
 
     for {
       resourceLocation <- extractResourceLocation(objectStoreURI)
@@ -399,6 +405,43 @@ class MovementsController @Inject() (
       baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
       message => Ok(Json.toJson(UpdateMovementResponse(message.id)))
     )
+  }
+
+  private def materializeSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, Seq[ByteString]] =
+    EitherT(
+      source
+        .runWith(Sink.seq)
+        .map(Right(_): Either[PresentationError, Seq[ByteString]])
+        .recover {
+          error =>
+            Left(PresentationError.internalServiceError(cause = Some(error)))
+        }
+    )
+
+  // Function to create a new source from the materialized sequence
+  private def createReusableSource(seq: Seq[ByteString]): Source[ByteString, _] = Source(seq.toList)
+
+  private def reUsableSourceRequest(request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, List[Source[ByteString, _]]] = for {
+    byteStringSeq <- materializeSource(request.body)
+  } yield List.fill(4)(createReusableSource(byteStringSeq))
+
+  private def reUsableSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, List[Source[ByteString, _]]] = for {
+    byteStringSeq <- materializeSource(source)
+  } yield List.fill(4)(createReusableSource(byteStringSeq))
+
+  // Function to calculate the size using EitherT
+  private def calculateSize(source: Source[ByteString, _]): EitherT[Future, PresentationError, Long] = {
+    val sizeFuture: Future[Either[PresentationError, Long]] = source
+      .map(_.size.toLong)
+      .runWith(Sink.fold(0L)(_ + _))
+      .map(
+        size => Right(size): Either[PresentationError, Long]
+      )
+      .recover {
+        case _: Exception => Left(PresentationError.internalServiceError())
+      }
+
+    EitherT(sizeFuture)
   }
 
 }

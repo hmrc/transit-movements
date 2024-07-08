@@ -17,6 +17,7 @@
 package uk.gov.hmrc.transitmovements.controllers
 
 import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Sink
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 import cats.data.EitherT
@@ -27,6 +28,7 @@ import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
+import play.api.mvc.Request
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.config.Constants.Predicates.READ_MESSAGE
@@ -90,16 +92,20 @@ class MessageBodyController @Inject() (
     }
 
   def createBody(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
-    internalAuth(WRITE_MESSAGE).streamWithSize {
-      implicit request => size =>
+    internalAuth(WRITE_MESSAGE).async(streamFromMemory) {
+      implicit request =>
         val received = OffsetDateTime.now(clock)
         (for {
-          message       <- persistenceService.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
+
+          message <- persistenceService.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
+
           _             <- ensureNoMessageBody(message)
           messageType   <- extract(request.headers).asPresentation
-          messageData   <- messagesXmlParsingService.extractMessageData(request.body, messageType).asPresentation
-          extractedData <- movementsXmlParsingService.extractData(messageType, request.body).asPresentation
-          bodyStorage   <- messageService.storeIfLarge(movementId, messageId, size, request.body).asPresentation
+          source        <- reUsableSource(request)
+          messageData   <- messagesXmlParsingService.extractMessageData(source.lift(0).get, messageType).asPresentation
+          extractedData <- movementsXmlParsingService.extractData(messageType, source.lift(1).get).asPresentation
+          size          <- calculateSize(source.lift(2).get)
+          bodyStorage   <- messageService.storeIfLarge(movementId, messageId, size, source.lift(3).get).asPresentation
           _ <- persistenceService
             .updateMessage(
               movementId,
@@ -160,4 +166,36 @@ class MessageBodyController @Inject() (
         received
       )
       .asPresentation
+
+  private def materializeSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, Seq[ByteString]] =
+    EitherT(
+      source
+        .runWith(Sink.seq)
+        .map(Right(_): Either[PresentationError, Seq[ByteString]])
+        .recover {
+          error =>
+            Left(PresentationError.internalServiceError(cause = Some(error)))
+        }
+    )
+  // Function to create a new source from the materialized sequence
+  private def createReusableSource(seq: Seq[ByteString]): Source[ByteString, _] = Source(seq.toList)
+
+  private def reUsableSource(request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, List[Source[ByteString, _]]] = for {
+    byteStringSeq <- materializeSource(request.body)
+  } yield List.fill(4)(createReusableSource(byteStringSeq))
+
+  // Function to calculate the size using EitherT
+  private def calculateSize(source: Source[ByteString, _]): EitherT[Future, PresentationError, Long] = {
+    val sizeFuture: Future[Either[PresentationError, Long]] = source
+      .map(_.size.toLong)
+      .runWith(Sink.fold(0L)(_ + _))
+      .map(
+        size => Right(size): Either[PresentationError, Long]
+      )
+      .recover {
+        case _: Exception => Left(PresentationError.internalServiceError())
+      }
+
+    EitherT(sizeFuture)
+  }
 }

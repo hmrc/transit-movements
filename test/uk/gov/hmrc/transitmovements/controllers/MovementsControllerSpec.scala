@@ -16,10 +16,10 @@
 
 package uk.gov.hmrc.transitmovements.controllers
 
+import cats.data.EitherT
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
-import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.argThat
 import org.mockito.ArgumentMatchersSugar.eqTo
@@ -55,11 +55,7 @@ import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpVerbs.POST
-import uk.gov.hmrc.internalauth.client.IAAction
-import uk.gov.hmrc.internalauth.client.Predicate
-import uk.gov.hmrc.internalauth.client.Resource
-import uk.gov.hmrc.internalauth.client.ResourceLocation
-import uk.gov.hmrc.internalauth.client.ResourceType
+import uk.gov.hmrc.internalauth.client._
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.config.AppConfig
@@ -69,8 +65,8 @@ import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services._
-import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
+import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 import uk.gov.hmrc.transitmovements.services.errors.StreamError
 
@@ -81,8 +77,8 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
 import scala.annotation.nowarn
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.xml.NodeSeq
@@ -433,45 +429,6 @@ class MovementsControllerSpec
         )(any[ExecutionContext])
         verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
-
-      "when file creation fails" in {
-        val validXml: NodeSeq =
-          <CC015C>
-            <messageSender>ABC123</messageSender>
-            <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-          </CC015C>
-
-        val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
-        val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-
-        val triggerId: MessageId = arbitraryMessageId.arbitrary.sample.get
-
-        when(mockMessageFactory.generateId()).thenReturn(triggerId)
-        when(mockMovementFactory.generateId()).thenReturn(movementId)
-
-        when(mockTemporaryFileCreator.create()).thenThrow(new Exception("File creation failed"))
-        val request = fakeRequest(
-          POST,
-          Source.single(ByteString(validXml.mkString)),
-          movementId,
-          Some(triggerId),
-          Some(MessageType.DeclarationData.code)
-        )
-
-        val result: Future[Result] =
-          controller.createMovement(eoriNumber, MovementType.Departure)(request)
-
-        status(result) mustBe INTERNAL_SERVER_ERROR
-        contentAsJson(result) mustBe Json.obj(
-          "code"    -> "INTERNAL_SERVER_ERROR",
-          "message" -> "Internal server error"
-        )
-
-        verify(mockInternalAuthActionProvider, times(1)).apply(
-          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
-        )(any[ExecutionContext])
-        verifyNoMoreInteractions(mockInternalAuthActionProvider)
-      }
     }
   }
 
@@ -762,35 +719,6 @@ class MovementsControllerSpec
         verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
-      "when file creation fails" in {
-
-        when(mockMessageFactory.generateId()).thenReturn(triggerId)
-        when(mockMovementFactory.generateId()).thenReturn(movementId)
-        when(mockTemporaryFileCreator.create()).thenThrow(new Exception("File creation failed"))
-
-        //        val request = fakeRequest(POST, Source.single(ByteString(validXml.mkString)), Some(MessageType.ArrivalNotification.code))
-        val request = fakeRequest(
-          POST,
-          Source.single(ByteString(validXml.mkString)),
-          movementId,
-          Some(triggerId),
-          Some(MessageType.ArrivalNotification.code)
-        )
-
-        val result: Future[Result] =
-          controller.createMovement(eoriNumber, MovementType.Arrival)(request)
-
-        status(result) mustBe INTERNAL_SERVER_ERROR
-        contentAsJson(result) mustBe Json.obj(
-          "code"    -> "INTERNAL_SERVER_ERROR",
-          "message" -> "Internal server error"
-        )
-
-        verify(mockInternalAuthActionProvider, times(1)).apply(
-          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
-        )(any[ExecutionContext])
-        verifyNoMoreInteractions(mockInternalAuthActionProvider)
-      }
     }
   }
 
@@ -1697,29 +1625,6 @@ class MovementsControllerSpec
         verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
 
-      "when file creation fails" in {
-        when(mockMessageFactory.generateId()).thenReturn(triggerId)
-        when(mockMovementFactory.generateId()).thenReturn(movementId)
-        when(mockTemporaryFileCreator.create()).thenThrow(new Exception("File creation failed"))
-
-        //        val request = fakeRequest(POST, Source.single(ByteString(validXml.mkString)), Some(messageType.code))
-        val request = fakeRequest(
-          method = POST,
-          body = Source.single(ByteString(validXml.mkString)),
-          movementId = movementId,
-          triggerId = Some(triggerId),
-          messageType = Some(messageType.code)
-        )
-
-        val result: Future[Result] =
-          controller.updateMovement(movementId, Some(triggerId))(request)
-
-        status(result) mustBe INTERNAL_SERVER_ERROR
-        contentAsJson(result) mustBe Json.obj(
-          "code"    -> "INTERNAL_SERVER_ERROR",
-          "message" -> "Internal server error"
-        )
-      }
     }
   }
 
