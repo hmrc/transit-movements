@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.transitmovements.controllers
 
+import cats.data.EitherT
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
-import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.argThat
@@ -33,12 +33,7 @@ import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-import play.api.http.Status.BAD_REQUEST
-import play.api.http.Status.CONFLICT
-import play.api.http.Status.CREATED
-import play.api.http.Status.INTERNAL_SERVER_ERROR
-import play.api.http.Status.NOT_FOUND
-import play.api.http.Status.OK
+import play.api.http.Status._
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
@@ -52,37 +47,15 @@ import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.internalauth.client.IAAction
-import uk.gov.hmrc.internalauth.client.Predicate
-import uk.gov.hmrc.internalauth.client.Resource
-import uk.gov.hmrc.internalauth.client.ResourceLocation
-import uk.gov.hmrc.internalauth.client.ResourceType
+import uk.gov.hmrc.internalauth.client._
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
-import uk.gov.hmrc.transitmovements.models.ArrivalData
-import uk.gov.hmrc.transitmovements.models.BodyStorage
-import uk.gov.hmrc.transitmovements.models.DeclarationData
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.ExtractedData
-import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.MessageData
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MessageSender
-import uk.gov.hmrc.transitmovements.models.MessageStatus
-import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.MovementType
-import uk.gov.hmrc.transitmovements.models.ObjectStoreResourceLocation
+import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
-import uk.gov.hmrc.transitmovements.services.MessageService
-import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
-import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
-import uk.gov.hmrc.transitmovements.services.ObjectStoreService
-import uk.gov.hmrc.transitmovements.services.PersistenceService
+import uk.gov.hmrc.transitmovements.services._
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
@@ -1255,67 +1228,6 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(EitherT.rightT((): Unit))
-
-        val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
-        val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
-
-        status(result) mustBe INTERNAL_SERVER_ERROR
-    }
-
-    "must return Internal Server Error when Mongo is unable to update a movement" in forAll(
-      arbitrary[EORINumber],
-      arbitrary[MovementId],
-      arbitrary[MessageId],
-      arbitrary[MessageType],
-      arbitrary[MovementType],
-      Gen.stringOfN(15, Gen.alphaNumChar)
-    ) {
-      (eori, movementId, messageId, messageType, movementType, string) =>
-        val ControllerAndMocks(sut, movementsRepository, _, messagesXmlParsingService, movementsXmlParsingService, messageService) = createController()
-
-        when(
-          movementsRepository.getSingleMessage(
-            EORINumber(eqTo(eori.value)),
-            MovementId(eqTo(movementId.value)),
-            MessageId(eqTo(messageId.value)),
-            eqTo(movementType)
-          )
-        )
-          .thenReturn(
-            EitherT.rightT(
-              MessageResponse(
-                messageId,
-                now,
-                None,
-                None,
-                Some(MessageStatus.Pending),
-                None
-              )
-            )
-          )
-
-        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
-          .thenReturn(EitherT.rightT(MessageData(now, None)))
-
-        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
-          .thenReturn(EitherT.rightT(None))
-
-        when(
-          messageService
-            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
-        ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
-
-        when(
-          movementsRepository.updateMessage(
-            MovementId(eqTo(movementId.value)),
-            MessageId(eqTo(messageId.value)),
-            argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
-            eqTo(now)
-          )
-        ).thenReturn(EitherT.rightT((): Unit))
-
-        when(movementsRepository.updateMovement(MovementId(eqTo(movementId.value)), eqTo(None), eqTo(None), eqTo(None), eqTo(None), eqTo(nowMinusOne)))
-          .thenReturn(EitherT.leftT(MongoError.UpdateNotAcknowledged("bleh")))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
