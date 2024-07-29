@@ -26,6 +26,7 @@ import org.scalacheck.Gen
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.Application
 import play.api.Logging
@@ -48,6 +49,13 @@ import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
+import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
+import uk.gov.hmrc.transitmovements.models.requests.common.ItemCount
+import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.PageNumber
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
@@ -66,7 +74,8 @@ class MovementsRepositorySpec
     with Logging
     with DefaultPlayMongoRepositorySupport[MongoMovement]
     with ModelGenerators
-    with OptionValues {
+    with OptionValues
+    with GuiceOneAppPerSuite {
 
   val instant: OffsetDateTime         = OffsetDateTime.of(2022, 5, 25, 16, 0, 0, 0, ZoneOffset.UTC)
   val receivedInstant: OffsetDateTime = OffsetDateTime.of(2022, 6, 12, 0, 0, 0, 0, ZoneOffset.UTC)
@@ -77,7 +86,7 @@ class MovementsRepositorySpec
     MongoComponent(mongoUri)
   }
 
-  implicit lazy val app: Application = GuiceApplicationBuilder()
+  implicit override lazy val app: Application = GuiceApplicationBuilder()
     .configure(
       "encryption.key"           -> "7CYXDDh/UbNDY1UV8bkxvTzur3pCUzsAvMVH+HsRWbY=",
       "encryption.tolerant-read" -> false
@@ -1614,24 +1623,24 @@ class MovementsRepositorySpec
 
     def setupMessages(dateTime: OffsetDateTime): Vector[MongoMessage] =
       Vector(
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None)
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None)
       )
 
     def setupMessagesWithOutBody(dateTime: OffsetDateTime): Vector[MongoMessage] =
       Vector(
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None, body = None),
-        arbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None, body = None)
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None, body = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None, body = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None, body = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None, body = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None, body = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None, body = None),
+        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None, body = None)
       )
 
     def setupPagination(): Either[MongoError, Unit] = {

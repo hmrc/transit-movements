@@ -26,17 +26,20 @@ import play.api.test.DefaultAwaitTimeout
 import play.api.test.FakeRequest
 import play.api.test.FutureAwaits
 import play.api.test.Helpers._
-import test.uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
+import test.uk.gov.hmrc.transitmovements.it.generators.{ModelGenerators => TransitionalModelGenerators}
 import uk.gov.hmrc.crypto.Decrypter
 import uk.gov.hmrc.crypto.Encrypter
 import uk.gov.hmrc.crypto.SymmetricCryptoFactory
 import uk.gov.hmrc.mongo.MongoComponent
-import uk.gov.hmrc.mongo.test.PlayMongoRepositorySupport
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
-import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl
+import uk.gov.hmrc.transitmovements.models.formats.{MongoFormats => TransitionalMongoFormats}
+import uk.gov.hmrc.transitmovements.models.mongo.write.{MongoMovement => TransitionalMongoMovement}
+import uk.gov.hmrc.transitmovements.repositories.{MovementsRepositoryImpl => TransitionalMovementsRepositoryImpl}
+import uk.gov.hmrc.transitmovements.v2_1.repositories.MovementsRepositoryImpl
 import uk.gov.hmrc.transitmovements.testOnly.controllers.TestOnlyController
+import uk.gov.hmrc.transitmovements.v2_1.generators.ModelGenerators
+import uk.gov.hmrc.transitmovements.v2_1.models.formats.MongoFormats
+import uk.gov.hmrc.transitmovements.v2_1.models.mongo.write.MongoMovement
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -46,7 +49,7 @@ class TestOnlyControllerSpec
     with ScalaCheckPropertyChecks
     with FutureAwaits
     with DefaultAwaitTimeout
-    with PlayMongoRepositorySupport[MongoMovement]
+    with TransitionalModelGenerators
     with ModelGenerators
     with OptionValues
     with MockitoSugar {
@@ -56,7 +59,7 @@ class TestOnlyControllerSpec
   when(appConfig.encryptionTolerantRead).thenReturn(true)
   when(appConfig.encryptionKey).thenReturn("7CYXDDh/UbNDY1UV8bkxvTzur3pCUzsAvMVH+HsRWbY=")
 
-  override lazy val mongoComponent: MongoComponent = {
+  lazy val mongoComponent: MongoComponent = {
     val databaseName: String = "test-movements-testonly"
     val mongoUri: String     = s"mongodb://localhost:27017/$databaseName?retryWrites=false"
     MongoComponent(mongoUri)
@@ -64,21 +67,31 @@ class TestOnlyControllerSpec
 
   implicit val crypto: Encrypter with Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
   val mongoFormats: MongoFormats                = new MongoFormats(appConfig)
+  val transitionalMongoFormats                  = new TransitionalMongoFormats(appConfig)
 
-  override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, mongoFormats)
+  lazy val repository             = new MovementsRepositoryImpl(appConfig, mongoComponent, mongoFormats)
+  lazy val transitionalRepository = new TransitionalMovementsRepositoryImpl(appConfig, mongoComponent, transitionalMongoFormats)
 
-  lazy val controller = new TestOnlyController(stubControllerComponents(), repository)
+  lazy val controller = new TestOnlyController(stubControllerComponents(), transitionalRepository, repository)
 
-  private def documentCount: Long = await(count())
+  def transitionalCount: Long = await(transitionalRepository.collection.countDocuments().head)
+  def count: Long             = await(repository.collection.countDocuments().head)
 
-  "dropCollection" should "drop the movements collection and return OK" in forAll(arbitrary[MongoMovement]) {
-    movement =>
-      await(insert(movement))
-      documentCount shouldBe 1
+  "dropCollection" should "drop the movements collection and return OK" in forAll(
+    arbitrary[MongoMovement],
+    arbitrary[TransitionalMongoMovement]
+  ) {
+    (movement, transitionalMovement) =>
+      await(transitionalRepository.insert(transitionalMovement).value)
+      await(repository.insert(movement).value)
+
+      transitionalCount shouldBe 1
+      count shouldBe 1
 
       val result = controller.dropCollection()(FakeRequest("DELETE", "/"))
       status(result) shouldBe OK
 
-      documentCount shouldBe 0
+      transitionalCount shouldBe 0
+      count shouldBe 0
   }
 }
