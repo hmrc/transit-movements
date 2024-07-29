@@ -24,8 +24,8 @@ import play.api.libs.json.OWrites
 import play.api.libs.json.Reads
 import play.api.libs.json.__
 import uk.gov.hmrc.http.UpstreamErrorResponse
-import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
+import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
 
 object PresentationError extends CommonFormats with Logging {
 

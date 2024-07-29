@@ -25,14 +25,14 @@ import play.api.libs.json.JsString
 import play.api.libs.json.JsSuccess
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
+import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 
 object CommonFormats extends CommonFormats
 

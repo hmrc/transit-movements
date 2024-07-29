@@ -29,6 +29,9 @@ object Constants {
 
   val ObjectStoreOwner = "transit-movements"
 
+  val APIVersionHeaderKey: String        = "APIVersion"
+  val APIVersionFinalHeaderValue: String = "final"
+
   object Predicates {
 
     private val resourceType      = ResourceType("transit-movements")

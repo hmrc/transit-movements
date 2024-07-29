@@ -22,7 +22,7 @@ import org.scalatest.matchers.must.Matchers
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovements.controllers.errors.ErrorCode.Conflict
-import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
 
 class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar {
 

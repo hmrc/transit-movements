@@ -23,7 +23,6 @@ import org.apache.pekko.util.ByteString
 import cats.data.EitherT
 import play.api.Logging
 import play.api.http.MimeTypes
-import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
@@ -36,22 +35,22 @@ import uk.gov.hmrc.transitmovements.config.Constants.Predicates.WRITE_MESSAGE
 import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
-import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.ExtractedData
 import uk.gov.hmrc.transitmovements.models.MessageData
-import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
-import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
+import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
+import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services.MessageService
 import uk.gov.hmrc.transitmovements.services.MessagesXmlParsingService
 import uk.gov.hmrc.transitmovements.services.MovementsXmlParsingService
 import uk.gov.hmrc.transitmovements.services.ObjectStoreService
 import uk.gov.hmrc.transitmovements.services.PersistenceService
+import uk.gov.hmrc.transitmovements.stream.StreamingParsers
 
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -70,8 +69,7 @@ class MessageBodyController @Inject() (
   clock: Clock
 )(implicit
   ec: ExecutionContext,
-  val materializer: Materializer,
-  temporaryFileCreator: TemporaryFileCreator
+  val materializer: Materializer
 ) extends BackendController(cc)
     with Logging
     with StreamingParsers

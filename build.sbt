@@ -14,7 +14,7 @@ lazy val microservice = Project(appName, file("."))
     PlayKeys.playDefaultPort := 9520,
     // Import models by default in route files
     RoutesKeys.routesImport ++= Seq(
-      "uk.gov.hmrc.transitmovements.models._",
+      "uk.gov.hmrc.transitmovements.models.requests.common._",
       "uk.gov.hmrc.transitmovements.models.Bindings._",
       "java.time.OffsetDateTime"
     )

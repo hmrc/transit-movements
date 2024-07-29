@@ -16,6 +16,10 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
+import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
+
 import java.time.OffsetDateTime
 
 sealed trait ExtractedData {

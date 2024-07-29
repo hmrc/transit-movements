@@ -33,7 +33,7 @@ import com.google.inject.Inject
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MessageType.MrnAllocated
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime

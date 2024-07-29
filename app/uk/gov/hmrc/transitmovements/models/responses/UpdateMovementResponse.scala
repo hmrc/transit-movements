@@ -18,8 +18,8 @@ package uk.gov.hmrc.transitmovements.models.responses
 
 import play.api.libs.json.Json
 import play.api.libs.json.OFormat
-import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
+import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
 
 case class UpdateMovementResponse(messageId: MessageId)
 

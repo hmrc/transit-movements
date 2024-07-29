@@ -40,13 +40,20 @@ import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
-import uk.gov.hmrc.transitmovements.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.requests.UpdateStatus
+import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
+import uk.gov.hmrc.transitmovements.models.requests.common.ItemCount
+import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.PageNumber
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.services._
+import uk.gov.hmrc.transitmovements.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.utils.StreamWithFile
 
 import java.time.Clock
@@ -79,7 +86,7 @@ class MovementsController @Inject() (
     with ContentTypeRouting
     with ObjectStoreURIHelpers {
 
-  def createMovement(eori: EORINumber, movementType: MovementType) =
+  def createMovement(eori: EORINumber, movementType: MovementType): Action[Source[ByteString, _]] =
     contentTypeRoute {
       case Some(_) =>
         movementType match {
@@ -108,7 +115,7 @@ class MovementsController @Inject() (
   }
 
   private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
-    implicit request => size =>
+    implicit request => _ =>
       {
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         for {

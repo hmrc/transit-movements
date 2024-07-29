@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovements.models
 
 import play.api.libs.json.Json
 import play.api.libs.json.OFormat
+import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
 
 import java.net.URI
 import java.time.OffsetDateTime

@@ -54,6 +54,11 @@ import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvid
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
 import uk.gov.hmrc.transitmovements.models._
+import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
+import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services._
 import uk.gov.hmrc.transitmovements.services.errors.MongoError

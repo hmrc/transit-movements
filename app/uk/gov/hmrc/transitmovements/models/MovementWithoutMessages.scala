@@ -18,6 +18,10 @@ package uk.gov.hmrc.transitmovements.models
 
 import play.api.libs.json.Json
 import play.api.libs.json.OFormat
+import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
+import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 
 import java.time.OffsetDateTime
 

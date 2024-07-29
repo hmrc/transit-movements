@@ -18,9 +18,9 @@ package uk.gov.hmrc.transitmovements.models.mongo.read
 
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
-import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
 import java.time.OffsetDateTime

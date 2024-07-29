@@ -48,6 +48,13 @@ import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMovements
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
+import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
+import uk.gov.hmrc.transitmovements.models.requests.common.ItemCount
+import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.PageNumber
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError._

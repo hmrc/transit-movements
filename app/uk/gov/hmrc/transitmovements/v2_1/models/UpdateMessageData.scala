@@ -1,0 +1,38 @@
+/*
+ * Copyright 2023 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package uk.gov.hmrc.transitmovements.v2_1.models
+
+import uk.gov.hmrc.transitmovements.v2_1.models.requests.UpdateMessageMetadata
+import uk.gov.hmrc.transitmovements.v2_1.models.requests.UpdateStatus
+
+import java.time.OffsetDateTime
+
+object UpdateMessageData {
+  def apply(status: UpdateStatus): UpdateMessageData = UpdateMessageData(None, None, None, status.status, None)
+
+  def apply(metadata: UpdateMessageMetadata, generationDate: Option[OffsetDateTime]): UpdateMessageData =
+    UpdateMessageData(metadata.objectStoreURI, None, None, metadata.status, metadata.messageType, generationDate)
+}
+
+final case class UpdateMessageData(
+  objectStoreURI: Option[ObjectStoreURI] = None,
+  body: Option[String] = None,
+  size: Option[Long] = None,
+  status: MessageStatus,
+  messageType: Option[MessageType] = None,
+  generationDate: Option[OffsetDateTime] = None
+)

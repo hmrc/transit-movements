@@ -39,6 +39,7 @@ import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.base.TestSourceProvider
+import uk.gov.hmrc.transitmovements.stream.StreamingParsers
 
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec

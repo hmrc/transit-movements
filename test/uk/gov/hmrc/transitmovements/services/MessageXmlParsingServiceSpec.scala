@@ -28,7 +28,7 @@ import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.MessageData
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
