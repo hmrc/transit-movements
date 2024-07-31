@@ -23,6 +23,7 @@ import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.transitmovements.models.ClientId
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
@@ -33,6 +34,7 @@ import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementEori
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
@@ -74,6 +76,10 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
     Arbitrary(Gen.oneOf(MessageType.values))
+
+  implicit lazy val arbitraryClientId: Arbitrary[ClientId] = Arbitrary {
+    Gen.stringOfN(24, Gen.alphaNumChar).map(ClientId.apply)
+  }
 
   implicit lazy val arbitraryURI: Arbitrary[URI] =
     Arbitrary(new URI("http://www.google.com"))
@@ -131,7 +137,8 @@ trait ModelGenerators extends BaseGenerators {
         messages                <- arbitrary[Vector[Message]]
         lrn                     <- arbitrary[Option[LocalReferenceNumber]]
         messageSender           <- arbitrary[Option[MessageSender]]
-      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, lrn, messageSender, created, updated, messages)
+        clientId                <- arbitrary[Option[ClientId]]
+      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, lrn, messageSender, created, updated, messages, clientId)
     }
 
   implicit lazy val arbitraryMessageResponse: Arbitrary[MessageResponse] =
@@ -257,5 +264,14 @@ trait ModelGenerators extends BaseGenerators {
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
       } yield MongoMovementSummary(id, eori, movementEori, movementReferenceNumber, lrn, created, updated)
+    }
+
+  implicit lazy val arbitraryMongoMovementEori: Arbitrary[MongoMovementEori] =
+    Arbitrary {
+      for {
+        id       <- arbitrary[MovementId]
+        eori     <- arbitrary[EORINumber]
+        clientId <- Gen.option(arbitrary[ClientId])
+      } yield MongoMovementEori(id, eori, clientId)
     }
 }

@@ -17,6 +17,7 @@
 package uk.gov.hmrc.transitmovements.services
 
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
@@ -26,6 +27,7 @@ import uk.gov.hmrc.transitmovements.generators.BaseGenerators
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.models.ArrivalData
+import uk.gov.hmrc.transitmovements.models.ClientId
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageSender
@@ -62,9 +64,10 @@ class MovementFactoryImplSpec
       arbitrary[EORINumber],
       arbitrary[Message],
       arbitrary[LocalReferenceNumber],
-      arbitrary[MessageSender]
+      arbitrary[MessageSender],
+      Gen.option(arbitrary[ClientId])
     ) {
-      (enrollmentEori, movementEori, message, lrn, sender) =>
+      (enrollmentEori, movementEori, message, lrn, sender, clientId) =>
         val departure =
           sut.createDeparture(
             movementId,
@@ -73,7 +76,8 @@ class MovementFactoryImplSpec
             DeclarationData(Some(movementEori), instant, lrn, sender),
             message,
             instant,
-            instant
+            instant,
+            clientId
           )
 
         departure.messages.length mustBe 1
@@ -89,10 +93,25 @@ class MovementFactoryImplSpec
   "createArrival" - {
     val sut = new MovementFactoryImpl(clock, random)
 
-    "will create a arrival with a message" in forAll(arbitrary[MovementReferenceNumber], arbitrary[EORINumber], arbitrary[EORINumber], arbitrary[Message]) {
-      (mrn, enrollmentEori, movementEori, message) =>
+    "will create a arrival with a message" in forAll(
+      arbitrary[MovementReferenceNumber],
+      arbitrary[EORINumber],
+      arbitrary[EORINumber],
+      arbitrary[Message],
+      Gen.option(arbitrary[ClientId])
+    ) {
+      (mrn, enrollmentEori, movementEori, message, clientId) =>
         val arrival =
-          sut.createArrival(movementId, enrollmentEori, MovementType.Arrival, ArrivalData(Some(movementEori), instant, mrn), message, instant, instant)
+          sut.createArrival(
+            movementId,
+            enrollmentEori,
+            MovementType.Arrival,
+            ArrivalData(Some(movementEori), instant, mrn),
+            message,
+            instant,
+            instant,
+            clientId
+          )
 
         arrival.messages.length mustBe 1
         arrival.movementReferenceNumber mustBe Some(mrn)
@@ -110,11 +129,12 @@ class MovementFactoryImplSpec
     "will create a movement with message and without movementEORINumber, movementReferenceNumber" in forAll(
       arbitrary[MovementType],
       arbitrary[EORINumber],
-      arbitrary[Message]
+      arbitrary[Message],
+      Gen.option(arbitrary[ClientId])
     ) {
-      (movementType, enrollmentEori, message) =>
+      (movementType, enrollmentEori, message, clientId) =>
         val movement =
-          sut.createEmptyMovement(enrollmentEori, movementType, message, instant, instant)
+          sut.createEmptyMovement(enrollmentEori, movementType, message, instant, instant, clientId)
 
         movement.movementType mustBe movementType
         movement.messages.length mustBe 1

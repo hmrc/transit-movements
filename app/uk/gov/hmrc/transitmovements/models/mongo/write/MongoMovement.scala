@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.models.mongo.write
 
+import uk.gov.hmrc.transitmovements.models.ClientId
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementType
@@ -39,7 +40,8 @@ object MongoMovement {
       movement.messageSender,
       movement.created,
       movement.updated,
-      movement.messages.map(MongoMessage.from)
+      movement.messages.map(MongoMessage.from),
+      movement.clientId
     )
 
 }
@@ -54,5 +56,6 @@ case class MongoMovement(
   messageSender: Option[MessageSender],
   created: OffsetDateTime,
   updated: OffsetDateTime,
-  messages: Vector[MongoMessage]
+  messages: Vector[MongoMessage],
+  clientId: Option[ClientId]
 )

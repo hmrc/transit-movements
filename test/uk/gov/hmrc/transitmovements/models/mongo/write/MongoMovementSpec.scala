@@ -39,7 +39,8 @@ class MongoMovementSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenP
           movement.messageSender,
           movement.created,
           movement.updated,
-          movement.messages.map(MongoMessage.from) // MongoMessage is tested elsewhere
+          movement.messages.map(MongoMessage.from),
+          movement.clientId
         )
     }
   }

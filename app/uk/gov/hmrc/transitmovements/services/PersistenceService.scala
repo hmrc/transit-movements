@@ -23,6 +23,7 @@ import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.Movement
 import uk.gov.hmrc.transitmovements.models.MovementType
+import uk.gov.hmrc.transitmovements.models.MovementWithEori
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
 import uk.gov.hmrc.transitmovements.models.PaginationMovementSummary
@@ -80,6 +81,10 @@ trait PersistenceService {
     movementId: MovementId,
     movementType: MovementType
   ): EitherT[Future, MongoError, MovementWithoutMessages]
+
+  def getMovementEori(
+    movementId: MovementId
+  ): EitherT[Future, MongoError, MovementWithEori]
 
   def getSingleMessage(
     eoriNumber: EORINumber,
@@ -149,6 +154,11 @@ class PersistenceServiceImpl @Inject() (movementsRespository: MovementsRepositor
     movementType: MovementType
   ): EitherT[Future, MongoError, MovementWithoutMessages] =
     movementsRespository.getMovementWithoutMessages(eoriNumber, movementId, movementType).map(_.asMovementWithoutMessages)
+
+  override def getMovementEori(
+    movementId: MovementId
+  ): EitherT[Future, MongoError, MovementWithEori] =
+    movementsRespository.getMovementEori(movementId).map(_.movementWithEori)
 
   override def getSingleMessage(
     eoriNumber: EORINumber,

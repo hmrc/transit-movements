@@ -45,6 +45,7 @@ import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementEori
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
@@ -127,6 +128,13 @@ class MovementsRepositorySpec
       original.localReferenceNumber,
       original.created,
       original.updated
+    )
+
+  def expectedMovementWithEori(original: MongoMovement): MongoMovementEori =
+    MongoMovementEori(
+      original._id,
+      original.enrollmentEORINumber,
+      original.clientId
     )
 
   "DepartureMovementRepository" should "have the correct name" in {
@@ -225,6 +233,25 @@ class MovementsRepositorySpec
     await(repository.insert(movement).value)
 
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, MovementId("2"), movement.movementType).value)
+
+    result.toOption.isEmpty should be(true)
+  }
+
+  "getMovementEori" should "return MovementWithEori if it exists" in {
+    val movement = arbitrary[MongoMovement].sample.value
+
+    await(repository.insert(movement).value)
+
+    val result = await(repository.getMovementEori(movement._id).value)
+    result.toOption.get should be(expectedMovementWithEori(movement))
+  }
+
+  "getMovementEori" should "return none if the movement doesn't exist" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(_id = MovementId("1"))
+
+    await(repository.insert(movement).value)
+
+    val result = await(repository.getMovementEori(MovementId("2")).value)
 
     result.toOption.isEmpty should be(true)
   }

@@ -109,5 +109,6 @@ class MongoFormats @Inject() (appConfig: AppConfig)(implicit crypto: Encrypter w
   implicit val messageMetadataAndBodyFormat: Format[MongoMessageMetadataAndBody] = Json.format[MongoMessageMetadataAndBody]
   implicit val paginationMovementSummaryFormat: Format[MongoPaginatedMovements]  = Json.format[MongoPaginatedMovements]
   implicit val paginationMessageSummaryFormat: Format[MongoPaginatedMessages]    = Json.format[MongoPaginatedMessages]
+  implicit val mongoMovementEoriFormat: Format[MongoMovementEori]                = Json.format[MongoMovementEori]
 
 }
