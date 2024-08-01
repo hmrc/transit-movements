@@ -27,7 +27,8 @@ object Constants {
   val ObjectStoreURI = "X-Object-Store-Uri"
   val MessageType    = "X-Message-Type"
 
-  val ObjectStoreOwner = "transit-movements"
+  val ObjectStoreOwner        = "transit-movements"
+  val XClientIdHeader: String = "X-Client-Id"
 
   val APIVersionHeaderKey: String        = "APIVersion"
   val APIVersionFinalHeaderValue: String = "final"

@@ -37,6 +37,7 @@ import uk.gov.hmrc.transitmovements.models.TotalCount
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementEori
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMessages
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMovements
@@ -360,6 +361,49 @@ class PersistenceServiceSpec
               EORINumber(eqTo(mongoMovement.enrollmentEORINumber.value)),
               MovementId(eqTo(mongoMovement._id.value)),
               eqTo(movementType)
+            )
+            verifyNoMoreInteractions(movementsRepository)
+          case value => fail(s"Expected a Left of MongoError.UnexpectedError, got $value")
+        }
+    }
+  }
+
+  "getMovementEori" - {
+
+    "getting a movement back from Mongo will perform the correct transformation" in forAll(arbitrary[MongoMovementEori]) {
+      mongoMovementEori =>
+        val (sut, movementsRepository) = createService()
+        when(
+          movementsRepository.getMovementEori(
+            MovementId(eqTo(mongoMovementEori._id.value))
+          )
+        ).thenReturn(EitherT.rightT[Future, MongoError](mongoMovementEori))
+
+        whenReady(sut.getMovementEori(mongoMovementEori._id).value) {
+          result =>
+            result mustBe Right(mongoMovementEori.movementWithEori)
+            verify(movementsRepository, times(1)).getMovementEori(
+              MovementId(eqTo(mongoMovementEori._id.value))
+            )
+            verifyNoMoreInteractions(movementsRepository)
+        }
+    }
+
+    "failing to get a movement with eori back from Mongo will return the error from the repository layer" in forAll(arbitrary[MongoMovementEori]) {
+      mongoMovementEori =>
+        val (sut, movementsRepository) = createService()
+        val error                      = MongoError.UnexpectedError(Some(new IllegalStateException()))
+        when(
+          movementsRepository.getMovementEori(
+            MovementId(eqTo(mongoMovementEori._id.value))
+          )
+        ).thenReturn(EitherT.leftT[Future, MongoMovementEori](error))
+
+        whenReady(sut.getMovementEori(mongoMovementEori._id).value) {
+          case Left(actual: MongoError.UnexpectedError) =>
+            actual must be theSameInstanceAs error
+            verify(movementsRepository, times(1)).getMovementEori(
+              MovementId(eqTo(mongoMovementEori._id.value))
             )
             verifyNoMoreInteractions(movementsRepository)
           case value => fail(s"Expected a Left of MongoError.UnexpectedError, got $value")

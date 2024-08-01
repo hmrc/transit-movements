@@ -34,6 +34,7 @@ import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
+import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.config.Constants.Predicates._
 import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
@@ -99,6 +100,7 @@ class MovementsController @Inject() (
   private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).async(streamFromMemory) {
     implicit request =>
       {
+        val clientId = request.headers.get(Constants.XClientIdHeader).map(ClientId(_))
         for {
           source      <- reUsableSourceRequest(request)
           arrivalData <- movementsXmlParsingService.extractArrivalData(source.lift(1).get).asPresentation
@@ -108,16 +110,17 @@ class MovementsController @Inject() (
           message <- messageService
             .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, source.lift(3).get, MessageStatus.Processing)
             .asPresentation
-          movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received)
+          movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received, clientId)
           _ <- repo.insertMovement(movement).asPresentation
         } yield MovementResponse(movement._id, Some(movement.messages.head.id))
       }.fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), response => Ok(Json.toJson(response)))
   }
 
-  private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).streamWithSize {
-    implicit request => _ =>
+  private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).async(streamFromMemory) {
+    implicit request =>
       {
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+        val clientId                   = request.headers.get(Constants.XClientIdHeader).map(ClientId(_))
         for {
           source          <- reUsableSourceRequest(request)
           declarationData <- movementsXmlParsingService.extractDeclarationData(source.lift(1).get).asPresentation
@@ -127,7 +130,7 @@ class MovementsController @Inject() (
           message <- messageService
             .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, source.lift(3).get, MessageStatus.Processing)
             .asPresentation
-          movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received)
+          movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received, clientId)
           _ <- repo.insertMovement(movement).asPresentation
         } yield MovementResponse(movement._id, Some(movement.messages.head.id))
       }.fold[Result](
@@ -137,15 +140,15 @@ class MovementsController @Inject() (
   }
 
   private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = internalAuth(WRITE_MOVEMENT).async(parse.anyContent) {
-    _ =>
+    request =>
       val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       val messageType = movementType match {
         case MovementType.Arrival   => MessageType.ArrivalNotification
         case MovementType.Departure => MessageType.DeclarationData
       }
-
+      val clientId = request.headers.get(Constants.XClientIdHeader).map(ClientId(_))
       val message  = messageService.createEmptyMessage(Some(messageType), received)
-      val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received)
+      val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received, clientId)
 
       (for {
         _ <- repo.insertMovement(movement).asPresentation
@@ -259,11 +262,12 @@ class MovementsController @Inject() (
                 messageType.statusOnAttach
               )
               .asPresentation
-            _ <- repo.attachMessage(movementId, message, messageData.mrn, received).asPresentation
-          } yield message.id
+            _                <- repo.attachMessage(movementId, message, messageData.mrn, received).asPresentation
+            movementWithEori <- repo.getMovementEori(movementId).asPresentation
+          } yield UpdateMovementResponse(message.id, movementWithEori.enrollmentEORINumber, movementWithEori.clientId)
         }.fold[Result](
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-          id => Ok(Json.toJson(UpdateMovementResponse(id)))
+          result => Ok(Json.toJson(result))
         )
     }
 
@@ -407,10 +411,11 @@ class MovementsController @Inject() (
       received
     )
     (for {
-      _ <- repo.attachMessage(movementId, message, None, received).asPresentation
-    } yield message).fold[Result](
+      _                <- repo.attachMessage(movementId, message, None, received).asPresentation
+      movementWithEori <- repo.getMovementEori(movementId).asPresentation
+    } yield UpdateMovementResponse(message.id, movementWithEori.enrollmentEORINumber, movementWithEori.clientId)).fold[Result](
       baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-      message => Ok(Json.toJson(UpdateMovementResponse(message.id)))
+      result => Ok(Json.toJson(result))
     )
   }
 

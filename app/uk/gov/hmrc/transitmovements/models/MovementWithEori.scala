@@ -16,23 +16,25 @@
 
 package uk.gov.hmrc.transitmovements.models
 
+import play.api.libs.json.Json
+import play.api.libs.json.OFormat
 import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 
-import java.time.OffsetDateTime
-
-case class Movement(
+case class MovementWithEori(
   _id: MovementId,
-  movementType: MovementType,
   enrollmentEORINumber: EORINumber,
-  movementEORINumber: Option[EORINumber],
-  movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
-  localReferenceNumber: Option[LocalReferenceNumber],
-  messageSender: Option[MessageSender],
-  created: OffsetDateTime,
-  updated: OffsetDateTime,
-  messages: Vector[Message],
   clientId: Option[ClientId]
 )
+
+object MovementWithEori {
+  implicit val format: OFormat[MovementWithEori] = Json.format[MovementWithEori]
+
+  def fromMovement(movement: Movement) =
+    MovementWithEori(
+      movement._id,
+      movement.enrollmentEORINumber,
+      movement.clientId
+    )
+
+}

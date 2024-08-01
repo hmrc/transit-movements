@@ -63,16 +63,11 @@ import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvid
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
 import uk.gov.hmrc.transitmovements.models._
-import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.ItemCount
-import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.PageNumber
+import uk.gov.hmrc.transitmovements.models.requests.common._
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
-import uk.gov.hmrc.transitmovements.routing.routes
+import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.services._
+import uk.gov.hmrc.transitmovements.routing.routes
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
@@ -237,7 +232,8 @@ class MovementsControllerSpec
           any[DeclarationData],
           any[Message],
           any[OffsetDateTime],
-          any[OffsetDateTime]
+          any[OffsetDateTime],
+          Some(any[String].asInstanceOf[ClientId])
         )
       )
         .thenReturn(movement)
@@ -508,7 +504,8 @@ class MovementsControllerSpec
           any[ArrivalData],
           any[Message],
           any[OffsetDateTime],
-          any[OffsetDateTime]
+          any[OffsetDateTime],
+          Some(any[String].asInstanceOf[ClientId])
         )
       )
         .thenReturn(movement)
@@ -778,7 +775,8 @@ class MovementsControllerSpec
           any[String].asInstanceOf[MovementType],
           any[Message],
           any[OffsetDateTime],
-          any[OffsetDateTime]
+          any[OffsetDateTime],
+          Some(any[String].asInstanceOf[ClientId])
         )
       )
         .thenReturn(movement)
@@ -814,7 +812,8 @@ class MovementsControllerSpec
           any[String].asInstanceOf[MovementType],
           any[Message],
           any[OffsetDateTime],
-          any[OffsetDateTime]
+          any[OffsetDateTime],
+          Some(any[String].asInstanceOf[ClientId])
         )
       )
         .thenReturn(movement)
@@ -1390,6 +1389,7 @@ class MovementsControllerSpec
     val messageId: MessageId   = arbitraryMessageId.arbitrary.sample.get
     val triggerId: MessageId   = arbitraryMessageId.arbitrary.sample.get
     val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
+    val clientId: ClientId     = arbitraryClientId.arbitrary.sample.get
     val now: OffsetDateTime    = OffsetDateTime.now
     val message: Message =
       arbitraryMessage.arbitrary.sample.get.copy(
@@ -1399,6 +1399,18 @@ class MovementsControllerSpec
         triggerId = Some(triggerId),
         uri = Some(new URI("http://www.google.com"))
       )
+
+    val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
+
+    val movement: Movement = arbitrary[Movement].sample.value.copy(
+      _id = movementId,
+      enrollmentEORINumber = eoriNumber,
+      movementEORINumber = Some(eoriNumber),
+      created = now,
+      updated = now,
+      messages = Vector(message),
+      clientId = Some(clientId)
+    )
 
     lazy val messageFactoryEither: EitherT[Future, StreamError, Message] =
       EitherT.rightT(message)
@@ -1430,14 +1442,16 @@ class MovementsControllerSpec
       when(mockPersistenceService.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.rightT(()))
 
-      //      val request = fakeRequest(POST, validXmlStream, Some(messageType.code))
+      when(mockPersistenceService.getMovementEori(any[String].asInstanceOf[MovementId]))
+        .thenReturn(EitherT.rightT(MovementWithEori.fromMovement(movement)))
+
       val request = fakeRequest(POST, validXmlStream, movementId, Some(triggerId), Some(messageType.code))
 
       val result: Future[Result] =
         controller.updateMovement(movementId, Some(triggerId))(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.obj("messageId" -> messageId.value)
+      contentAsJson(result) mustBe Json.toJson(UpdateMovementResponse(messageId = messageId, eori = eoriNumber, clientId = Some(clientId)))
 
       verify(mockInternalAuthActionProvider, times(1)).apply(
         eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
@@ -1468,7 +1482,6 @@ class MovementsControllerSpec
             )
           )
 
-        //        val request = fakeRequest(POST, xmlStream, Some(messageType.code))
         val request = fakeRequest(POST, xmlStream, movementId, Some(triggerId), Some(messageType.code))
 
         val result: Future[Result] =
@@ -1514,7 +1527,6 @@ class MovementsControllerSpec
         )
           .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(s"No departure found with the given id: ${movementId.value}")))
 
-        //        val request = fakeRequest(POST, validXmlStream, Some(messageType.code))
         val request = fakeRequest(POST, validXmlStream, movementId, Some(triggerId), Some(messageType.code))
 
         val result: Future[Result] =
@@ -1539,7 +1551,6 @@ class MovementsControllerSpec
         when(mockMovementFactory.generateId()).thenReturn(movementId)
         when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
-        //        val request = fakeRequest(POST, Source.single(ByteString(validXml.mkString)), None, FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)))
         val request = fakeRequest(
           method = POST,
           body = Source.single(ByteString(validXml.mkString)),
@@ -1639,9 +1650,11 @@ class MovementsControllerSpec
   "updateMovement for an empty message" - {
 
     val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
+    val messageId: MessageId   = arbitraryMessageId.arbitrary.sample.get
 
     lazy val message =
       arbitraryMessage.arbitrary.sample.get.copy(
+        messageId,
         generated = None,
         messageType = None,
         triggerId = None,
@@ -1649,6 +1662,19 @@ class MovementsControllerSpec
         body = None,
         status = Some(MessageStatus.Pending)
       )
+
+    val now: OffsetDateTime    = OffsetDateTime.now
+    val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
+    val clientId: ClientId     = arbitrary[ClientId].sample.get
+    val movement: Movement = arbitrary[Movement].sample.value.copy(
+      _id = movementId,
+      enrollmentEORINumber = eoriNumber,
+      movementEORINumber = Some(eoriNumber),
+      created = now,
+      updated = now,
+      messages = Vector(message),
+      clientId = Some(clientId)
+    )
 
     lazy val request = FakeRequest(
       method = "POST",
@@ -1672,11 +1698,14 @@ class MovementsControllerSpec
       when(mockPersistenceService.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime]))
         .thenReturn(EitherT.rightT(()))
 
+      when(mockPersistenceService.getMovementEori(any[String].asInstanceOf[MovementId]))
+        .thenReturn(EitherT.rightT(MovementWithEori.fromMovement(movement)))
+
       val result: Future[Result] =
         controller.updateMovement(movementId, None)(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.obj("messageId" -> message.id.value)
+      contentAsJson(result) mustBe Json.toJson(UpdateMovementResponse(messageId = messageId, eori = eoriNumber, clientId = Some(clientId)))
 
       verify(mockInternalAuthActionProvider, times(1)).apply(
         eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))

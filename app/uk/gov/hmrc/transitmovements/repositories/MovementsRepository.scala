@@ -42,6 +42,7 @@ import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
+import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementEori
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMessages
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMovements
@@ -107,6 +108,10 @@ trait MovementsRepository {
     movementType: MovementType
   ): EitherT[Future, MongoError, MongoMovementSummary]
 
+  def getMovementEori(
+    movementId: MovementId
+  ): EitherT[Future, MongoError, MongoMovementEori]
+
   def getSingleMessage(
     eoriNumber: EORINumber,
     movementId: MovementId,
@@ -171,7 +176,8 @@ class MovementsRepositoryImpl @Inject() (
         Codecs.playFormatCodec(mongoFormats.messageSenderFormat),
         Codecs.playFormatCodec(mongoFormats.paginationMovementSummaryFormat),
         Codecs.playFormatCodec(mongoFormats.paginationMessageSummaryFormat),
-        Codecs.playFormatCodec(mongoFormats.sensitiveStringFormat)
+        Codecs.playFormatCodec(mongoFormats.sensitiveStringFormat),
+        Codecs.playFormatCodec(mongoFormats.mongoMovementEoriFormat)
       ),
       replaceIndexes = appConfig.replaceIndexes
     )
@@ -213,6 +219,33 @@ class MovementsRepositoryImpl @Inject() (
     )
 
     mongoRetry(Try(collection.aggregate[MongoMovementSummary](aggregates)) match {
+      case Success(obs) =>
+        obs
+          .headOption()
+          .map {
+            case Some(opt) => Right(opt)
+            case None      => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+          }
+      case Failure(NonFatal(ex)) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
+  }
+
+  override def getMovementEori(
+    movementId: MovementId
+  ): EitherT[Future, MongoError, MongoMovementEori] = {
+
+    val selector =
+      mEq("_id", movementId.value)
+
+    val projection = MongoMovementEori.movementProjection
+
+    val aggregates = Seq(
+      Aggregates.filter(selector),
+      Aggregates.project(projection)
+    )
+
+    mongoRetry(Try(collection.aggregate[MongoMovementEori](aggregates)) match {
       case Success(obs) =>
         obs
           .headOption()

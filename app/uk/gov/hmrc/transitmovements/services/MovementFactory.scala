@@ -20,6 +20,7 @@ import org.apache.pekko.stream.Materializer
 import com.google.inject.ImplementedBy
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.models.ArrivalData
+import uk.gov.hmrc.transitmovements.models.ClientId
 import uk.gov.hmrc.transitmovements.models.DeclarationData
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.Movement
@@ -44,7 +45,8 @@ trait MovementFactory {
     declarationData: DeclarationData,
     message: Message,
     created: OffsetDateTime,
-    updated: OffsetDateTime
+    updated: OffsetDateTime,
+    clientId: Option[ClientId]
   ): Movement
 
   def createArrival(
@@ -54,10 +56,18 @@ trait MovementFactory {
     arrivalData: ArrivalData,
     message: Message,
     created: OffsetDateTime,
-    updated: OffsetDateTime
+    updated: OffsetDateTime,
+    clientId: Option[ClientId]
   ): Movement
 
-  def createEmptyMovement(eori: EORINumber, movementType: MovementType, message: Message, created: OffsetDateTime, updated: OffsetDateTime): Movement
+  def createEmptyMovement(
+    eori: EORINumber,
+    movementType: MovementType,
+    message: Message,
+    created: OffsetDateTime,
+    updated: OffsetDateTime,
+    clientId: Option[ClientId]
+  ): Movement
 
 }
 
@@ -77,7 +87,8 @@ class MovementFactoryImpl @Inject() (
     declarationData: DeclarationData,
     message: Message,
     created: OffsetDateTime,
-    updated: OffsetDateTime
+    updated: OffsetDateTime,
+    clientId: Option[ClientId]
   ): Movement =
     Movement(
       _id = movementId,
@@ -89,7 +100,8 @@ class MovementFactoryImpl @Inject() (
       messageSender = Some(declarationData.sender),
       created = created,
       updated = updated,
-      messages = Vector(message)
+      messages = Vector(message),
+      clientId = clientId
     )
 
   def createArrival(
@@ -99,7 +111,8 @@ class MovementFactoryImpl @Inject() (
     arrivalData: ArrivalData,
     message: Message,
     created: OffsetDateTime,
-    updated: OffsetDateTime
+    updated: OffsetDateTime,
+    clientId: Option[ClientId]
   ): Movement =
     Movement(
       _id = movementId,
@@ -111,10 +124,18 @@ class MovementFactoryImpl @Inject() (
       messageSender = None,
       created = created,
       updated = updated,
-      messages = Vector(message)
+      messages = Vector(message),
+      clientId = clientId
     )
 
-  def createEmptyMovement(eori: EORINumber, movementType: MovementType, message: Message, created: OffsetDateTime, updated: OffsetDateTime): Movement =
+  def createEmptyMovement(
+    eori: EORINumber,
+    movementType: MovementType,
+    message: Message,
+    created: OffsetDateTime,
+    updated: OffsetDateTime,
+    clientId: Option[ClientId]
+  ): Movement =
     Movement(
       _id = generateId(),
       enrollmentEORINumber = eori,
@@ -125,7 +146,8 @@ class MovementFactoryImpl @Inject() (
       messageSender = None,
       created = created,
       updated = updated,
-      messages = Vector(message)
+      messages = Vector(message),
+      clientId = clientId
     )
 
 }

@@ -20,6 +20,7 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
+import uk.gov.hmrc.transitmovements.models.ClientId
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
@@ -55,6 +56,10 @@ trait ModelGenerators extends TransitionalBaseGenerators {
         id <- transitionalIntWithMaxLength(9)
       } yield MovementId(id.toString)
     }
+
+  implicit lazy val arbitraryClientId: Arbitrary[ClientId] = Arbitrary {
+    Gen.stringOfN(24, Gen.alphaNumChar).map(ClientId.apply)
+  }
 
   implicit lazy val transitionalArbitraryMessageId: Arbitrary[MessageId] =
     Arbitrary {
@@ -122,7 +127,8 @@ trait ModelGenerators extends TransitionalBaseGenerators {
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
         messages                <- arbitrary[Vector[MongoMessage]]
-      } yield MongoMovement(id, movementType, eori, Some(eori), movementReferenceNumber, movementLRN, messageSender, created, updated, messages)
+        clientId                <- arbitrary[Option[ClientId]]
+      } yield MongoMovement(id, movementType, eori, Some(eori), movementReferenceNumber, movementLRN, messageSender, created, updated, messages, clientId)
     }
 
   implicit lazy val transitionalArbitraryMessageSender: Arbitrary[MessageSender] =

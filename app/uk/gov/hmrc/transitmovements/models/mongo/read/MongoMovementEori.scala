@@ -14,25 +14,36 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models
+package uk.gov.hmrc.transitmovements.models.mongo.read
 
+import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.bson.conversions.Bson
+import uk.gov.hmrc.transitmovements.models.MovementWithEori
+import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 
-import java.time.OffsetDateTime
+object MongoMovementEori {
 
-case class Movement(
+  val movementProjection: Bson =
+    BsonDocument(
+      "_id"                  -> 1,
+      "enrollmentEORINumber" -> 1,
+      "clientId"             -> 1
+    )
+}
+
+case class MongoMovementEori(
   _id: MovementId,
-  movementType: MovementType,
   enrollmentEORINumber: EORINumber,
-  movementEORINumber: Option[EORINumber],
-  movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
-  localReferenceNumber: Option[LocalReferenceNumber],
-  messageSender: Option[MessageSender],
-  created: OffsetDateTime,
-  updated: OffsetDateTime,
-  messages: Vector[Message],
   clientId: Option[ClientId]
-)
+) {
+
+  @transient lazy val movementWithEori: MovementWithEori =
+    MovementWithEori(
+      _id,
+      enrollmentEORINumber,
+      clientId
+    )
+
+}
