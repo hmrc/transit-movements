@@ -20,18 +20,13 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
-import uk.gov.hmrc.transitmovements.models.ClientId
+import uk.gov.hmrc.transitmovements.models.{ClientId, EORINumber, LocalReferenceNumber, MessageId, MovementId, MovementReferenceNumber}
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
-import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 
 import java.net.URI
 import java.time.Instant

@@ -56,7 +56,7 @@ trait ConvertError {
     def convert(input: E): PresentationError
   }
 
-  implicit val parseErrorConverter = new Converter[ParseError] {
+  implicit val parseErrorConverter: Converter[ParseError] = new Converter[ParseError] {
     import uk.gov.hmrc.transitmovements.services.errors.ParseError._
 
     def convert(parseError: ParseError): PresentationError = parseError match {
@@ -68,7 +68,7 @@ trait ConvertError {
 
   }
 
-  implicit val mongoErrorConverter = new Converter[MongoError] {
+  implicit val mongoErrorConverter: Converter[MongoError] = new Converter[MongoError] {
     import uk.gov.hmrc.transitmovements.services.errors.MongoError._
 
     def convert(mongoError: MongoError): PresentationError = mongoError match {
@@ -79,7 +79,7 @@ trait ConvertError {
     }
   }
 
-  implicit val streamErrorConverter = new Converter[StreamError] {
+  implicit val streamErrorConverter: Converter[StreamError] = new Converter[StreamError] {
     import uk.gov.hmrc.transitmovements.services.errors.StreamError._
 
     def convert(streamError: StreamError): PresentationError = streamError match {
@@ -87,7 +87,7 @@ trait ConvertError {
     }
   }
 
-  implicit val objectStoreErrorConverter = new Converter[ObjectStoreError] {
+  implicit val objectStoreErrorConverter: Converter[ObjectStoreError] = new Converter[ObjectStoreError] {
 
     import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError._
 
@@ -98,7 +98,7 @@ trait ConvertError {
   }
 
   // Needed for the object store controller (pass by URL instead of header).
-  val objectStoreErrorWithNotFoundConverter = new Converter[ObjectStoreError] {
+  val objectStoreErrorWithNotFoundConverter: Converter[ObjectStoreError] = new Converter[ObjectStoreError] {
 
     override def convert(input: ObjectStoreError): PresentationError = input match {
       case FileNotFound(fileLocation) => PresentationError.notFoundError(s"file not found at location: $fileLocation")

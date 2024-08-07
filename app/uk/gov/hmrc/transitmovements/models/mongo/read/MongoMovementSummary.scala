@@ -18,11 +18,11 @@ package uk.gov.hmrc.transitmovements.models.mongo.read
 
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
+import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
-import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 
 import java.time.OffsetDateTime
 

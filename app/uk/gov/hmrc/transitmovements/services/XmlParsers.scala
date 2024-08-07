@@ -20,11 +20,11 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.connectors.xml.ParseEvent
 import org.apache.pekko.stream.connectors.xml.scaladsl.XmlParsing
 import org.apache.pekko.stream.scaladsl.Flow
+import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageSender
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.LocalDateTime

@@ -17,13 +17,14 @@
 package uk.gov.hmrc.transitmovements.models.requests
 
 import play.api.libs.json.Json
+import play.api.libs.json.OFormat
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 
 object UpdateMessageMetadata extends CommonFormats {
-  implicit val updateMessageMetadata = Json.format[UpdateMessageMetadata]
+  implicit val updateMessageMetadata: OFormat[UpdateMessageMetadata] = Json.format[UpdateMessageMetadata]
 }
 
 final case class UpdateMessageMetadata(objectStoreURI: Option[ObjectStoreURI] = None, status: MessageStatus, messageType: Option[MessageType] = None)

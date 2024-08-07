@@ -44,13 +44,6 @@ import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.requests.UpdateStatus
-import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.ItemCount
-import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.PageNumber
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.services._

@@ -18,8 +18,6 @@ package uk.gov.hmrc.transitmovements.models
 
 import play.api.libs.json.Json
 import play.api.libs.json.OFormat
-import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
 
 case class MovementWithEori(
   _id: MovementId,

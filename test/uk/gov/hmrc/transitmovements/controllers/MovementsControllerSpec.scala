@@ -63,11 +63,9 @@ import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvid
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
 import uk.gov.hmrc.transitmovements.models._
-import uk.gov.hmrc.transitmovements.models.requests.common._
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
 import uk.gov.hmrc.transitmovements.services._
-import uk.gov.hmrc.transitmovements.routing.routes
 import uk.gov.hmrc.transitmovements.services.errors.MongoError.UnexpectedError
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
@@ -157,7 +155,7 @@ class MovementsControllerSpec
   ): Request[A] =
     FakeRequest(
       method = method,
-      uri = routes.VersionedRoutingController.updateMovement(movementId, triggerId).url,
+      uri = routes.MovementsController.updateMovement(movementId, triggerId).url,
       headers = if (messageType.isDefined) headers.add("X-Message-Type" -> messageType.get) else headers,
       body = body
     )
@@ -414,7 +412,7 @@ class MovementsControllerSpec
 
         val request = FakeRequest(
           method = POST,
-          uri = routes.VersionedRoutingController.createMovement(eoriNumber, MovementType.Departure.value).url,
+          uri = routes.MovementsController.createMovement(eoriNumber, MovementType.Departure).url,
           headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)),
           body = Source.single(ByteString(unknownErrorXml))
         )
@@ -704,7 +702,7 @@ class MovementsControllerSpec
 
         val request = FakeRequest(
           method = POST,
-          uri = routes.VersionedRoutingController.createMovement(eoriNumber, MovementType.Arrival.value).url,
+          uri = routes.MovementsController.createMovement(eoriNumber, MovementType.Arrival).url,
           headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> MessageType.ArrivalNotification.code)),
           body = Source.single(ByteString(unknownErrorXml))
         )
@@ -762,7 +760,7 @@ class MovementsControllerSpec
 
     lazy val streamRequest: Request[Source[ByteString, _]] = FakeRequest(
       method = "POST",
-      uri = routes.VersionedRoutingController.createMovement(eoriNumber, emptyMovement.movementType.value).url,
+      uri = routes.MovementsController.createMovement(eoriNumber, emptyMovement.movementType).url,
       headers = FakeHeaders(Seq("X-Message-Type" -> emptyMovement.movementType.value)),
       body = Source.empty[ByteString]
     )
@@ -838,7 +836,7 @@ class MovementsControllerSpec
   }
 
   for (movementType <- Seq(MovementType.Departure, MovementType.Arrival)) {
-    s"when the movement type equals ${movementType.value}" - {
+    s"when the movement type equals $movementType" - {
 
       "getMovementWithoutMessages" - {
         val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
@@ -863,7 +861,7 @@ class MovementsControllerSpec
           updated = now,
           messages = Vector(message)
         )
-        val request = FakeRequest("GET", routes.VersionedRoutingController.getMovementWithoutMessages(eoriNumber, movementType.value, movementId).url)
+        val request = FakeRequest("GET", routes.MovementsController.getMovementWithoutMessages(eoriNumber, movementType, movementId).url)
 
         "must return OK if departure found" in {
           when(mockMessageFactory.generateId()).thenReturn(triggerId)
@@ -935,7 +933,7 @@ class MovementsControllerSpec
           messages = Vector(message)
         )
 
-        val request = FakeRequest("GET", routes.VersionedRoutingController.getMessage(eoriNumber, movementType.value, movementId, messageId).url)
+        val request = FakeRequest("GET", routes.MovementsController.getMessage(eoriNumber, movementType, movementId, messageId).url)
 
         "must return OK if message found in the correct format" in {
           val messageResponse = MessageResponse.fromMessageWithBody(movement.messages.head)
@@ -1017,7 +1015,7 @@ class MovementsControllerSpec
           val triggerId: MessageId   = arbitraryMessageId.arbitrary.sample.get
           val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
           val now: OffsetDateTime    = OffsetDateTime.now
-          val request                = FakeRequest("GET", routes.VersionedRoutingController.getMessages(eoriNumber, movementType.value, movementId).url)
+          val request                = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
           val message: Message =
             arbitraryMessage.arbitrary.sample.get.copy(
               id = messageId,
@@ -1065,7 +1063,7 @@ class MovementsControllerSpec
           val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
           val messageId: MessageId   = arbitraryMessageId.arbitrary.sample.get
           val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-          val request                = FakeRequest("GET", routes.VersionedRoutingController.getMessages(eoriNumber, movementType.value, movementId).url)
+          val request                = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
 
@@ -1104,7 +1102,7 @@ class MovementsControllerSpec
           val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
           val messageId: MessageId   = arbitraryMessageId.arbitrary.sample.get
           val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-          val request                = FakeRequest("GET", routes.VersionedRoutingController.getMessages(eoriNumber, movementType.value, movementId).url)
+          val request                = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
           when(mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType)))
@@ -1124,7 +1122,7 @@ class MovementsControllerSpec
           val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
           val messageId: MessageId   = arbitraryMessageId.arbitrary.sample.get
           val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-          val request                = FakeRequest("GET", routes.VersionedRoutingController.getMessages(eoriNumber, movementType.value, movementId).url)
+          val request                = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
           when(mockMessageFactory.generateId()).thenReturn(messageId)
           when(mockMovementFactory.generateId()).thenReturn(movementId)
           when(
@@ -1155,8 +1153,8 @@ class MovementsControllerSpec
         when(mockMovementFactory.generateId()).thenReturn(movementId)
         val request = FakeRequest(
           "GET",
-          routes.VersionedRoutingController
-            .getMovementsForEori(eoriNumber, movementType.value, None, Some(EORINumber("GB1234")), None, Some(PageNumber(0)), Some(ItemCount(15)))
+          routes.MovementsController
+            .getMovementsForEori(eoriNumber, movementType, None, Some(EORINumber("GB1234")), None, Some(PageNumber(0)), Some(ItemCount(15)))
             .url
         )
 
@@ -1624,7 +1622,7 @@ class MovementsControllerSpec
 
         val request = FakeRequest(
           method = POST,
-          uri = routes.VersionedRoutingController.updateMovement(movementId, Some(triggerId)).url,
+          uri = routes.MovementsController.updateMovement(movementId, Some(triggerId)).url,
           headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code)),
           body = Source.single(ByteString(unknownErrorXml))
         )
@@ -1678,7 +1676,7 @@ class MovementsControllerSpec
 
     lazy val request = FakeRequest(
       method = "POST",
-      uri = routes.VersionedRoutingController.updateMovement(movementId, None).url,
+      uri = routes.MovementsController.updateMovement(movementId, None).url,
       headers = FakeHeaders(Seq.empty[(String, String)]),
       body = Source.empty[ByteString]
     )
@@ -1889,7 +1887,7 @@ class MovementsControllerSpec
             )
             val request = FakeRequest(
               method = POST,
-              uri = routes.VersionedRoutingController.updateMessage(eori, MovementType.Arrival.value, movementId, messageId).url,
+              uri = routes.MovementsController.updateMessage(eori, MovementType.Arrival, movementId, messageId).url,
               headers = headers,
               body = body
             )
@@ -2007,7 +2005,7 @@ class MovementsControllerSpec
             )
             val request = FakeRequest(
               method = POST,
-              uri = routes.VersionedRoutingController.updateMessage(eori, MovementType.Departure.value, movementId, messageId).url,
+              uri = routes.MovementsController.updateMessage(eori, MovementType.Departure, movementId, messageId).url,
               headers = headers,
               body = body
             )
@@ -2120,7 +2118,7 @@ class MovementsControllerSpec
             )
             val request = FakeRequest(
               method = POST,
-              uri = routes.VersionedRoutingController.updateMessage(eori, movementType.value, movementId, messageId).url,
+              uri = routes.MovementsController.updateMessage(eori, movementType, movementId, messageId).url,
               headers = headers,
               body = body
             )
@@ -2234,7 +2232,7 @@ class MovementsControllerSpec
             )
             val request = FakeRequest(
               method = POST,
-              uri = routes.VersionedRoutingController.updateMessage(eori, movementType.value, movementId, messageId).url,
+              uri = routes.MovementsController.updateMessage(eori, movementType, movementId, messageId).url,
               headers = headers,
               body = body
             )
@@ -2318,7 +2316,7 @@ class MovementsControllerSpec
           )
           val request = FakeRequest(
             method = POST,
-            uri = routes.VersionedRoutingController.updateMessage(eori, movementType.value, movementId, messageId).url,
+            uri = routes.MovementsController.updateMessage(eori, movementType, movementId, messageId).url,
             headers = headers,
             body = body
           )
@@ -2359,7 +2357,7 @@ class MovementsControllerSpec
           val messageId: MessageId   = arbitraryMessageId.arbitrary.sample.get
           val request = FakeRequest(
             method = POST,
-            uri = routes.VersionedRoutingController.updateMessage(eori, messageType.value, movementId, messageId).url,
+            uri = routes.MovementsController.updateMessage(eori, messageType, movementId, messageId).url,
             headers = headers,
             body = body
           )
@@ -2406,7 +2404,7 @@ class MovementsControllerSpec
           )
           val request = FakeRequest(
             method = POST,
-            uri = routes.VersionedRoutingController.updateMessage(eori, messageType.value, movementId, messageId).url,
+            uri = routes.MovementsController.updateMessage(eori, messageType, movementId, messageId).url,
             headers = headers,
             body = body
           )
@@ -2480,7 +2478,7 @@ class MovementsControllerSpec
             )
             val request = FakeRequest(
               method = POST,
-              uri = routes.VersionedRoutingController.updateMessage(eori, MovementType.Arrival.value, movementId, messageId).url,
+              uri = routes.MovementsController.updateMessage(eori, MovementType.Arrival, movementId, messageId).url,
               headers = headers,
               body = body
             )
@@ -2555,7 +2553,7 @@ class MovementsControllerSpec
             )
             val request = FakeRequest(
               method = POST,
-              uri = routes.VersionedRoutingController.updateMessage(eori, MovementType.Departure.value, movementId, messageId).url,
+              uri = routes.MovementsController.updateMessage(eori, MovementType.Departure, movementId, messageId).url,
               headers = headers,
               body = body
             )
@@ -2603,7 +2601,7 @@ class MovementsControllerSpec
 
           val request = FakeRequest(
             method = POST,
-            uri = routes.VersionedRoutingController.updateMessage(eori, MovementType.Departure.value, movementId, messageId).url,
+            uri = routes.MovementsController.updateMessage(eori, MovementType.Departure, movementId, messageId).url,
             headers = headers,
             body = body
           )
@@ -2682,7 +2680,7 @@ class MovementsControllerSpec
           )
           val request = FakeRequest(
             method = POST,
-            uri = routes.VersionedRoutingController.updateMessage(eori, MovementType.Departure.value, movementId, messageId).url,
+            uri = routes.MovementsController.updateMessage(eori, MovementType.Departure, movementId, messageId).url,
             headers = headers,
             body = body
           )
@@ -2727,7 +2725,7 @@ class MovementsControllerSpec
           val messageId: MessageId   = arbitraryMessageId.arbitrary.sample.get
           val request = FakeRequest(
             method = POST,
-            uri = routes.VersionedRoutingController.updateMessage(eori, MovementType.Arrival.value, movementId, messageId).url,
+            uri = routes.MovementsController.updateMessage(eori, MovementType.Arrival, movementId, messageId).url,
             headers = headers,
             body = body
           )
@@ -2781,7 +2779,7 @@ class MovementsControllerSpec
         )
         val request = FakeRequest(
           method = POST,
-          uri = routes.VersionedRoutingController.updateMessageStatus(movementId, messageId).url,
+          uri = routes.MovementsController.updateMessageStatus(movementId, messageId).url,
           headers = headers,
           body = body
         )
@@ -2812,7 +2810,7 @@ class MovementsControllerSpec
         )
         val request = FakeRequest(
           method = POST,
-          uri = routes.VersionedRoutingController.updateMessageStatus(movementId, messageId).url,
+          uri = routes.MovementsController.updateMessageStatus(movementId, messageId).url,
           headers = headers,
           body = body
         )
@@ -2859,7 +2857,7 @@ class MovementsControllerSpec
         )
         val request = FakeRequest(
           method = POST,
-          uri = routes.VersionedRoutingController.updateMessageStatus(movementId, messageId).url,
+          uri = routes.MovementsController.updateMessageStatus(movementId, messageId).url,
           headers = headers,
           body = body
         )

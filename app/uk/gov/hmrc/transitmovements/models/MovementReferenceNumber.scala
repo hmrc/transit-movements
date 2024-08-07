@@ -14,17 +14,13 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.models.responses
+package uk.gov.hmrc.transitmovements.models
 
+import play.api.libs.json.Format
 import play.api.libs.json.Json
-import play.api.libs.json.OFormat
-import uk.gov.hmrc.transitmovements.models.ClientId
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 
-case class UpdateMovementResponse(messageId: MessageId, eori: EORINumber, clientId: Option[ClientId])
+case class MovementReferenceNumber(value: String) extends AnyVal
 
-object UpdateMovementResponse extends CommonFormats {
-  implicit val declarationResponseFormat: OFormat[UpdateMovementResponse] = Json.format[UpdateMovementResponse]
+object MovementReferenceNumber {
+  implicit val movementReferenceNumberFormat: Format[MovementReferenceNumber] = Json.valueFormat[MovementReferenceNumber]
 }

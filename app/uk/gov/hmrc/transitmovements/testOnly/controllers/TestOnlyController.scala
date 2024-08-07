@@ -21,7 +21,7 @@ import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovements.repositories.{MovementsRepositoryImpl => TransitionalMovementsRepositoryImpl}
-import uk.gov.hmrc.transitmovements.v2_1.repositories.MovementsRepositoryImpl
+import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl
 
 import javax.inject.Inject
 import scala.concurrent.ExecutionContext

@@ -19,9 +19,9 @@ package uk.gov.hmrc.transitmovements.models.responses
 import play.api.libs.json.Format
 import play.api.libs.json.Json
 import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
 
 import java.net.URI
 import java.time.OffsetDateTime

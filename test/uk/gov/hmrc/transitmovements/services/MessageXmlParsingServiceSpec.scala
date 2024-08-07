@@ -27,8 +27,8 @@ import org.scalatest.time.Span
 import uk.gov.hmrc.transitmovements.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.models.MessageData
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageType
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -41,7 +41,7 @@ class MessageXmlParsingServiceSpec extends AnyFreeSpec with ScalaFutures with Ma
   private val testDate      = OffsetDateTime.now(ZoneOffset.UTC)
   private val UTCDateString = testDate.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
 
-  implicit val defaultPatience =
+  implicit val defaultPatience: PatienceConfig =
     PatienceConfig(timeout = Span(6, Seconds))
 
   val validMrnAllocationXml: NodeSeq =
