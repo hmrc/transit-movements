@@ -24,18 +24,18 @@ import org.scalacheck.Gen.choose
 import org.scalacheck.Gen.listOfN
 import org.scalacheck.Gen.numChar
 
-trait TransitionalBaseGenerators {
+trait BaseGenerators {
 
-  def transitionalListWithMaxLength[A](maxLength: Int)(implicit a: Arbitrary[A]): Gen[List[A]] =
+  def ListWithMaxLength[A](maxLength: Int)(implicit a: Arbitrary[A]): Gen[List[A]] =
     for {
       length <- choose(1, maxLength)
       seq    <- listOfN(length, arbitrary[A])
     } yield seq
 
-  def transitionalNonEmptyListOfMaxLength[A: Arbitrary](maxLength: Int): Gen[NonEmptyList[A]] =
-    transitionalListWithMaxLength(maxLength).map(NonEmptyList.fromListUnsafe)
+  def NonEmptyListOfMaxLength[A: Arbitrary](maxLength: Int): Gen[NonEmptyList[A]] =
+    ListWithMaxLength(maxLength).map(NonEmptyList.fromListUnsafe)
 
-  def transitionalIntWithMaxLength(maxLength: Int): Gen[Int] =
+  def IntWithMaxLength(maxLength: Int): Gen[Int] =
     for {
       length        <- choose(1, maxLength)
       listOfCharNum <- listOfN(length, numChar)
