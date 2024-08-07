@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.testOnly.controllers
+package test.uk.gov.hmrc.transitmovements.testOnly.controllers
 
 import org.mockito.scalatest.MockitoSugar
 import org.scalacheck.Arbitrary.arbitrary
