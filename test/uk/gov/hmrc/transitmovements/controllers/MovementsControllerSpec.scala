@@ -130,8 +130,9 @@ class MovementsControllerSpec
     super.afterEach()
   }
 
-  val instant: OffsetDateTime = OffsetDateTime.of(2022, 8, 26, 9, 0, 0, 0, ZoneOffset.UTC)
-  implicit val clock: Clock   = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
+  val instant: OffsetDateTime         = OffsetDateTime.of(2022, 8, 26, 9, 0, 0, 0, ZoneOffset.UTC)
+  implicit val clock: Clock           = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
+  private val sourceManagementService = new SourceManagementServiceImpl()
 
   val controller =
     new MovementsController(
@@ -141,6 +142,7 @@ class MovementsControllerSpec
       mockPersistenceService,
       mockMovementsXmlParsingService,
       mockMessagesXmlParsingService,
+      sourceManagementService,
       mockObjectStoreService,
       mockInternalAuthActionProvider
     )

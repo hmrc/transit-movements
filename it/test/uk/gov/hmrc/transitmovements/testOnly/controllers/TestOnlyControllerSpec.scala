@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package test.uk.gov.hmrc.transitmovements.testOnly.controllers
+package uk.gov.hmrc.transitmovements.testOnly.controllers
 
 import org.mockito.scalatest.MockitoSugar
 import org.scalacheck.Arbitrary.arbitrary
@@ -35,11 +35,11 @@ import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models.formats.{MongoFormats => TransitionalMongoFormats}
 import uk.gov.hmrc.transitmovements.models.mongo.write.{MongoMovement => TransitionalMongoMovement}
 import uk.gov.hmrc.transitmovements.repositories.{MovementsRepositoryImpl => TransitionalMovementsRepositoryImpl}
-import uk.gov.hmrc.transitmovements.v2_1.repositories.MovementsRepositoryImpl
+import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl
 import uk.gov.hmrc.transitmovements.testOnly.controllers.TestOnlyController
-import uk.gov.hmrc.transitmovements.v2_1.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.v2_1.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.v2_1.models.mongo.write.MongoMovement
+import uk.gov.hmrc.transitmovements.generators.ModelGenerators
+import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
+import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 
 import scala.concurrent.ExecutionContext.Implicits.global
 

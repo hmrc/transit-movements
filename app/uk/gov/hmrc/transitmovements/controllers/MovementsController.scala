@@ -17,7 +17,6 @@
 package uk.gov.hmrc.transitmovements.controllers
 
 import org.apache.pekko.stream.Materializer
-import org.apache.pekko.stream.scaladsl.Sink
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 import cats.data.EitherT
@@ -29,7 +28,6 @@ import play.api.libs.json.Reads
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
-import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -65,6 +63,7 @@ class MovementsController @Inject() (
   repo: PersistenceService,
   movementsXmlParsingService: MovementsXmlParsingService,
   messagesXmlParsingService: MessagesXmlParsingService,
+  sourceManagementService: SourceManagementService,
   objectStoreService: ObjectStoreService,
   internalAuth: InternalAuthActionProvider
 )(implicit
@@ -95,13 +94,13 @@ class MovementsController @Inject() (
       {
         val clientId = request.headers.get(Constants.XClientIdHeader).map(ClientId(_))
         for {
-          source      <- reUsableSourceRequest(request)
-          arrivalData <- movementsXmlParsingService.extractArrivalData(source.lift(1).get).asPresentation
+          source      <- sourceManagementService.replicateRequestSource(request, 4)
+          arrivalData <- movementsXmlParsingService.extractArrivalData(source(1)).asPresentation
           received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
           movementId = movementFactory.generateId()
-          size <- calculateSize(source.lift(2).get)
+          size <- sourceManagementService.calculateSize(source(2))
           message <- messageService
-            .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, source.lift(3).get, MessageStatus.Processing)
+            .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, source(3), MessageStatus.Processing)
             .asPresentation
           movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received, clientId)
           _ <- repo.insertMovement(movement).asPresentation
@@ -115,13 +114,13 @@ class MovementsController @Inject() (
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         val clientId                   = request.headers.get(Constants.XClientIdHeader).map(ClientId(_))
         for {
-          source          <- reUsableSourceRequest(request)
-          declarationData <- movementsXmlParsingService.extractDeclarationData(source.lift(1).get).asPresentation
+          source          <- sourceManagementService.replicateRequestSource(request, 4)
+          declarationData <- movementsXmlParsingService.extractDeclarationData(source(1)).asPresentation
           received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
           movementId = movementFactory.generateId()
-          size <- calculateSize(source.lift(2).get)
+          size <- sourceManagementService.calculateSize(source(2))
           message <- messageService
-            .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, source.lift(3).get, MessageStatus.Processing)
+            .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, source(3), MessageStatus.Processing)
             .asPresentation
           movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received, clientId)
           _ <- repo.insertMovement(movement).asPresentation
@@ -239,10 +238,10 @@ class MovementsController @Inject() (
           implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
           for {
             messageType <- extract(request.headers).asPresentation
-            source      <- reUsableSourceRequest(request)
-            messageData <- messagesXmlParsingService.extractMessageData(source.lift(1).get, messageType).asPresentation
+            source      <- sourceManagementService.replicateRequestSource(request, 4)
+            messageData <- messagesXmlParsingService.extractMessageData(source(1), messageType).asPresentation
             received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-            size <- calculateSize(source.lift(2).get)
+            size <- sourceManagementService.calculateSize(source(2))
             message <- messageService
               .create(
                 movementId,
@@ -251,7 +250,7 @@ class MovementsController @Inject() (
                 received,
                 triggerId,
                 size,
-                source.lift(3).get,
+                source(3),
                 messageType.statusOnAttach
               )
               .asPresentation
@@ -334,9 +333,9 @@ class MovementsController @Inject() (
 
     def extractAndUpdate(source: Source[ByteString, _]): EitherT[Future, PresentationError, OffsetDateTime] =
       for {
-        source               <- reUsableSource(source)
-        extractedData        <- movementsXmlParsingService.extractData(messageType, source.lift(1).get).asPresentation
-        extractedMessageData <- messagesXmlParsingService.extractMessageData(source.lift(2).get, messageType).asPresentation
+        source               <- sourceManagementService.replicateSource(source, 4)
+        extractedData        <- movementsXmlParsingService.extractData(messageType, source(1)).asPresentation
+        extractedMessageData <- messagesXmlParsingService.extractMessageData(source(2), messageType).asPresentation
         _ <- repo
           .updateMovement(
             movementId,
@@ -411,42 +410,4 @@ class MovementsController @Inject() (
       result => Ok(Json.toJson(result))
     )
   }
-
-  private def materializeSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, Seq[ByteString]] =
-    EitherT(
-      source
-        .runWith(Sink.seq)
-        .map(Right(_): Either[PresentationError, Seq[ByteString]])
-        .recover {
-          error =>
-            Left(PresentationError.internalServiceError(cause = Some(error)))
-        }
-    )
-
-  // Function to create a new source from the materialized sequence
-  private def createReusableSource(seq: Seq[ByteString]): Source[ByteString, _] = Source(seq.toList)
-
-  private def reUsableSourceRequest(request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, List[Source[ByteString, _]]] = for {
-    byteStringSeq <- materializeSource(request.body)
-  } yield List.fill(4)(createReusableSource(byteStringSeq))
-
-  private def reUsableSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, List[Source[ByteString, _]]] = for {
-    byteStringSeq <- materializeSource(source)
-  } yield List.fill(4)(createReusableSource(byteStringSeq))
-
-  // Function to calculate the size using EitherT
-  private def calculateSize(source: Source[ByteString, _]): EitherT[Future, PresentationError, Long] = {
-    val sizeFuture: Future[Either[PresentationError, Long]] = source
-      .map(_.size.toLong)
-      .runWith(Sink.fold(0L)(_ + _))
-      .map(
-        size => Right(size): Either[PresentationError, Long]
-      )
-      .recover {
-        case _: Exception => Left(PresentationError.internalServiceError())
-      }
-
-    EitherT(sizeFuture)
-  }
-
 }

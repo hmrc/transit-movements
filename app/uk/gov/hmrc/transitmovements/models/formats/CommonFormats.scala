@@ -56,7 +56,7 @@ trait CommonFormats {
 
   implicit val messageTypeFormat: Format[MessageType] = enumFormat(MessageType.values)(_.code)
 
-  def enumFormat[A](values: Set[A])(getKey: A => String): Format[A] = new Format[A] {
+  private def enumFormat[A](values: Set[A])(getKey: A => String): Format[A] = new Format[A] {
 
     override def writes(a: A): JsValue =
       JsString(getKey(a))

@@ -76,9 +76,10 @@ class MessageBodyControllerSpec
     with ModelGenerators
     with ScalaCheckDrivenPropertyChecks {
 
-  private val now         = OffsetDateTime.now()
-  private val nowMinusOne = now.minusMinutes(1)
-  private val clock       = Clock.fixed(now.toInstant, now.getOffset)
+  private val now                     = OffsetDateTime.now()
+  private val nowMinusOne             = now.minusMinutes(1)
+  private val clock                   = Clock.fixed(now.toInstant, now.getOffset)
+  private val sourceManagementService = new SourceManagementServiceImpl()
 
   "getBody" - {
 
@@ -136,6 +137,7 @@ class MessageBodyControllerSpec
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -217,6 +219,7 @@ class MessageBodyControllerSpec
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -284,6 +287,7 @@ class MessageBodyControllerSpec
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -342,6 +346,7 @@ class MessageBodyControllerSpec
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -400,6 +405,7 @@ class MessageBodyControllerSpec
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -475,6 +481,7 @@ class MessageBodyControllerSpec
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -1245,6 +1252,7 @@ class MessageBodyControllerSpec
         mockObjectStoreService,
         mockMessagesXmlParsingService,
         mockMovementsXmlParsingService,
+        sourceManagementService,
         mockMessageService,
         mockInternalAuthActionProvider,
         clock
