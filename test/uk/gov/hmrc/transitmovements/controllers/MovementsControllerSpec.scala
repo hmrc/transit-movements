@@ -1389,7 +1389,7 @@ class MovementsControllerSpec
     val messageId: MessageId   = arbitraryMessageId.arbitrary.sample.get
     val triggerId: MessageId   = arbitraryMessageId.arbitrary.sample.get
     val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
-    val clientId: ClientId     = arbitraryClientId.arbitrary.sample.get
+    val clientId: ClientId     = arbClientId.arbitrary.sample.get
     val now: OffsetDateTime    = OffsetDateTime.now
     val message: Message =
       arbitraryMessage.arbitrary.sample.get.copy(

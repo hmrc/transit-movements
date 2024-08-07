@@ -77,7 +77,7 @@ trait ModelGenerators extends BaseGenerators {
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
     Arbitrary(Gen.oneOf(MessageType.values))
 
-  implicit lazy val arbitraryClientId: Arbitrary[ClientId] = Arbitrary {
+  implicit lazy val arbClientId: Arbitrary[ClientId] = Arbitrary {
     Gen.stringOfN(24, Gen.alphaNumChar).map(ClientId.apply)
   }
 
