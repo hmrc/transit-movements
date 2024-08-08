@@ -32,4 +32,16 @@ object Bindings {
       (param, _) => s"Cannot parse parameter $param as a valid ISO 8601 timestamp, e.g. 2015-09-08T01:55:28+00:00"
     )
   }
+
+  implicit def pathBinder(implicit binder: PathBindable[String]): PathBindable[MovementType] = new PathBindable[MovementType] {
+
+    override def bind(key: String, value: String): Either[String, MovementType] =
+      for {
+        urlFragment  <- binder.bind(key, value)
+        movementType <- MovementType.movementTypes.find(_.urlFragment == urlFragment).toRight("Invalid movement type")
+      } yield movementType
+
+    override def unbind(key: String, movementType: MovementType): String =
+      movementType.urlFragment
+  }
 }

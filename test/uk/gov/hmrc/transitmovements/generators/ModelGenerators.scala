@@ -24,6 +24,13 @@ import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovements.models.ClientId
+import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.ItemCount
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
+import uk.gov.hmrc.transitmovements.models.PageNumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
@@ -37,13 +44,6 @@ import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBod
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementEori
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
-import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.ItemCount
-import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.PageNumber
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
 import java.net.URI
@@ -77,7 +77,7 @@ trait ModelGenerators extends BaseGenerators {
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
     Arbitrary(Gen.oneOf(MessageType.values))
 
-  implicit lazy val arbitraryClientId: Arbitrary[ClientId] = Arbitrary {
+  implicit lazy val arbClientId: Arbitrary[ClientId] = Arbitrary {
     Gen.stringOfN(24, Gen.alphaNumChar).map(ClientId.apply)
   }
 

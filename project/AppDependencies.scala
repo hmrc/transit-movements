@@ -1,4 +1,4 @@
-import sbt._
+import sbt.*
 
 object AppDependencies {
 
@@ -6,7 +6,7 @@ object AppDependencies {
   private val hmrcMongoVersion     = "1.9.0"
   private val hmrcBootstrapVersion = "8.6.0"
 
-  val compile = Seq(
+  val compile: Seq[ModuleID] = Seq(
     "uk.gov.hmrc"             %% "bootstrap-backend-play-30"    % hmrcBootstrapVersion,
     "uk.gov.hmrc.mongo"       %% "hmrc-mongo-play-30"           % hmrcMongoVersion,
     "uk.gov.hmrc.objectstore" %% "object-store-client-play-30"  % "1.4.0",
@@ -19,7 +19,7 @@ object AppDependencies {
     "uk.gov.hmrc"             %% "crypto-json-play-30"          % "8.0.0"
   )
 
-  val test = Seq(
+  val test: Seq[ModuleID] = Seq(
     "uk.gov.hmrc"       %% "bootstrap-test-play-30"  % hmrcBootstrapVersion,
     "uk.gov.hmrc.mongo" %% "hmrc-mongo-test-play-30" % hmrcMongoVersion,
     "org.typelevel"     %% "cats-core"               % catsVersion,

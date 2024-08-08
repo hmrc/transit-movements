@@ -21,39 +21,39 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.transitmovements.models.ClientId
+import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
+import uk.gov.hmrc.transitmovements.models.MessageId
+import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
-import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 
 import java.net.URI
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-trait ModelGenerators extends TransitionalBaseGenerators {
+trait ModelGenerators extends BaseGenerators {
 
-  implicit lazy val transitionalArbitraryEoriNumber: Arbitrary[EORINumber] =
+  implicit lazy val ArbitraryEoriNumber: Arbitrary[EORINumber] =
     Arbitrary {
       for {
-        id <- transitionalIntWithMaxLength(9)
+        id <- IntWithMaxLength(9)
       } yield EORINumber(id.toString)
     }
 
-  implicit lazy val transitionalArbitraryMovementType: Arbitrary[MovementType] =
+  implicit lazy val ArbitraryMovementType: Arbitrary[MovementType] =
     Arbitrary(Gen.oneOf(MovementType.movementTypes))
 
-  implicit lazy val transitionalArbitraryMovementId: Arbitrary[MovementId] =
+  implicit lazy val ArbitraryMovementId: Arbitrary[MovementId] =
     Arbitrary {
       for {
-        id <- transitionalIntWithMaxLength(9)
+        id <- IntWithMaxLength(9)
       } yield MovementId(id.toString)
     }
 
@@ -61,20 +61,20 @@ trait ModelGenerators extends TransitionalBaseGenerators {
     Gen.stringOfN(24, Gen.alphaNumChar).map(ClientId.apply)
   }
 
-  implicit lazy val transitionalArbitraryMessageId: Arbitrary[MessageId] =
+  implicit lazy val ArbitraryMessageId: Arbitrary[MessageId] =
     Arbitrary {
       for {
-        id <- transitionalIntWithMaxLength(9)
+        id <- IntWithMaxLength(9)
       } yield MessageId(id.toString)
     }
 
-  implicit lazy val transitionalArbitraryMessageType: Arbitrary[MessageType] =
+  implicit lazy val ArbitraryMessageType: Arbitrary[MessageType] =
     Arbitrary(Gen.oneOf(MessageType.values))
 
-  implicit lazy val transitionalArbitraryURI: Arbitrary[URI] =
+  implicit lazy val ArbitraryURI: Arbitrary[URI] =
     Arbitrary(new URI("http://www.google.com"))
 
-  implicit lazy val transitionalArbitraryMovementReferenceNumber: Arbitrary[MovementReferenceNumber] =
+  implicit lazy val ArbitraryMovementReferenceNumber: Arbitrary[MovementReferenceNumber] =
     Arbitrary {
       for {
         year <- Gen
@@ -87,20 +87,20 @@ trait ModelGenerators extends TransitionalBaseGenerators {
       } yield MovementReferenceNumber(year ++ country.mkString ++ serial.mkString)
     }
 
-  implicit lazy val transitionalArbitraryLRN: Arbitrary[LocalReferenceNumber] =
+  implicit lazy val ArbitraryLRN: Arbitrary[LocalReferenceNumber] =
     Arbitrary {
       Gen.alphaNumStr.map(LocalReferenceNumber(_))
     }
 
   // Restricts the date times to the range of positive long numbers to avoid overflows.
-  implicit lazy val transitionalArbitraryOffsetDateTime: Arbitrary[OffsetDateTime] =
+  implicit lazy val ArbitraryOffsetDateTime: Arbitrary[OffsetDateTime] =
     Arbitrary {
       for {
         millis <- Gen.chooseNum(0, Long.MaxValue / 1000L)
       } yield OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
     }
 
-  implicit lazy val transitionalArbitraryMessage: Arbitrary[MongoMessage] =
+  implicit lazy val ArbitraryMessage: Arbitrary[MongoMessage] =
     Arbitrary {
       for {
         id          <- arbitrary[MessageId]
@@ -115,7 +115,7 @@ trait ModelGenerators extends TransitionalBaseGenerators {
       } yield MongoMessage(id, received, generated, Some(messageType), triggerId, url, body, Some(size), Some(status))
     }
 
-  implicit lazy val transitionalArbitraryMovement: Arbitrary[MongoMovement] =
+  implicit lazy val ArbitraryMovement: Arbitrary[MongoMovement] =
     Arbitrary {
       for {
         id                      <- arbitrary[MovementId]
@@ -131,7 +131,7 @@ trait ModelGenerators extends TransitionalBaseGenerators {
       } yield MongoMovement(id, movementType, eori, Some(eori), movementReferenceNumber, movementLRN, messageSender, created, updated, messages, clientId)
     }
 
-  implicit lazy val transitionalArbitraryMessageSender: Arbitrary[MessageSender] =
+  implicit lazy val ArbitraryMessageSender: Arbitrary[MessageSender] =
     Arbitrary {
       Gen.alphaNumStr.map(MessageSender(_))
     }

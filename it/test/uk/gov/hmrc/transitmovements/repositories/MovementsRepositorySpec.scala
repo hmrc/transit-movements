@@ -50,13 +50,6 @@ import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
-import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.ItemCount
-import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.PageNumber
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
@@ -1650,24 +1643,24 @@ class MovementsRepositorySpec
 
     def setupMessages(dateTime: OffsetDateTime): Vector[MongoMessage] =
       Vector(
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None)
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None)
       )
 
     def setupMessagesWithOutBody(dateTime: OffsetDateTime): Vector[MongoMessage] =
       Vector(
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None, body = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None, body = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None, body = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None, body = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None, body = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None, body = None),
-        transitionalArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None, body = None)
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(3), uri = None, body = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(2), uri = None, body = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.plusMinutes(1), uri = None, body = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime, uri = None, body = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(1), uri = None, body = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(2), uri = None, body = None),
+        ArbitraryMessage.arbitrary.sample.value.copy(received = dateTime.minusMinutes(3), uri = None, body = None)
       )
 
     def setupPagination(): Either[MongoError, Unit] = {

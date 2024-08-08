@@ -42,10 +42,7 @@ object MessageStatus {
     status => value == status.toString
   )
 
-  implicit val messageStatusWrites = new Writes[MessageStatus] {
-
-    def writes(status: MessageStatus) = Json.toJson(status.toString)
-  }
+  implicit val messageStatusWrites: Writes[MessageStatus] = (status: MessageStatus) => Json.toJson(status.toString)
 
   implicit val statusReads: Reads[MessageStatus] = Reads {
     case JsString(proposedStatus) =>

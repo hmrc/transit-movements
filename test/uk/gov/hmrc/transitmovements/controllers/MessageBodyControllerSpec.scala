@@ -34,8 +34,6 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.Status._
-import play.api.libs.Files.SingletonTemporaryFileCreator
-import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Result
@@ -54,11 +52,6 @@ import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvid
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
 import uk.gov.hmrc.transitmovements.models._
-import uk.gov.hmrc.transitmovements.models.requests.common.EORINumber
-import uk.gov.hmrc.transitmovements.models.requests.common.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.requests.common.MessageId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementId
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 import uk.gov.hmrc.transitmovements.services._
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
@@ -83,9 +76,10 @@ class MessageBodyControllerSpec
     with ModelGenerators
     with ScalaCheckDrivenPropertyChecks {
 
-  private val now         = OffsetDateTime.now()
-  private val nowMinusOne = now.minusMinutes(1)
-  private val clock       = Clock.fixed(now.toInstant, now.getOffset)
+  private val now                     = OffsetDateTime.now()
+  private val nowMinusOne             = now.minusMinutes(1)
+  private val clock                   = Clock.fixed(now.toInstant, now.getOffset)
+  private val sourceManagementService = new SourceManagementServiceImpl()
 
   "getBody" - {
 
@@ -137,14 +131,13 @@ class MessageBodyControllerSpec
           )(any())
         ).thenReturn(DefaultActionBuilder(stubControllerComponents().parsers.defaultBodyParser))
 
-        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
-
         val sut = new MessageBodyController(
           stubControllerComponents(),
           mockMovementsRepo,
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -213,7 +206,6 @@ class MessageBodyControllerSpec
         val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
         val mockMessageService             = mock[MessageService]
 
-        implicit val tfc: TemporaryFileCreator                         = SingletonTemporaryFileCreator
         val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
         when(
           mockInternalAuthActionProvider.apply(
@@ -227,6 +219,7 @@ class MessageBodyControllerSpec
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -281,7 +274,6 @@ class MessageBodyControllerSpec
         val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
         val mockMessageService             = mock[MessageService]
 
-        implicit val tfc: TemporaryFileCreator                         = SingletonTemporaryFileCreator
         val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
         when(
           mockInternalAuthActionProvider.apply(
@@ -295,6 +287,7 @@ class MessageBodyControllerSpec
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -340,7 +333,6 @@ class MessageBodyControllerSpec
         val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
         val mockMessageService             = mock[MessageService]
 
-        implicit val tfc: TemporaryFileCreator                         = SingletonTemporaryFileCreator
         val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
         when(
           mockInternalAuthActionProvider.apply(
@@ -354,6 +346,7 @@ class MessageBodyControllerSpec
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -406,14 +399,13 @@ class MessageBodyControllerSpec
           )(any())
         ).thenReturn(DefaultActionBuilder(stubControllerComponents().parsers.defaultBodyParser))
 
-        implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
-
         val sut = new MessageBodyController(
           stubControllerComponents(),
           mockMovementsRepo,
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -476,7 +468,6 @@ class MessageBodyControllerSpec
         val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
         val mockMessageService             = mock[MessageService]
 
-        implicit val tfc: TemporaryFileCreator                         = SingletonTemporaryFileCreator
         val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
         when(
           mockInternalAuthActionProvider.apply(
@@ -490,6 +481,7 @@ class MessageBodyControllerSpec
           mockObjectStoreService,
           mockMessagesXmlParsingSerivce,
           mockMovementsXmlParsingSerivce,
+          sourceManagementService,
           mockMessageService,
           mockInternalAuthActionProvider,
           clock
@@ -1241,7 +1233,6 @@ class MessageBodyControllerSpec
     }
 
     def createController(): ControllerAndMocks = {
-      implicit val tfc: TemporaryFileCreator = SingletonTemporaryFileCreator
 
       val mockPersistenceService: PersistenceService                 = mock[PersistenceService]
       val mockObjectStoreService: ObjectStoreService                 = mock[ObjectStoreService]
@@ -1261,6 +1252,7 @@ class MessageBodyControllerSpec
         mockObjectStoreService,
         mockMessagesXmlParsingService,
         mockMovementsXmlParsingService,
+        sourceManagementService,
         mockMessageService,
         mockInternalAuthActionProvider,
         clock

@@ -31,9 +31,9 @@ import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import uk.gov.hmrc.transitmovements.models.MessageData
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.MessageType.MrnAllocated
-import uk.gov.hmrc.transitmovements.models.requests.common.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
 
 import java.time.OffsetDateTime
@@ -54,7 +54,7 @@ class MessagesXmlParsingServiceImpl @Inject() (implicit materializer: Materializ
   // we don't want to starve the Play pool
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
-  def buildMessageData(
+  private def buildMessageData(
     dateMaybe: ParseResult[OffsetDateTime],
     mrnMaybe: ParseResult[Option[MovementReferenceNumber]]
   ): ParseResult[MessageData] =
@@ -63,7 +63,7 @@ class MessagesXmlParsingServiceImpl @Inject() (implicit materializer: Materializ
       mrn            <- mrnMaybe
     } yield MessageData(generationDate, mrn)
 
-  def messageFlow(messageType: MessageType) = Flow.fromGraph(
+  private def messageFlow(messageType: MessageType) = Flow.fromGraph(
     GraphDSL.create() {
       implicit builder =>
         import GraphDSL.Implicits._
