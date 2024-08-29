@@ -30,6 +30,7 @@ import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.Application
 import play.api.Logging
+import play.api.inject
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.DefaultAwaitTimeout
 import play.api.test.FutureAwaits
@@ -38,8 +39,10 @@ import uk.gov.hmrc.crypto.Decrypter
 import uk.gov.hmrc.crypto.Encrypter
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.SymmetricCryptoFactory
+import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
+import uk.gov.hmrc.play.bootstrap.http.HttpClientV2Provider
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
@@ -85,6 +88,7 @@ class MovementsRepositorySpec
       "encryption.key"           -> "7CYXDDh/UbNDY1UV8bkxvTzur3pCUzsAvMVH+HsRWbY=",
       "encryption.tolerant-read" -> false
     )
+    .overrides(inject.bind[HttpClientV2].toProvider[HttpClientV2Provider])
     .build()
   private val appConfig = Mockito.spy(app.injector.instanceOf[AppConfig])
 
