@@ -20,6 +20,7 @@ object AppDependencies {
   )
 
   val test: Seq[ModuleID] = Seq(
+    "org.apache.pekko"  %% "pekko-testkit"           % "1.0.3",
     "uk.gov.hmrc"       %% "bootstrap-test-play-30"  % hmrcBootstrapVersion,
     "uk.gov.hmrc.mongo" %% "hmrc-mongo-test-play-30" % hmrcMongoVersion,
     "org.typelevel"     %% "cats-core"               % catsVersion,
