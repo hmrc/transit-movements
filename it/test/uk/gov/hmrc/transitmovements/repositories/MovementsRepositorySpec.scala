@@ -88,7 +88,6 @@ class MovementsRepositorySpec
       "encryption.key"           -> "7CYXDDh/UbNDY1UV8bkxvTzur3pCUzsAvMVH+HsRWbY=",
       "encryption.tolerant-read" -> false
     )
-    .overrides(inject.bind[HttpClientV2].toProvider[HttpClientV2Provider])
     .build()
   private val appConfig = Mockito.spy(app.injector.instanceOf[AppConfig])
 
