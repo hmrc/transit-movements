@@ -52,9 +52,11 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val ArbitraryMovementId: Arbitrary[MovementId] =
     Arbitrary {
-      for {
-        id <- IntWithMaxLength(9)
-      } yield MovementId(id.toString)
+      Gen
+        .listOfN(16, Gen.hexChar)
+        .map(
+          id => MovementId(id.mkString)
+        )
     }
 
   implicit lazy val arbitraryClientId: Arbitrary[ClientId] = Arbitrary {
