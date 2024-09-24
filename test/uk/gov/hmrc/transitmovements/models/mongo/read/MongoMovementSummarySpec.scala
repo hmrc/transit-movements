@@ -35,7 +35,8 @@ class MongoMovementSummarySpec extends AnyFreeSpec with Matchers with ScalaCheck
           movement.movementReferenceNumber,
           movement.localReferenceNumber,
           movement.created,
-          movement.updated
+          movement.updated,
+          movement.isTransitional.getOrElse(true)
         )
     }
   }

@@ -130,7 +130,21 @@ trait ModelGenerators extends BaseGenerators {
         updated                 <- arbitrary[OffsetDateTime]
         messages                <- arbitrary[Vector[MongoMessage]]
         clientId                <- arbitrary[Option[ClientId]]
-      } yield MongoMovement(id, movementType, eori, Some(eori), movementReferenceNumber, movementLRN, messageSender, created, updated, messages, clientId)
+        isTransitional          <- arbitrary[Option[Boolean]]
+      } yield MongoMovement(
+        id,
+        movementType,
+        eori,
+        Some(eori),
+        movementReferenceNumber,
+        movementLRN,
+        messageSender,
+        created,
+        updated,
+        messages,
+        clientId,
+        isTransitional
+      )
     }
 
   implicit lazy val ArbitraryMessageSender: Arbitrary[MessageSender] =

@@ -28,6 +28,7 @@ import play.api.libs.json.Reads
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents
+import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -89,6 +90,11 @@ class MovementsController @Inject() (
       case None => createEmptyMovement(eori, movementType)
     }
 
+  def isTransitional(implicit request: Request[_]): Boolean =
+    !request.headers
+      .get(Constants.APIVersionHeaderKey)
+      .contains(Constants.APIVersionFinalHeaderValue)
+
   private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).async(streamFromMemory) {
     implicit request =>
       {
@@ -102,7 +108,7 @@ class MovementsController @Inject() (
           message <- messageService
             .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, source(3), MessageStatus.Processing)
             .asPresentation
-          movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received, clientId)
+          movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received, clientId, isTransitional)
           _ <- repo.insertMovement(movement).asPresentation
         } yield MovementResponse(movement._id, Some(movement.messages.head.id))
       }.fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), response => Ok(Json.toJson(response)))
@@ -122,7 +128,17 @@ class MovementsController @Inject() (
           message <- messageService
             .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, source(3), MessageStatus.Processing)
             .asPresentation
-          movement = movementFactory.createDeparture(movementId, eori, MovementType.Departure, declarationData, message, received, received, clientId)
+          movement = movementFactory.createDeparture(
+            movementId,
+            eori,
+            MovementType.Departure,
+            declarationData,
+            message,
+            received,
+            received,
+            clientId,
+            isTransitional
+          )
           _ <- repo.insertMovement(movement).asPresentation
         } yield MovementResponse(movement._id, Some(movement.messages.head.id))
       }.fold[Result](
@@ -132,7 +148,7 @@ class MovementsController @Inject() (
   }
 
   private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = internalAuth(WRITE_MOVEMENT).async(parse.anyContent) {
-    request =>
+    implicit request =>
       val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       val messageType = movementType match {
         case MovementType.Arrival   => MessageType.ArrivalNotification
@@ -140,7 +156,7 @@ class MovementsController @Inject() (
       }
       val clientId = request.headers.get(Constants.XClientIdHeader).map(ClientId(_))
       val message  = messageService.createEmptyMessage(Some(messageType), received)
-      val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received, clientId)
+      val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received, clientId, isTransitional)
 
       (for {
         _ <- repo.insertMovement(movement).asPresentation

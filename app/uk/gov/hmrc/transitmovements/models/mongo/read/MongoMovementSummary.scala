@@ -36,7 +36,8 @@ object MongoMovementSummary {
       "movementReferenceNumber" -> 1,
       "localReferenceNumber"    -> 1,
       "created"                 -> 1,
-      "updated"                 -> 1
+      "updated"                 -> 1,
+      "isTransitional"          -> 1
     )
 }
 
@@ -47,7 +48,8 @@ case class MongoMovementSummary(
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
   localReferenceNumber: Option[LocalReferenceNumber],
   created: OffsetDateTime,
-  updated: OffsetDateTime
+  updated: OffsetDateTime,
+  isTransitional: Option[Boolean]
 ) {
 
   @transient lazy val asMovementWithoutMessages: MovementWithoutMessages =
@@ -58,7 +60,8 @@ case class MongoMovementSummary(
       movementReferenceNumber,
       localReferenceNumber,
       created,
-      updated
+      updated,
+      isTransitional.getOrElse(true)
     )
 
 }

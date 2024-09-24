@@ -233,7 +233,8 @@ class MovementsControllerSpec
           any[Message],
           any[OffsetDateTime],
           any[OffsetDateTime],
-          Some(any[String].asInstanceOf[ClientId])
+          Some(any[String].asInstanceOf[ClientId]),
+          any[Boolean]
         )
       )
         .thenReturn(movement)
@@ -505,7 +506,8 @@ class MovementsControllerSpec
           any[Message],
           any[OffsetDateTime],
           any[OffsetDateTime],
-          Some(any[String].asInstanceOf[ClientId])
+          Some(any[String].asInstanceOf[ClientId]),
+          any[Boolean]
         )
       )
         .thenReturn(movement)
@@ -776,7 +778,8 @@ class MovementsControllerSpec
           any[Message],
           any[OffsetDateTime],
           any[OffsetDateTime],
-          Some(any[String].asInstanceOf[ClientId])
+          Some(any[String].asInstanceOf[ClientId]),
+          any[Boolean]
         )
       )
         .thenReturn(movement)
@@ -813,7 +816,8 @@ class MovementsControllerSpec
           any[Message],
           any[OffsetDateTime],
           any[OffsetDateTime],
-          Some(any[String].asInstanceOf[ClientId])
+          Some(any[String].asInstanceOf[ClientId]),
+          any[Boolean]
         )
       )
         .thenReturn(movement)
@@ -1046,7 +1050,11 @@ class MovementsControllerSpec
           when(
             mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
-            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+            .thenReturn(
+              EitherT.rightT(
+                MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+              )
+            )
 
           when(mockPersistenceService.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
             .thenReturn(EitherT.rightT(paginationMesssageSummary))
@@ -1072,7 +1080,11 @@ class MovementsControllerSpec
           when(
             mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
-            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+            .thenReturn(
+              EitherT.rightT(
+                MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+              )
+            )
 
           lazy val paginationMesssageSummary = PaginationMessageSummary(TotalCount(0), Vector.empty[MessageResponse])
 
@@ -1130,7 +1142,11 @@ class MovementsControllerSpec
           when(
             mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
-            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+            .thenReturn(
+              EitherT.rightT(
+                MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+              )
+            )
 
           when(mockPersistenceService.getMessages(EORINumber(any()), MovementId(any()), eqTo(movementType), eqTo(None), eqTo(None), eqTo(None), eqTo(None)))
             .thenReturn(EitherT.leftT(UnexpectedError(None)))
@@ -1824,7 +1840,11 @@ class MovementsControllerSpec
             when(
               mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
             )
-              .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+              .thenReturn(
+                EitherT.rightT(
+                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                )
+              )
 
             when(
               mockPersistenceService.getSingleMessage(
@@ -1942,7 +1962,11 @@ class MovementsControllerSpec
             when(
               mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Arrival))
             )
-              .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+              .thenReturn(
+                EitherT.rightT(
+                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                )
+              )
 
             when(
               mockPersistenceService.getSingleMessage(
@@ -2063,7 +2087,9 @@ class MovementsControllerSpec
               mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
             )
               .thenReturn(
-                EitherT.rightT(MovementWithoutMessages(movementId, eori, Some(eori), None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))
+                EitherT.rightT(
+                  MovementWithoutMessages(movementId, eori, Some(eori), None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                )
               )
 
             when(
@@ -2178,7 +2204,11 @@ class MovementsControllerSpec
             when(
               mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
             )
-              .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+              .thenReturn(
+                EitherT.rightT(
+                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                )
+              )
 
             when(
               mockPersistenceService.getSingleMessage(
@@ -2289,7 +2319,9 @@ class MovementsControllerSpec
             mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
           )
             .thenReturn(
-              EitherT.rightT(MovementWithoutMessages(movementId, eori, Some(eori), None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock)))
+              EitherT.rightT(
+                MovementWithoutMessages(movementId, eori, Some(eori), None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+              )
             )
 
           when(
@@ -2443,7 +2475,11 @@ class MovementsControllerSpec
             when(
               mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
             )
-              .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+              .thenReturn(
+                EitherT.rightT(
+                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                )
+              )
 
             when(
               mockPersistenceService.getSingleMessage(
@@ -2526,7 +2562,11 @@ class MovementsControllerSpec
             when(
               mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Arrival))
             )
-              .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+              .thenReturn(
+                EitherT.rightT(
+                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                )
+              )
 
             when(
               mockPersistenceService.getSingleMessage(
@@ -2644,7 +2684,11 @@ class MovementsControllerSpec
           when(
             mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
           )
-            .thenReturn(EitherT.rightT(MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))))
+            .thenReturn(
+              EitherT.rightT(
+                MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+              )
+            )
 
           when(
             mockPersistenceService.getSingleMessage(

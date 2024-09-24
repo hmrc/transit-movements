@@ -16,6 +16,7 @@
 
 package test.uk.gov.hmrc.transitmovements.repositories
 
+import cats.implicits.catsSyntaxOptionId
 import org.mockito.Mockito
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Aggregates
@@ -123,7 +124,8 @@ class MovementsRepositorySpec
       original.movementReferenceNumber,
       original.localReferenceNumber,
       original.created,
-      original.updated
+      original.updated,
+      original.isTransitional
     )
 
   def expectedMovementWithEori(original: MongoMovement): MongoMovementEori =
@@ -212,6 +214,7 @@ class MovementsRepositorySpec
     firstItem._id.value should be(emptyMovement._id.value)
     firstItem.movementEORINumber should be(None)
     firstItem.messages.isEmpty should be(true)
+    firstItem.isTransitional should be(emptyMovement.isTransitional)
   }
 
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists" in {

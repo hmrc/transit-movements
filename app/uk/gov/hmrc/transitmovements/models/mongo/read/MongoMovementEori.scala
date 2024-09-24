@@ -29,7 +29,8 @@ object MongoMovementEori {
     BsonDocument(
       "_id"                  -> 1,
       "enrollmentEORINumber" -> 1,
-      "clientId"             -> 1
+      "clientId"             -> 1,
+      "isTransitional"       -> 1
     )
 }
 

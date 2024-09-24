@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovements.repositories
 
 import org.apache.pekko.pattern.retry
 import cats.data.EitherT
+import cats.implicits.catsSyntaxOptionId
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.empty
 import com.mongodb.client.model.Filters.{and => mAnd}
@@ -216,8 +217,15 @@ class MovementsRepositoryImpl @Inject() (
         obs
           .headOption()
           .map {
-            case Some(opt) => Right(opt)
-            case None      => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+            case Some(opt) =>
+              Right(
+                opt.copy(isTransitional =
+                  opt.isTransitional.fold(true.some)(
+                    v => v.some
+                  )
+                )
+              )
+            case None => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))

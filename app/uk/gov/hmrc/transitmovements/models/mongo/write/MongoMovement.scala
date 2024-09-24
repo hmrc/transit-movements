@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.models.mongo.write
 
+import cats.implicits.catsSyntaxOptionId
 import uk.gov.hmrc.transitmovements.models.ClientId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
@@ -41,7 +42,8 @@ object MongoMovement {
       movement.created,
       movement.updated,
       movement.messages.map(MongoMessage.from),
-      movement.clientId
+      movement.clientId,
+      movement.isTransitional.some
     )
 
 }
@@ -57,5 +59,6 @@ case class MongoMovement(
   created: OffsetDateTime,
   updated: OffsetDateTime,
   messages: Vector[MongoMessage],
-  clientId: Option[ClientId]
+  clientId: Option[ClientId],
+  isTransitional: Option[Boolean]
 )

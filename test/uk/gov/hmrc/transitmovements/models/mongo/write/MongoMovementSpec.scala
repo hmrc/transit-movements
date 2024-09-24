@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.models.mongo.write
 
+import cats.implicits.catsSyntaxOptionId
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
@@ -40,7 +41,8 @@ class MongoMovementSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenP
           movement.created,
           movement.updated,
           movement.messages.map(MongoMessage.from),
-          movement.clientId
+          movement.clientId,
+          movement.isTransitional.some
         )
     }
   }

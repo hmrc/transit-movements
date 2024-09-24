@@ -46,7 +46,8 @@ trait MovementFactory {
     message: Message,
     created: OffsetDateTime,
     updated: OffsetDateTime,
-    clientId: Option[ClientId]
+    clientId: Option[ClientId],
+    isTransitional: Boolean
   ): Movement
 
   def createArrival(
@@ -57,7 +58,8 @@ trait MovementFactory {
     message: Message,
     created: OffsetDateTime,
     updated: OffsetDateTime,
-    clientId: Option[ClientId]
+    clientId: Option[ClientId],
+    isTransitional: Boolean
   ): Movement
 
   def createEmptyMovement(
@@ -66,7 +68,8 @@ trait MovementFactory {
     message: Message,
     created: OffsetDateTime,
     updated: OffsetDateTime,
-    clientId: Option[ClientId]
+    clientId: Option[ClientId],
+    isTransitional: Boolean
   ): Movement
 
 }
@@ -88,7 +91,8 @@ class MovementFactoryImpl @Inject() (
     message: Message,
     created: OffsetDateTime,
     updated: OffsetDateTime,
-    clientId: Option[ClientId]
+    clientId: Option[ClientId],
+    isTransitional: Boolean
   ): Movement =
     Movement(
       _id = movementId,
@@ -101,7 +105,8 @@ class MovementFactoryImpl @Inject() (
       created = created,
       updated = updated,
       messages = Vector(message),
-      clientId = clientId
+      clientId = clientId,
+      isTransitional = isTransitional
     )
 
   def createArrival(
@@ -112,7 +117,8 @@ class MovementFactoryImpl @Inject() (
     message: Message,
     created: OffsetDateTime,
     updated: OffsetDateTime,
-    clientId: Option[ClientId]
+    clientId: Option[ClientId],
+    isTransitional: Boolean
   ): Movement =
     Movement(
       _id = movementId,
@@ -125,7 +131,8 @@ class MovementFactoryImpl @Inject() (
       created = created,
       updated = updated,
       messages = Vector(message),
-      clientId = clientId
+      clientId = clientId,
+      isTransitional = isTransitional
     )
 
   def createEmptyMovement(
@@ -134,7 +141,8 @@ class MovementFactoryImpl @Inject() (
     message: Message,
     created: OffsetDateTime,
     updated: OffsetDateTime,
-    clientId: Option[ClientId]
+    clientId: Option[ClientId],
+    isTransitional: Boolean
   ): Movement =
     Movement(
       _id = generateId(),
@@ -147,7 +155,8 @@ class MovementFactoryImpl @Inject() (
       created = created,
       updated = updated,
       messages = Vector(message),
-      clientId = clientId
+      clientId = clientId,
+      isTransitional = isTransitional
     )
 
 }

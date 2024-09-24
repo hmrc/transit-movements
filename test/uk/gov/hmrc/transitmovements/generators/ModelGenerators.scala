@@ -138,7 +138,8 @@ trait ModelGenerators extends BaseGenerators {
         lrn                     <- arbitrary[Option[LocalReferenceNumber]]
         messageSender           <- arbitrary[Option[MessageSender]]
         clientId                <- arbitrary[Option[ClientId]]
-      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, lrn, messageSender, created, updated, messages, clientId)
+        isTransitional          <- arbitrary[Boolean]
+      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, lrn, messageSender, created, updated, messages, clientId, isTransitional)
     }
 
   implicit lazy val arbitraryMessageResponse: Arbitrary[MessageResponse] =
@@ -263,7 +264,8 @@ trait ModelGenerators extends BaseGenerators {
         lrn                     <- arbitrary[Option[LocalReferenceNumber]]
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
-      } yield MongoMovementSummary(id, eori, movementEori, movementReferenceNumber, lrn, created, updated)
+        isTransitional          <- arbitrary[Option[Boolean]]
+      } yield MongoMovementSummary(id, eori, movementEori, movementReferenceNumber, lrn, created, updated, isTransitional)
     }
 
   implicit lazy val arbitraryMongoMovementEori: Arbitrary[MongoMovementEori] =
