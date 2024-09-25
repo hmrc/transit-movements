@@ -16,7 +16,6 @@
 
 package test.uk.gov.hmrc.transitmovements.repositories
 
-import cats.implicits.catsSyntaxOptionId
 import org.mockito.Mockito
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Aggregates
@@ -31,19 +30,16 @@ import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.Application
 import play.api.Logging
-import play.api.inject
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.DefaultAwaitTimeout
 import play.api.test.FutureAwaits
 import test.uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.Decrypter
 import uk.gov.hmrc.crypto.Encrypter
-import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.SymmetricCryptoFactory
-import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
-import uk.gov.hmrc.play.bootstrap.http.HttpClientV2Provider
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
@@ -132,7 +128,8 @@ class MovementsRepositorySpec
     MongoMovementEori(
       original._id,
       original.enrollmentEORINumber,
-      original.clientId
+      original.clientId,
+      original.isTransitional
     )
 
   "DepartureMovementRepository" should "have the correct name" in {

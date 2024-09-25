@@ -59,6 +59,7 @@ import uk.gov.hmrc.internalauth.client._
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.config.AppConfig
+import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
@@ -163,7 +164,7 @@ class MovementsControllerSpec
     )
 
   "createMovement - Departure" - {
-    "must return OK if XML data extraction is successful" in {
+    "must return OK if XML data extraction is successful and mark the movement as 'final' with final header" in {
 
       val validXml: NodeSeq =
         <CC015C>
@@ -211,7 +212,8 @@ class MovementsControllerSpec
         movementEORINumber = Some(eoriNumber),
         created = now,
         updated = now,
-        messages = Vector(message)
+        messages = Vector(message),
+        isTransitional = false
       )
 
       val triggerId: MessageId = arbitraryMessageId.arbitrary.sample.get
@@ -234,7 +236,134 @@ class MovementsControllerSpec
           any[OffsetDateTime],
           any[OffsetDateTime],
           Some(any[String].asInstanceOf[ClientId]),
-          any[Boolean]
+          eqTo(false)
+        )
+      )
+        .thenReturn(movement)
+
+      when(
+        mockMessageFactory.create(
+          MovementId(eqTo(movementId.value)),
+          eqTo(MessageType.DeclarationData),
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          any[Option[MessageId]],
+          any[Long],
+          any[Source[ByteString, _]],
+          eqTo(MessageStatus.Processing)
+        )(any[HeaderCarrier])
+      )
+        .thenReturn(messageFactoryEither)
+
+      when(mockPersistenceService.insertMovement(eqTo(movement)))
+        .thenReturn(EitherT.rightT(Right(())))
+      val request: Request[Source[ByteString, _]] =
+        fakeRequest[Source[ByteString, _]](
+          POST,
+          validXmlStream,
+          movementId,
+          Some(triggerId),
+          Some(MessageType.DeclarationData.code),
+          FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, Constants.APIVersionHeaderKey -> "final"))
+        )
+      val result: Future[Result] =
+        controller.createMovement(eoriNumber, MovementType.Departure)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.obj(
+        "movementId" -> movementId.value,
+        "messageId"  -> messageId.value
+      )
+
+      verify(mockMessageFactory, times(1)).create(
+        MovementId(eqTo(movementId.value)),
+        eqTo(MessageType.DeclarationData),
+        any[OffsetDateTime],
+        any[OffsetDateTime],
+        any[Option[MessageId]],
+        any[Long],
+        any[Source[ByteString, _]],
+        eqTo(MessageStatus.Processing)
+      )(any[HeaderCarrier])
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
+    }
+    "must return OK if XML data extraction is successful and mark the movement as 'transitional' with no final header" in {
+
+      val validXml: NodeSeq =
+        <CC015C>
+          <messageSender>ABC123</messageSender>
+          <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+        </CC015C>
+
+      val validXmlStream: Source[ByteString, _] = Source.single(ByteString(validXml.mkString))
+      val eoriNumber: EORINumber                = arbitrary[EORINumber].sample.get
+      val lrn: LocalReferenceNumber             = arbitraryLRN.arbitrary.sample.get
+      val messageSender: MessageSender          = arbitraryMessageSender.arbitrary.sample.get
+      val declarationData                       = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn, messageSender)
+
+      val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
+        EitherT.rightT(declarationData)
+
+      val received             = OffsetDateTime.now(ZoneId.of("UTC"))
+      val uri                  = new URI("test")
+      val size                 = Gen.chooseNum[Long](1L, 25000L).sample.getOrElse(1L) // <- This is safer, as it handles None case
+      val messageId: MessageId = MessageId("0123456789abcdef")
+      val message =
+        Message(
+          messageId,
+          received,
+          Some(received),
+          Some(MessageType.DeclarationData),
+          Some(messageId),
+          Some(uri),
+          Some("content"),
+          Some(size),
+          Some(MessageStatus.Processing)
+        )
+
+      val messageFactoryEither: EitherT[Future, StreamError, Message] =
+        EitherT.rightT(message)
+
+      val tempFile = SingletonTemporaryFileCreator.create()
+
+      lazy val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
+      val now: OffsetDateTime         = OffsetDateTime.now
+
+      val movement: Movement = arbitrary[Movement].sample.value.copy(
+        _id = movementId,
+        enrollmentEORINumber = eoriNumber,
+        movementEORINumber = Some(eoriNumber),
+        created = now,
+        updated = now,
+        messages = Vector(message),
+        isTransitional = true
+      )
+
+      val triggerId: MessageId = arbitraryMessageId.arbitrary.sample.get
+
+      when(mockMessageFactory.generateId()).thenReturn(messageId)
+      when(mockMovementFactory.generateId()).thenReturn(movementId)
+
+      when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
+
+      when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+        .thenReturn(departureDataEither)
+
+      when(
+        mockMovementFactory.createDeparture(
+          any[String].asInstanceOf[MovementId],
+          any[String].asInstanceOf[EORINumber],
+          any[String].asInstanceOf[MovementType],
+          any[DeclarationData],
+          any[Message],
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          Some(any[String].asInstanceOf[ClientId]),
+          eqTo(true)
         )
       )
         .thenReturn(movement)
@@ -257,6 +386,133 @@ class MovementsControllerSpec
         .thenReturn(EitherT.rightT(Right(())))
       val request: Request[Source[ByteString, _]] =
         fakeRequest[Source[ByteString, _]](POST, validXmlStream, movementId, Some(triggerId), Some(MessageType.DeclarationData.code))
+      val result: Future[Result] =
+        controller.createMovement(eoriNumber, MovementType.Departure)(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.obj(
+        "movementId" -> movementId.value,
+        "messageId"  -> messageId.value
+      )
+
+      verify(mockMessageFactory, times(1)).create(
+        MovementId(eqTo(movementId.value)),
+        eqTo(MessageType.DeclarationData),
+        any[OffsetDateTime],
+        any[OffsetDateTime],
+        any[Option[MessageId]],
+        any[Long],
+        any[Source[ByteString, _]],
+        eqTo(MessageStatus.Processing)
+      )(any[HeaderCarrier])
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
+    }
+    "must return OK if XML data extraction is successful and mark the movement as 'transitional' with a final header that does not specify 'final' as the value" in {
+
+      val validXml: NodeSeq =
+        <CC015C>
+          <messageSender>ABC123</messageSender>
+          <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+        </CC015C>
+
+      val validXmlStream: Source[ByteString, _] = Source.single(ByteString(validXml.mkString))
+      val eoriNumber: EORINumber                = arbitrary[EORINumber].sample.get
+      val lrn: LocalReferenceNumber             = arbitraryLRN.arbitrary.sample.get
+      val messageSender: MessageSender          = arbitraryMessageSender.arbitrary.sample.get
+      val declarationData                       = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn, messageSender)
+
+      val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
+        EitherT.rightT(declarationData)
+
+      val received             = OffsetDateTime.now(ZoneId.of("UTC"))
+      val uri                  = new URI("test")
+      val size                 = Gen.chooseNum[Long](1L, 25000L).sample.getOrElse(1L) // <- This is safer, as it handles None case
+      val messageId: MessageId = MessageId("0123456789abcdef")
+      val message =
+        Message(
+          messageId,
+          received,
+          Some(received),
+          Some(MessageType.DeclarationData),
+          Some(messageId),
+          Some(uri),
+          Some("content"),
+          Some(size),
+          Some(MessageStatus.Processing)
+        )
+
+      val messageFactoryEither: EitherT[Future, StreamError, Message] =
+        EitherT.rightT(message)
+
+      val tempFile = SingletonTemporaryFileCreator.create()
+
+      lazy val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
+      val now: OffsetDateTime         = OffsetDateTime.now
+
+      val movement: Movement = arbitrary[Movement].sample.value.copy(
+        _id = movementId,
+        enrollmentEORINumber = eoriNumber,
+        movementEORINumber = Some(eoriNumber),
+        created = now,
+        updated = now,
+        messages = Vector(message),
+        isTransitional = true
+      )
+
+      val triggerId: MessageId = arbitraryMessageId.arbitrary.sample.get
+
+      when(mockMessageFactory.generateId()).thenReturn(messageId)
+      when(mockMovementFactory.generateId()).thenReturn(movementId)
+
+      when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
+
+      when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, _]]))
+        .thenReturn(departureDataEither)
+
+      when(
+        mockMovementFactory.createDeparture(
+          any[String].asInstanceOf[MovementId],
+          any[String].asInstanceOf[EORINumber],
+          any[String].asInstanceOf[MovementType],
+          any[DeclarationData],
+          any[Message],
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          Some(any[String].asInstanceOf[ClientId]),
+          eqTo(true)
+        )
+      )
+        .thenReturn(movement)
+
+      when(
+        mockMessageFactory.create(
+          MovementId(eqTo(movementId.value)),
+          eqTo(MessageType.DeclarationData),
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          any[Option[MessageId]],
+          any[Long],
+          any[Source[ByteString, _]],
+          eqTo(MessageStatus.Processing)
+        )(any[HeaderCarrier])
+      )
+        .thenReturn(messageFactoryEither)
+
+      when(mockPersistenceService.insertMovement(eqTo(movement)))
+        .thenReturn(EitherT.rightT(Right(())))
+      val request: Request[Source[ByteString, _]] =
+        fakeRequest[Source[ByteString, _]](
+          POST,
+          validXmlStream,
+          movementId,
+          Some(triggerId),
+          Some(MessageType.DeclarationData.code),
+          FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, Constants.APIVersionHeaderKey -> "not-final"))
+        )
       val result: Future[Result] =
         controller.createMovement(eoriNumber, MovementType.Departure)(request)
 
@@ -398,7 +654,6 @@ class MovementsControllerSpec
         verifyNoMoreInteractions(mockInternalAuthActionProvider)
       }
     }
-
     "must return INTERNAL_SERVICE_ERROR" - {
 
       "when an invalid xml causes an unknown ParseError to be thrown" in {
@@ -484,7 +739,7 @@ class MovementsControllerSpec
     lazy val arrivalDataEither: EitherT[Future, ParseError, ArrivalData] =
       EitherT.rightT(arrivalData)
 
-    "must return OK if XML data extraction is successful" in {
+    "must return OK if XML data extraction is successful and mark the movement as 'transitional' with no final header" in {
 
       val tempFile = SingletonTemporaryFileCreator.create()
 
@@ -507,7 +762,7 @@ class MovementsControllerSpec
           any[OffsetDateTime],
           any[OffsetDateTime],
           Some(any[String].asInstanceOf[ClientId]),
-          any[Boolean]
+          eqTo(true)
         )
       )
         .thenReturn(movement)
@@ -536,6 +791,168 @@ class MovementsControllerSpec
         movementId,
         Some(triggerId),
         Some(MessageType.ArrivalNotification.code)
+      )
+
+      val result: Future[Result] =
+        controller.createMovement(eoriNumber, MovementType.Arrival)(request)
+
+      await(result)
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.obj(
+        "movementId" -> movementId.value,
+        "messageId"  -> messageId.value
+      )
+
+      verify(mockMessageFactory, times(1)).create(
+        MovementId(eqTo(movementId.value)),
+        eqTo(MessageType.ArrivalNotification),
+        any[OffsetDateTime],
+        any[OffsetDateTime],
+        any[Option[MessageId]],
+        any[Long],
+        any[Source[ByteString, _]],
+        eqTo(MessageStatus.Processing)
+      )(any[HeaderCarrier])
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
+    }
+    "must return OK if XML data extraction is successful and mark the movement as 'transitional' with a final header that does not specify 'final' as the value" in {
+
+      val tempFile = SingletonTemporaryFileCreator.create()
+
+      when(mockMessageFactory.generateId()).thenReturn(triggerId)
+      when(mockMessageFactory.generateId()).thenReturn(messageId)
+      when(mockMovementFactory.generateId()).thenReturn(movementId)
+
+      when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
+
+      when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
+        .thenReturn(arrivalDataEither)
+
+      when(
+        mockMovementFactory.createArrival(
+          any[String].asInstanceOf[MovementId],
+          any[String].asInstanceOf[EORINumber],
+          any[String].asInstanceOf[MovementType],
+          any[ArrivalData],
+          any[Message],
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          Some(any[String].asInstanceOf[ClientId]),
+          eqTo(true)
+        )
+      )
+        .thenReturn(movement)
+
+      when(
+        mockMessageFactory.create(
+          MovementId(eqTo(movementId.value)),
+          eqTo(MessageType.ArrivalNotification),
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          any[Option[MessageId]],
+          any[Long],
+          any[Source[ByteString, _]],
+          eqTo(MessageStatus.Processing)
+        )(any[HeaderCarrier])
+      )
+        .thenReturn(messageFactoryEither)
+
+      when(mockPersistenceService.insertMovement(eqTo(movement)))
+        .thenReturn(EitherT.rightT(Right(())))
+
+      //      val request = fakeRequest[Source[ByteString, _]](POST, validXmlStream, Some(MessageType.ArrivalNotification.code))
+      val request = fakeRequest(
+        POST,
+        validXmlStream,
+        movementId,
+        Some(triggerId),
+        Some(MessageType.ArrivalNotification.code),
+        FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, Constants.APIVersionHeaderKey -> "not-final"))
+      )
+
+      val result: Future[Result] =
+        controller.createMovement(eoriNumber, MovementType.Arrival)(request)
+
+      await(result)
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.obj(
+        "movementId" -> movementId.value,
+        "messageId"  -> messageId.value
+      )
+
+      verify(mockMessageFactory, times(1)).create(
+        MovementId(eqTo(movementId.value)),
+        eqTo(MessageType.ArrivalNotification),
+        any[OffsetDateTime],
+        any[OffsetDateTime],
+        any[Option[MessageId]],
+        any[Long],
+        any[Source[ByteString, _]],
+        eqTo(MessageStatus.Processing)
+      )(any[HeaderCarrier])
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
+    }
+    "must return OK if XML data extraction is successful and mark the movement as 'final' with a 'final' final header" in {
+
+      val tempFile = SingletonTemporaryFileCreator.create()
+
+      when(mockMessageFactory.generateId()).thenReturn(triggerId)
+      when(mockMessageFactory.generateId()).thenReturn(messageId)
+      when(mockMovementFactory.generateId()).thenReturn(movementId)
+
+      when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
+
+      when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, _]]))
+        .thenReturn(arrivalDataEither)
+
+      when(
+        mockMovementFactory.createArrival(
+          any[String].asInstanceOf[MovementId],
+          any[String].asInstanceOf[EORINumber],
+          any[String].asInstanceOf[MovementType],
+          any[ArrivalData],
+          any[Message],
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          Some(any[String].asInstanceOf[ClientId]),
+          eqTo(false)
+        )
+      )
+        .thenReturn(movement)
+
+      when(
+        mockMessageFactory.create(
+          MovementId(eqTo(movementId.value)),
+          eqTo(MessageType.ArrivalNotification),
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          any[Option[MessageId]],
+          any[Long],
+          any[Source[ByteString, _]],
+          eqTo(MessageStatus.Processing)
+        )(any[HeaderCarrier])
+      )
+        .thenReturn(messageFactoryEither)
+
+      when(mockPersistenceService.insertMovement(eqTo(movement)))
+        .thenReturn(EitherT.rightT(Right(())))
+
+      //      val request = fakeRequest[Source[ByteString, _]](POST, validXmlStream, Some(MessageType.ArrivalNotification.code))
+      val request = fakeRequest(
+        POST,
+        validXmlStream,
+        movementId,
+        Some(triggerId),
+        Some(MessageType.ArrivalNotification.code),
+        FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, Constants.APIVersionHeaderKey -> "final"))
       )
 
       val result: Future[Result] =
@@ -762,14 +1179,15 @@ class MovementsControllerSpec
       messages = Vector(message)
     )
 
-    lazy val streamRequest: Request[Source[ByteString, _]] = FakeRequest(
-      method = "POST",
-      uri = routes.MovementsController.createMovement(eoriNumber, emptyMovement.movementType).url,
-      headers = FakeHeaders(Seq("X-Message-Type" -> emptyMovement.movementType.value)),
-      body = Source.empty[ByteString]
-    )
+    def streamRequest(headers: Seq[(String, String)] = Seq("X-Message-Type" -> emptyMovement.movementType.value)): Request[Source[ByteString, _]] =
+      FakeRequest(
+        method = "POST",
+        uri = routes.MovementsController.createMovement(eoriNumber, emptyMovement.movementType).url,
+        headers = FakeHeaders(headers),
+        body = Source.empty[ByteString]
+      )
 
-    "must return OK if XML data extraction is successful" in {
+    "must return OK if XML data extraction is successful and mark the movement as 'transitional' with no final header" in {
 
       when(
         mockMovementFactory.createEmptyMovement(
@@ -779,7 +1197,7 @@ class MovementsControllerSpec
           any[OffsetDateTime],
           any[OffsetDateTime],
           Some(any[String].asInstanceOf[ClientId]),
-          any[Boolean]
+          eqTo(true)
         )
       )
         .thenReturn(movement)
@@ -791,7 +1209,81 @@ class MovementsControllerSpec
         .thenReturn(EitherT.rightT(Right((): Unit)))
 
       val result: Future[Result] =
-        controller.createMovement(eoriNumber, MovementType.Departure)(streamRequest)
+        controller.createMovement(eoriNumber, MovementType.Departure)(streamRequest())
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.obj(
+        "movementId" -> movementId.value,
+        "messageId"  -> messageId.value
+      )
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
+    }
+    "must return OK if XML data extraction is successful and mark the movement as 'transitional' with a final header that does not specify 'final'" in {
+
+      when(
+        mockMovementFactory.createEmptyMovement(
+          any[String].asInstanceOf[EORINumber],
+          any[String].asInstanceOf[MovementType],
+          any[Message],
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          Some(any[String].asInstanceOf[ClientId]),
+          eqTo(true)
+        )
+      )
+        .thenReturn(movement)
+
+      when(mockMessageFactory.generateId()).thenReturn(messageId)
+      when(mockMovementFactory.generateId()).thenReturn(movementId)
+
+      when(mockPersistenceService.insertMovement(eqTo(movement)))
+        .thenReturn(EitherT.rightT(Right((): Unit)))
+
+      val result: Future[Result] =
+        controller.createMovement(eoriNumber, MovementType.Departure)(
+          streamRequest(Seq("X-Message-Type" -> emptyMovement.movementType.value, Constants.APIVersionHeaderKey -> "not-final"))
+        )
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.obj(
+        "movementId" -> movementId.value,
+        "messageId"  -> messageId.value
+      )
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
+    }
+    "must return OK if XML data extraction is successful and mark the movement as 'final' with a 'final' final header" in {
+
+      when(
+        mockMovementFactory.createEmptyMovement(
+          any[String].asInstanceOf[EORINumber],
+          any[String].asInstanceOf[MovementType],
+          any[Message],
+          any[OffsetDateTime],
+          any[OffsetDateTime],
+          Some(any[String].asInstanceOf[ClientId]),
+          eqTo(false)
+        )
+      )
+        .thenReturn(movement)
+
+      when(mockMessageFactory.generateId()).thenReturn(messageId)
+      when(mockMovementFactory.generateId()).thenReturn(movementId)
+
+      when(mockPersistenceService.insertMovement(eqTo(movement)))
+        .thenReturn(EitherT.rightT(Right((): Unit)))
+
+      val result: Future[Result] =
+        controller.createMovement(eoriNumber, MovementType.Departure)(
+          streamRequest(Seq("X-Message-Type" -> emptyMovement.movementType.value, Constants.APIVersionHeaderKey -> "final"))
+        )
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
@@ -826,7 +1318,7 @@ class MovementsControllerSpec
         .thenReturn(EitherT.leftT(MongoError.InsertNotAcknowledged(s"Insert failed")))
 
       val result: Future[Result] =
-        controller.createMovement(eoriNumber, emptyMovement.movementType)(streamRequest)
+        controller.createMovement(eoriNumber, emptyMovement.movementType)(streamRequest())
 
       status(result) mustBe INTERNAL_SERVER_ERROR
       contentAsJson(result) mustBe Json.obj(
@@ -1467,7 +1959,9 @@ class MovementsControllerSpec
         controller.updateMovement(movementId, Some(triggerId))(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.toJson(UpdateMovementResponse(messageId = messageId, eori = eoriNumber, clientId = Some(clientId)))
+      contentAsJson(result) mustBe Json.toJson(
+        UpdateMovementResponse(messageId = messageId, eori = eoriNumber, clientId = Some(clientId), isTransitional = movement.isTransitional)
+      )
 
       verify(mockInternalAuthActionProvider, times(1)).apply(
         eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
@@ -1721,7 +2215,9 @@ class MovementsControllerSpec
         controller.updateMovement(movementId, None)(request)
 
       status(result) mustBe OK
-      contentAsJson(result) mustBe Json.toJson(UpdateMovementResponse(messageId = messageId, eori = eoriNumber, clientId = Some(clientId)))
+      contentAsJson(result) mustBe Json.toJson(
+        UpdateMovementResponse(messageId = messageId, eori = eoriNumber, clientId = Some(clientId), isTransitional = movement.isTransitional)
+      )
 
       verify(mockInternalAuthActionProvider, times(1)).apply(
         eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))

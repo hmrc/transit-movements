@@ -22,7 +22,8 @@ import play.api.libs.json.OFormat
 case class MovementWithEori(
   _id: MovementId,
   enrollmentEORINumber: EORINumber,
-  clientId: Option[ClientId]
+  clientId: Option[ClientId],
+  isTransitional: Boolean
 )
 
 object MovementWithEori {
@@ -32,7 +33,8 @@ object MovementWithEori {
     MovementWithEori(
       movement._id,
       movement.enrollmentEORINumber,
-      movement.clientId
+      movement.clientId,
+      movement.isTransitional
     )
 
 }

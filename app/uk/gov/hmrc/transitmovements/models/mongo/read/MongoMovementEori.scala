@@ -37,14 +37,16 @@ object MongoMovementEori {
 case class MongoMovementEori(
   _id: MovementId,
   enrollmentEORINumber: EORINumber,
-  clientId: Option[ClientId]
+  clientId: Option[ClientId],
+  isTransitional: Option[Boolean]
 ) {
 
   @transient lazy val movementWithEori: MovementWithEori =
     MovementWithEori(
       _id,
       enrollmentEORINumber,
-      clientId
+      clientId,
+      isTransitional.getOrElse(true)
     )
 
 }

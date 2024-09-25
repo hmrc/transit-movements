@@ -271,9 +271,10 @@ trait ModelGenerators extends BaseGenerators {
   implicit lazy val arbitraryMongoMovementEori: Arbitrary[MongoMovementEori] =
     Arbitrary {
       for {
-        id       <- arbitrary[MovementId]
-        eori     <- arbitrary[EORINumber]
-        clientId <- Gen.option(arbitrary[ClientId])
-      } yield MongoMovementEori(id, eori, clientId)
+        id             <- arbitrary[MovementId]
+        eori           <- arbitrary[EORINumber]
+        clientId       <- Gen.option(arbitrary[ClientId])
+        isTransitional <- arbitrary[Option[Boolean]]
+      } yield MongoMovementEori(id, eori, clientId, isTransitional)
     }
 }

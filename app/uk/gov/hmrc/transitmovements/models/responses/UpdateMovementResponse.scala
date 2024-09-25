@@ -23,7 +23,7 @@ import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 
-case class UpdateMovementResponse(messageId: MessageId, eori: EORINumber, clientId: Option[ClientId])
+case class UpdateMovementResponse(messageId: MessageId, eori: EORINumber, clientId: Option[ClientId], isTransitional: Boolean)
 
 object UpdateMovementResponse extends CommonFormats {
   implicit val declarationResponseFormat: OFormat[UpdateMovementResponse] = Json.format[UpdateMovementResponse]

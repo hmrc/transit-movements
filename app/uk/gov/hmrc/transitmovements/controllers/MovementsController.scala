@@ -272,7 +272,7 @@ class MovementsController @Inject() (
               .asPresentation
             _                <- repo.attachMessage(movementId, message, messageData.mrn, received).asPresentation
             movementWithEori <- repo.getMovementEori(movementId).asPresentation
-          } yield UpdateMovementResponse(message.id, movementWithEori.enrollmentEORINumber, movementWithEori.clientId)
+          } yield UpdateMovementResponse(message.id, movementWithEori.enrollmentEORINumber, movementWithEori.clientId, movementWithEori.isTransitional)
         }.fold[Result](
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
           result => Ok(Json.toJson(result))
@@ -421,7 +421,7 @@ class MovementsController @Inject() (
     (for {
       _                <- repo.attachMessage(movementId, message, None, received).asPresentation
       movementWithEori <- repo.getMovementEori(movementId).asPresentation
-    } yield UpdateMovementResponse(message.id, movementWithEori.enrollmentEORINumber, movementWithEori.clientId)).fold[Result](
+    } yield UpdateMovementResponse(message.id, movementWithEori.enrollmentEORINumber, movementWithEori.clientId, movementWithEori.isTransitional)).fold[Result](
       baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
       result => Ok(Json.toJson(result))
     )
