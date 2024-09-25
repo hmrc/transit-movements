@@ -217,15 +217,8 @@ class MovementsRepositoryImpl @Inject() (
         obs
           .headOption()
           .map {
-            case Some(opt) =>
-              Right(
-                opt.copy(isTransitional =
-                  opt.isTransitional.fold(true.some)(
-                    v => v.some
-                  )
-                )
-              )
-            case None => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+            case Some(opt) => Right(opt)
+            case None      => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
       case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
@@ -251,7 +244,7 @@ class MovementsRepositoryImpl @Inject() (
         obs
           .headOption()
           .map {
-            case Some(opt) => Right(opt)
+            case Some(opt) => Right(opt.copy(isTransitional = opt.isTransitional.fold(true.some)(_.some)))
             case None      => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
       case Failure(NonFatal(ex)) =>

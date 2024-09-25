@@ -264,8 +264,7 @@ trait ModelGenerators extends BaseGenerators {
         lrn                     <- arbitrary[Option[LocalReferenceNumber]]
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
-        isTransitional          <- arbitrary[Option[Boolean]]
-      } yield MongoMovementSummary(id, eori, movementEori, movementReferenceNumber, lrn, created, updated, isTransitional)
+      } yield MongoMovementSummary(id, eori, movementEori, movementReferenceNumber, lrn, created, updated)
     }
 
   implicit lazy val arbitraryMongoMovementEori: Arbitrary[MongoMovementEori] =

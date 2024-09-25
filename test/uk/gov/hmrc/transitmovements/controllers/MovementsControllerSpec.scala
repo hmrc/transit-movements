@@ -1544,7 +1544,7 @@ class MovementsControllerSpec
           )
             .thenReturn(
               EitherT.rightT(
-                MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))
               )
             )
 
@@ -1574,7 +1574,7 @@ class MovementsControllerSpec
           )
             .thenReturn(
               EitherT.rightT(
-                MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))
               )
             )
 
@@ -1636,7 +1636,7 @@ class MovementsControllerSpec
           )
             .thenReturn(
               EitherT.rightT(
-                MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                MovementWithoutMessages(movementId, eoriNumber, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))
               )
             )
 
@@ -2338,7 +2338,7 @@ class MovementsControllerSpec
             )
               .thenReturn(
                 EitherT.rightT(
-                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))
                 )
               )
 
@@ -2460,7 +2460,7 @@ class MovementsControllerSpec
             )
               .thenReturn(
                 EitherT.rightT(
-                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))
                 )
               )
 
@@ -2584,7 +2584,7 @@ class MovementsControllerSpec
             )
               .thenReturn(
                 EitherT.rightT(
-                  MovementWithoutMessages(movementId, eori, Some(eori), None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                  MovementWithoutMessages(movementId, eori, Some(eori), None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))
                 )
               )
 
@@ -2702,7 +2702,7 @@ class MovementsControllerSpec
             )
               .thenReturn(
                 EitherT.rightT(
-                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))
                 )
               )
 
@@ -2816,7 +2816,7 @@ class MovementsControllerSpec
           )
             .thenReturn(
               EitherT.rightT(
-                MovementWithoutMessages(movementId, eori, Some(eori), None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                MovementWithoutMessages(movementId, eori, Some(eori), None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))
               )
             )
 
@@ -2973,7 +2973,7 @@ class MovementsControllerSpec
             )
               .thenReturn(
                 EitherT.rightT(
-                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))
                 )
               )
 
@@ -3060,7 +3060,7 @@ class MovementsControllerSpec
             )
               .thenReturn(
                 EitherT.rightT(
-                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                  MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))
                 )
               )
 
@@ -3182,7 +3182,7 @@ class MovementsControllerSpec
           )
             .thenReturn(
               EitherT.rightT(
-                MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock), isTransitional = true)
+                MovementWithoutMessages(movementId, eori, None, None, None, OffsetDateTime.now(clock), OffsetDateTime.now(clock))
               )
             )
 

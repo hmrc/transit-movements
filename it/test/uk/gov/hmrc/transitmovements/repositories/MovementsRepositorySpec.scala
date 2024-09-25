@@ -16,6 +16,7 @@
 
 package test.uk.gov.hmrc.transitmovements.repositories
 
+import cats.implicits.catsSyntaxOptionId
 import org.mockito.Mockito
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Aggregates
@@ -120,8 +121,7 @@ class MovementsRepositorySpec
       original.movementReferenceNumber,
       original.localReferenceNumber,
       original.created,
-      original.updated,
-      original.isTransitional
+      original.updated
     )
 
   def expectedMovementWithEori(original: MongoMovement): MongoMovementEori =
@@ -223,6 +223,13 @@ class MovementsRepositorySpec
     result.toOption.get should be(expectedMovementSummary(movement))
   }
 
+  "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists with the 'isTransitional' flag not populated" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = None)
+    await(repository.insert(movement).value)
+    val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
+    result.toOption.get should be(expectedMovementSummary(movement))
+  }
+
   "getMovementWithoutMessages" should "return none if the movement doesn't exist" in {
     val movement = arbitrary[MongoMovement].sample.value.copy(_id = MovementId("1"))
 
@@ -240,6 +247,15 @@ class MovementsRepositorySpec
 
     val result = await(repository.getMovementEori(movement._id).value)
     result.toOption.get should be(expectedMovementWithEori(movement))
+  }
+
+  "getMovementEori" should "return MovementWithEori if it exists with the 'isTransitional' flag not populated" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = None)
+
+    await(repository.insert(movement).value)
+
+    val result = await(repository.getMovementEori(movement._id).value)
+    result.toOption.get should be(expectedMovementWithEori(movement.copy(isTransitional = true.some)))
   }
 
   "getMovementEori" should "return none if the movement doesn't exist" in {

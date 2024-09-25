@@ -36,5 +36,4 @@ object MovementWithEori {
       movement.clientId,
       movement.isTransitional
     )
-
 }
