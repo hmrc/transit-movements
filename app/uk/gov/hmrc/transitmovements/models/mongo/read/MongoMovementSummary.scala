@@ -36,8 +36,7 @@ object MongoMovementSummary {
       "movementReferenceNumber" -> 1,
       "localReferenceNumber"    -> 1,
       "created"                 -> 1,
-      "updated"                 -> 1,
-      "isTransitional"          -> 1
+      "updated"                 -> 1
     )
 }
 
