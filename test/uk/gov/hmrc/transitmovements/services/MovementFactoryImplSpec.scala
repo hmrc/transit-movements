@@ -112,7 +112,7 @@ class MovementFactoryImplSpec
             instant,
             instant,
             clientId,
-            isTransitional = true //TODO: check if we should improve this
+            isTransitional = true
           )
 
         arrival.messages.length mustBe 1
@@ -136,7 +136,7 @@ class MovementFactoryImplSpec
     ) {
       (movementType, enrollmentEori, message, clientId) =>
         val movement =
-          sut.createEmptyMovement(enrollmentEori, movementType, message, instant, instant, clientId, isTransitional = true) //TODO: check if we can improve this
+          sut.createEmptyMovement(enrollmentEori, movementType, message, instant, instant, clientId, isTransitional = true)
 
         movement.movementType mustBe movementType
         movement.messages.length mustBe 1
