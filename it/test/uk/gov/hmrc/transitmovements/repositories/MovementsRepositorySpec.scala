@@ -16,6 +16,7 @@
 
 package test.uk.gov.hmrc.transitmovements.repositories
 
+import cats.implicits.catsSyntaxOptionId
 import org.mockito.Mockito
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Aggregates
@@ -30,19 +31,16 @@ import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.Application
 import play.api.Logging
-import play.api.inject
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.DefaultAwaitTimeout
 import play.api.test.FutureAwaits
 import test.uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.Decrypter
 import uk.gov.hmrc.crypto.Encrypter
-import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.SymmetricCryptoFactory
-import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
-import uk.gov.hmrc.play.bootstrap.http.HttpClientV2Provider
 import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
@@ -130,7 +128,8 @@ class MovementsRepositorySpec
     MongoMovementEori(
       original._id,
       original.enrollmentEORINumber,
-      original.clientId
+      original.clientId,
+      original.isTransitional
     )
 
   "DepartureMovementRepository" should "have the correct name" in {
@@ -212,6 +211,7 @@ class MovementsRepositorySpec
     firstItem._id.value should be(emptyMovement._id.value)
     firstItem.movementEORINumber should be(None)
     firstItem.messages.isEmpty should be(true)
+    firstItem.isTransitional should be(emptyMovement.isTransitional)
   }
 
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists" in {
@@ -219,6 +219,13 @@ class MovementsRepositorySpec
 
     await(repository.insert(movement).value)
 
+    val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
+    result.toOption.get should be(expectedMovementSummary(movement))
+  }
+
+  "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists with the 'isTransitional' flag not populated" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = None)
+    await(repository.insert(movement).value)
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
     result.toOption.get should be(expectedMovementSummary(movement))
   }
@@ -240,6 +247,15 @@ class MovementsRepositorySpec
 
     val result = await(repository.getMovementEori(movement._id).value)
     result.toOption.get should be(expectedMovementWithEori(movement))
+  }
+
+  "getMovementEori" should "return MovementWithEori if it exists with the 'isTransitional' flag not populated" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = None)
+
+    await(repository.insert(movement).value)
+
+    val result = await(repository.getMovementEori(movement._id).value)
+    result.toOption.get should be(expectedMovementWithEori(movement.copy(isTransitional = true.some)))
   }
 
   "getMovementEori" should "return none if the movement doesn't exist" in {

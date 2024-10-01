@@ -29,5 +29,6 @@ case class Movement(
   created: OffsetDateTime,
   updated: OffsetDateTime,
   messages: Vector[Message],
-  clientId: Option[ClientId]
+  clientId: Option[ClientId],
+  isTransitional: Boolean
 )

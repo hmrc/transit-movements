@@ -29,21 +29,24 @@ object MongoMovementEori {
     BsonDocument(
       "_id"                  -> 1,
       "enrollmentEORINumber" -> 1,
-      "clientId"             -> 1
+      "clientId"             -> 1,
+      "isTransitional"       -> 1
     )
 }
 
 case class MongoMovementEori(
   _id: MovementId,
   enrollmentEORINumber: EORINumber,
-  clientId: Option[ClientId]
+  clientId: Option[ClientId],
+  isTransitional: Option[Boolean]
 ) {
 
   @transient lazy val movementWithEori: MovementWithEori =
     MovementWithEori(
       _id,
       enrollmentEORINumber,
-      clientId
+      clientId,
+      isTransitional.getOrElse(true)
     )
 
 }
