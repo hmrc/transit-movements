@@ -16,11 +16,11 @@
 
 package uk.gov.hmrc.transitmovements.runtime
 
-import org.mockito.MockitoSugar.mock
-import org.mockito.MockitoSugar.when
+import org.mockito.Mockito.when
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.crypto.AesGCMCrypto
 import uk.gov.hmrc.crypto.Crypted
@@ -32,7 +32,7 @@ import uk.gov.hmrc.transitmovements.config.AppConfig
 
 import java.nio.charset.StandardCharsets
 
-class CryptoModuleSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPropertyChecks {
+class CryptoModuleSpec extends AnyFreeSpec with MockitoSugar with Matchers with ScalaCheckDrivenPropertyChecks {
 
   "provideCrypto" - {
     "returns aesGcmCrypto by default" in {
@@ -59,7 +59,7 @@ class CryptoModuleSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPr
     val config = mock[AppConfig]
     when(config.encryptionEnabled).thenReturn(false)
 
-    val noCrypto: Encrypter with Decrypter = new CryptoModule().provideCrypto(config)
+    val noCrypto: Encrypter & Decrypter = new CryptoModule().provideCrypto(config)
 
     "encrypt does not encrypt a string" in forAll(Gen.alphaNumStr) {
       string =>

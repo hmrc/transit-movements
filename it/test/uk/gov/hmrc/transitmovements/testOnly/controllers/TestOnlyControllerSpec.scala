@@ -16,16 +16,17 @@
 
 package test.uk.gov.hmrc.transitmovements.testOnly.controllers
 
-import org.mockito.scalatest.MockitoSugar
+import org.mockito.Mockito.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.test.DefaultAwaitTimeout
 import play.api.test.FakeRequest
 import play.api.test.FutureAwaits
-import play.api.test.Helpers._
+import play.api.test.Helpers.*
 import test.uk.gov.hmrc.transitmovements.it.generators.ModelGenerators
 import uk.gov.hmrc.crypto.Decrypter
 import uk.gov.hmrc.crypto.Encrypter
@@ -60,7 +61,7 @@ class TestOnlyControllerSpec
     MongoComponent(mongoUri)
   }
 
-  implicit val crypto: Encrypter with Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
+  implicit val crypto: Encrypter & Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
   val mongoFormats: MongoFormats                = new MongoFormats(appConfig)
   val MongoFormats                              = new MongoFormats(appConfig)
 

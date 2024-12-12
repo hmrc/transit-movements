@@ -20,6 +20,7 @@ import cats.implicits.catsSyntaxOptionId
 import org.mockito.Mockito
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Aggregates
+import org.mongodb.scala.SingleObservableFuture
 import org.mongodb.scala.model.Filters
 import org.mongodb.scala.model.Indexes
 import org.scalacheck.Arbitrary.arbitrary
@@ -52,6 +53,7 @@ import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl
+import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl._
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.time.OffsetDateTime
@@ -89,7 +91,7 @@ class MovementsRepositorySpec
     .build()
   private val appConfig = Mockito.spy(app.injector.instanceOf[AppConfig])
 
-  implicit val crypto: Encrypter with Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
+  implicit val crypto: Encrypter & Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
   val mongoFormats: MongoFormats                = new MongoFormats(appConfig)
 
   override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, mongoFormats)
@@ -160,10 +162,10 @@ class MovementsRepositorySpec
     val message   = arbitrary[MongoMessage].sample.get.copy(body = Some(SensitiveString(body)))
     val departure = arbitrary[MongoMovement].sample.value.copy(_id = MovementId("2"), messages = Vector(message))
     await(
-      repository.insert(departure).value
+      repository.collection.insertOne(departure).toFuture()
     )
 
-    val firstItem = await {
+    val firstItem: MongoMovement = await {
       repository.collection.find(Filters.eq("_id", departure._id.value)).first().toFuture()
     }
 
@@ -201,7 +203,7 @@ class MovementsRepositorySpec
     )
 
     await(
-      repository.insert(emptyMovement).value
+      repository.collection.insertOne(emptyMovement).toFuture()
     )
 
     val firstItem = await {
@@ -217,7 +219,7 @@ class MovementsRepositorySpec
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists" in {
     val movement = arbitrary[MongoMovement].sample.value
 
-    await(repository.insert(movement).value)
+    await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
     result.toOption.get should be(expectedMovementSummary(movement))
@@ -225,7 +227,7 @@ class MovementsRepositorySpec
 
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists with the 'isTransitional' flag not populated" in {
     val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = None)
-    await(repository.insert(movement).value)
+    await(repository.collection.insertOne(movement).toFuture())
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
     result.toOption.get should be(expectedMovementSummary(movement))
   }
@@ -233,7 +235,7 @@ class MovementsRepositorySpec
   "getMovementWithoutMessages" should "return none if the movement doesn't exist" in {
     val movement = arbitrary[MongoMovement].sample.value.copy(_id = MovementId("1"))
 
-    await(repository.insert(movement).value)
+    await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, MovementId("2"), movement.movementType).value)
 
@@ -243,7 +245,7 @@ class MovementsRepositorySpec
   "getMovementEori" should "return MovementWithEori if it exists" in {
     val movement = arbitrary[MongoMovement].sample.value
 
-    await(repository.insert(movement).value)
+    await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementEori(movement._id).value)
     result.toOption.get should be(expectedMovementWithEori(movement))
@@ -252,7 +254,7 @@ class MovementsRepositorySpec
   "getMovementEori" should "return MovementWithEori if it exists with the 'isTransitional' flag not populated" in {
     val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = None)
 
-    await(repository.insert(movement).value)
+    await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementEori(movement._id).value)
     result.toOption.get should be(expectedMovementWithEori(movement.copy(isTransitional = true.some)))
@@ -261,7 +263,7 @@ class MovementsRepositorySpec
   "getMovementEori" should "return none if the movement doesn't exist" in {
     val movement = arbitrary[MongoMovement].sample.value.copy(_id = MovementId("1"))
 
-    await(repository.insert(movement).value)
+    await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementEori(MovementId("2")).value)
 
@@ -286,7 +288,7 @@ class MovementsRepositorySpec
           messages = Vector(message1)
         )
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, message1.id, departure.movementType).value)
     result.toOption.get should be(expectedMessageSummaryWithBody(message1))
@@ -311,7 +313,7 @@ class MovementsRepositorySpec
           messages = Vector(message1)
         )
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, departure.messages.head.id, departure.movementType).value)
     result.toOption.get should be(expectedMessageSummaryWithBody(departure.messages.head))
@@ -320,7 +322,7 @@ class MovementsRepositorySpec
   "getSingleMessage" should "return none if the message doesn't exist" in {
     val departure = arbitrary[MongoMovement].sample.value
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result = await(repository.getSingleMessage(departure.enrollmentEORINumber, departure._id, MessageId("X"), departure.movementType).value)
     result.toOption.isEmpty should be(true)
@@ -336,7 +338,7 @@ class MovementsRepositorySpec
 
     val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None).value)
 
@@ -356,7 +358,7 @@ class MovementsRepositorySpec
 
     val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, Some(dateTime)).value)
 
@@ -378,7 +380,7 @@ class MovementsRepositorySpec
 
     val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result = await(repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, None, None, Some(dateTime)).value)
 
@@ -400,7 +402,7 @@ class MovementsRepositorySpec
 
     val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result = await(
       repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, None, Some(ItemCount(2)), None).value
@@ -424,7 +426,7 @@ class MovementsRepositorySpec
 
     val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result = await(
       repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(2)), Some(ItemCount(2)), None).value
@@ -448,7 +450,7 @@ class MovementsRepositorySpec
 
     val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result = await(
       repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(3)), Some(ItemCount(2)), None).value
@@ -472,7 +474,7 @@ class MovementsRepositorySpec
 
     val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result = await(
       repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(4)), Some(ItemCount(2)), None).value
@@ -496,7 +498,7 @@ class MovementsRepositorySpec
 
     val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result = await(
       repository.getMessages(departure.enrollmentEORINumber, departure._id, departure.movementType, None, Some(PageNumber(5)), Some(ItemCount(2)), None).value
@@ -517,7 +519,7 @@ class MovementsRepositorySpec
 
     val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result =
       await(
@@ -552,7 +554,7 @@ class MovementsRepositorySpec
 
     val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
 
-    await(repository.insert(departure).value)
+    await(repository.collection.insertOne(departure).toFuture())
 
     val result =
       await(
@@ -601,7 +603,7 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements that were updated since the given time" in {
     val dateTime = instant
     GetMovementsSetup.setup()
-    await(repository.insert(GetMovementsSetup.departureGB3).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime), None, None, None, None, None, None).value)
 
     val paginationMovementSummary = result.toOption.get
@@ -619,7 +621,7 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements that were received up until the given time" in {
     val dateTime = instant
     GetMovementsSetup.setup()
-    await(repository.insert(GetMovementsSetup.departureGB3).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, None, None, Some(dateTime), None).value)
 
     val paginationMovementSummary = result.toOption.get
@@ -637,10 +639,10 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements between the updated since and the received until times" in {
     val dateTime = instant
     GetMovementsSetup.setup()
-    await(repository.insert(GetMovementsSetup.departureGB3).value)
-    await(repository.insert(GetMovementsSetup.departureGB7).value)
-    await(repository.insert(GetMovementsSetup.departureGB10).value)
-    await(repository.insert(GetMovementsSetup.departureGB11).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB7).toFuture())
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB10).toFuture())
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB11).toFuture())
 
     val result = await(
       repository
@@ -675,10 +677,10 @@ class MovementsRepositorySpec
   it should "return no movement responses for the supplied EORI, if updated since is after received until" in {
     val dateTime = instant
     GetMovementsSetup.setup()
-    await(repository.insert(GetMovementsSetup.departureGB3).value)
-    await(repository.insert(GetMovementsSetup.departureGB7).value)
-    await(repository.insert(GetMovementsSetup.departureGB10).value)
-    await(repository.insert(GetMovementsSetup.departureGB11).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB7).toFuture())
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB10).toFuture())
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB11).toFuture())
 
     val result = await(
       repository
@@ -707,7 +709,7 @@ class MovementsRepositorySpec
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed movementEORI" in {
     GetMovementsSetup.setup()
-    await(repository.insert(GetMovementsSetup.departureGB4).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB4).toFuture())
     val result = await(
       repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, Some(GetMovementsSetup.movementEORI), None, None, None, None, None).value
     )
@@ -894,7 +896,7 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements that were updated since the given time and passed movementEORI" in {
     val dateTime = instant
     GetMovementsSetup.setup()
-    await(repository.insert(GetMovementsSetup.departureGB3).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
     val result =
       await(
         repository
@@ -918,8 +920,8 @@ class MovementsRepositorySpec
     val dateTime = instant
 
     GetMovementsSetup.setup()
-    await(repository.insert(GetMovementsSetup.departureGB3).value)
-    await(repository.insert(GetMovementsSetup.departureGB10).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB10).toFuture())
     val result =
       await(
         repository
@@ -943,8 +945,8 @@ class MovementsRepositorySpec
     val dateTime = instant
 
     GetMovementsSetup.setup()
-    await(repository.insert(GetMovementsSetup.departureGB3).value)
-    await(repository.insert(GetMovementsSetup.departureGB10).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB10).toFuture())
     val result =
       await(
         repository
@@ -977,7 +979,7 @@ class MovementsRepositorySpec
   }
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed MRN" in {
-    await(repository.insert(GetMovementsSetup.departureGB4).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB4).toFuture())
     val result =
       await(
         repository
@@ -1007,8 +1009,8 @@ class MovementsRepositorySpec
   }
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with partial match MRN" in {
-    await(repository.insert(GetMovementsSetup.departureGB5).value)
-    await(repository.insert(GetMovementsSetup.departureGB6).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB5).toFuture())
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB6).toFuture())
     val result =
       await(
         repository
@@ -1029,7 +1031,7 @@ class MovementsRepositorySpec
   }
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed LRN" in {
-    await(repository.insert(GetMovementsSetup.departureGB4).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB4).toFuture())
     val result =
       await(
         repository
@@ -1056,8 +1058,8 @@ class MovementsRepositorySpec
   }
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with partial match LRN" in {
-    await(repository.insert(GetMovementsSetup.departureGB5).value)
-    await(repository.insert(GetMovementsSetup.departureGB6).value)
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB5).toFuture())
+    await(repository.collection.insertOne(GetMovementsSetup.departureGB6).toFuture())
     val result =
       await(
         repository
@@ -1128,7 +1130,7 @@ class MovementsRepositorySpec
   it should "return a list of an arrival movement responses for the supplied EORI if there are movements that were updated since the given time" in {
     val dateTime = instant
     GetMovementsSetup.setup()
-    await(repository.insert(GetMovementsSetup.arrivalGB3).value)
+    await(repository.collection.insertOne(GetMovementsSetup.arrivalGB3).toFuture())
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), None, None, localReferenceNumber = None).value)
 
     val paginationMovementSummary = result.toOption.get
@@ -1145,7 +1147,7 @@ class MovementsRepositorySpec
 
   it should "return a list of an arrival movement responses for the supplied EORI if there are movements that matched with passed movementEORI" in {
     GetMovementsSetup.setup()
-    await(repository.insert(GetMovementsSetup.arrivalGB4).value)
+    await(repository.collection.insertOne(GetMovementsSetup.arrivalGB4).toFuture())
     val result = await(
       repository
         .getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, Some(GetMovementsSetup.movementEORI), None, localReferenceNumber = None)
@@ -1167,7 +1169,7 @@ class MovementsRepositorySpec
   it should "return a list of an arrival movement responses for the supplied EORI if there are movements that were updated since the given time and passed movementEORI" in {
     val dateTime = instant
     GetMovementsSetup.setup()
-    await(repository.insert(GetMovementsSetup.arrivalGB3).value)
+    await(repository.collection.insertOne(GetMovementsSetup.arrivalGB3).toFuture())
     val result =
       await(
         repository
@@ -1188,7 +1190,7 @@ class MovementsRepositorySpec
   }
 
   it should "return a list of arrival movement responses for the supplied EORI if there are movements that matched with passed MRN" in {
-    await(repository.insert(GetMovementsSetup.arrivalGB3).value)
+    await(repository.collection.insertOne(GetMovementsSetup.arrivalGB3).toFuture())
     val result =
       await(
         repository
@@ -1218,8 +1220,8 @@ class MovementsRepositorySpec
   }
 
   it should "return a list of arrival movement responses for the supplied EORI if there are movements that matched with partial match MRN" in {
-    await(repository.insert(GetMovementsSetup.arrivalGB5).value)
-    await(repository.insert(GetMovementsSetup.arrivalGB6).value)
+    await(repository.collection.insertOne(GetMovementsSetup.arrivalGB5).toFuture())
+    await(repository.collection.insertOne(GetMovementsSetup.arrivalGB6).toFuture())
     val result =
       await(
         repository
@@ -1651,13 +1653,14 @@ class MovementsRepositorySpec
 
     def setup(): Either[MongoError, Unit] = {
       //populate db in non-time order
-      await(repository.insert(departureXi2).value)
-      await(repository.insert(departureGB2).value)
-      await(repository.insert(departureXi1).value)
-      await(repository.insert(departureGB1).value)
 
-      await(repository.insert(arrivalGB2).value)
-      await(repository.insert(arrivalGB1).value)
+      await(repository.collection.insertOne(departureXi2).toFuture())
+      await(repository.collection.insertOne(departureGB2).toFuture())
+      await(repository.collection.insertOne(departureXi1).toFuture())
+      await(repository.collection.insertOne(departureGB1).toFuture())
+
+      await(repository.collection.insertOne(arrivalGB2).toFuture())
+      await(repository.collection.insertOne(arrivalGB1).toFuture())
     }
 
     def setupMessages(dateTime: OffsetDateTime): Vector[MongoMessage] =
@@ -1686,24 +1689,24 @@ class MovementsRepositorySpec
       // for each GBXX, the XX represents both the id and the plus minutes, so expected order can be determined in tests.
       // add various non-departure and non-GB movements; populate db in non-time order
 
-      await(repository.insert(GetMovementsSetup.departureGB19).value)
-      await(repository.insert(GetMovementsSetup.departureGB21).value)
-      await(repository.insert(GetMovementsSetup.departureGB4).value)
-      await(repository.insert(GetMovementsSetup.departureGB30).value)
-      await(repository.insert(GetMovementsSetup.arrivalGB5).value)
-      await(repository.insert(GetMovementsSetup.departureXi1).value)
-      await(repository.insert(GetMovementsSetup.departureGB22).value)
-      await(repository.insert(GetMovementsSetup.departureGB27).value)
-      await(repository.insert(GetMovementsSetup.departureGB20).value)
-      await(repository.insert(GetMovementsSetup.departureGB24).value)
-      await(repository.insert(GetMovementsSetup.departureGB31).value)
-      await(repository.insert(GetMovementsSetup.departureXi2).value)
-      await(repository.insert(GetMovementsSetup.arrivalGB2).value)
-      await(repository.insert(GetMovementsSetup.departureGB29).value)
-      await(repository.insert(GetMovementsSetup.departureGB25).value)
-      await(repository.insert(GetMovementsSetup.departureGB26).value)
-      await(repository.insert(GetMovementsSetup.departureGB28).value)
-      await(repository.insert(GetMovementsSetup.departureGB23).value)
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB19).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB21).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB4).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB30).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.arrivalGB5).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureXi1).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB22).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB27).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB20).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB24).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB31).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureXi2).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.arrivalGB2).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB29).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB25).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB26).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB28).toFuture())
+      await(repository.collection.insertOne(GetMovementsSetup.departureGB23).toFuture())
     }
 
   }
@@ -1722,7 +1725,7 @@ class MovementsRepositorySpec
         )
 
     await(
-      repository.insert(departure).value
+      repository.collection.insertOne(departure).toFuture()
     )
 
     val message2 =
@@ -1767,7 +1770,7 @@ class MovementsRepositorySpec
         )
 
     await(
-      repository.insert(departure).value
+      repository.collection.insertOne(departure).toFuture()
     )
 
     val message2 =
@@ -1833,7 +1836,7 @@ class MovementsRepositorySpec
         )
 
     await(
-      repository.insert(departureMovement).value
+      repository.collection.insertOne(departureMovement).toFuture()
     )
 
     val updateData = MongoMessageUpdateData(
@@ -1881,7 +1884,7 @@ class MovementsRepositorySpec
         )
 
     await(
-      repository.insert(departureMovement).value
+      repository.collection.insertOne(departureMovement).toFuture()
     )
 
     val updateMessageData = MongoMessageUpdateData(
@@ -1929,7 +1932,7 @@ class MovementsRepositorySpec
         )
 
     await(
-      repository.insert(departureMovement).value
+      repository.collection.insertOne(departureMovement).toFuture()
     )
 
     val updateMessageData = MongoMessageUpdateData(
@@ -1977,7 +1980,7 @@ class MovementsRepositorySpec
         )
 
     await(
-      repository.insert(departureMovement).value
+      repository.collection.insertOne(departureMovement).toFuture()
     )
 
     val updateMessageData = MongoMessageUpdateData(
@@ -2030,7 +2033,7 @@ class MovementsRepositorySpec
         )
 
     await(
-      repository.insert(departureMovement).value
+      repository.collection.insertOne(departureMovement).toFuture()
     )
 
     val now = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS)
