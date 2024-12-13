@@ -51,7 +51,7 @@ class TestOnlyControllerSpec
     with MockitoSugar {
 
   val appConfig: AppConfig = mock[AppConfig]
-  when(appConfig.documentTtl).thenReturn(1000000) // doesn't matter, just something will do
+  when(appConfig.documentTtl).thenReturn(1000000L) // doesn't matter, just something will do
   when(appConfig.encryptionTolerantRead).thenReturn(true)
   when(appConfig.encryptionKey).thenReturn("7CYXDDh/UbNDY1UV8bkxvTzur3pCUzsAvMVH+HsRWbY=")
 
@@ -62,8 +62,8 @@ class TestOnlyControllerSpec
   }
 
   implicit val crypto: Encrypter & Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
-  val mongoFormats: MongoFormats                = new MongoFormats(appConfig)
-  val MongoFormats                              = new MongoFormats(appConfig)
+  val mongoFormats: MongoFormats             = new MongoFormats(appConfig)
+  val MongoFormats                           = new MongoFormats(appConfig)
 
   lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, mongoFormats)
   lazy val Repository = new MovementsRepositoryImpl(appConfig, mongoComponent, MongoFormats)

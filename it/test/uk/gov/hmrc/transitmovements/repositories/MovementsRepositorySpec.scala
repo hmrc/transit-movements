@@ -53,7 +53,6 @@ import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl
-import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl._
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.time.OffsetDateTime
@@ -92,9 +91,9 @@ class MovementsRepositorySpec
   private val appConfig = Mockito.spy(app.injector.instanceOf[AppConfig])
 
   implicit val crypto: Encrypter & Decrypter = SymmetricCryptoFactory.aesGcmCrypto(appConfig.encryptionKey)
-  val mongoFormats: MongoFormats                = new MongoFormats(appConfig)
+  val mongoFormats: MongoFormats             = new MongoFormats(appConfig)
 
-  override lazy val repository = new MovementsRepositoryImpl(appConfig, mongoComponent, mongoFormats)
+  override val repository: MovementsRepositoryImpl = new MovementsRepositoryImpl(appConfig, mongoComponent, mongoFormats)
 
   // helper methods
   def expectedMessageMetadata(original: MongoMessage): MongoMessageMetadata =
@@ -228,8 +227,9 @@ class MovementsRepositorySpec
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists with the 'isTransitional' flag not populated" in {
     val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = None)
     await(repository.collection.insertOne(movement).toFuture())
+
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
-    result.toOption.get should be(expectedMovementSummary(movement))
+    result.toOption.get shouldBe expectedMovementSummary(movement)
   }
 
   "getMovementWithoutMessages" should "return none if the movement doesn't exist" in {
@@ -1654,13 +1654,12 @@ class MovementsRepositorySpec
     def setup(): Either[MongoError, Unit] = {
       //populate db in non-time order
 
-      await(repository.collection.insertOne(departureXi2).toFuture())
-      await(repository.collection.insertOne(departureGB2).toFuture())
-      await(repository.collection.insertOne(departureXi1).toFuture())
-      await(repository.collection.insertOne(departureGB1).toFuture())
-
-      await(repository.collection.insertOne(arrivalGB2).toFuture())
-      await(repository.collection.insertOne(arrivalGB1).toFuture())
+      await(repository.insert(departureXi2).value)
+      await(repository.insert(departureGB2).value)
+      await(repository.insert(departureXi1).value)
+      await(repository.insert(departureGB1).value)
+      await(repository.insert(arrivalGB2).value)
+      await(repository.insert(arrivalGB1).value)
     }
 
     def setupMessages(dateTime: OffsetDateTime): Vector[MongoMessage] =
@@ -1689,24 +1688,24 @@ class MovementsRepositorySpec
       // for each GBXX, the XX represents both the id and the plus minutes, so expected order can be determined in tests.
       // add various non-departure and non-GB movements; populate db in non-time order
 
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB19).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB21).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB4).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB30).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.arrivalGB5).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureXi1).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB22).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB27).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB20).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB24).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB31).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureXi2).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.arrivalGB2).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB29).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB25).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB26).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB28).toFuture())
-      await(repository.collection.insertOne(GetMovementsSetup.departureGB23).toFuture())
+      await(repository.insert(GetMovementsSetup.departureGB19).value)
+      await(repository.insert(GetMovementsSetup.departureGB21).value)
+      await(repository.insert(GetMovementsSetup.departureGB4).value)
+      await(repository.insert(GetMovementsSetup.departureGB30).value)
+      await(repository.insert(GetMovementsSetup.arrivalGB5).value)
+      await(repository.insert(GetMovementsSetup.departureXi1).value)
+      await(repository.insert(GetMovementsSetup.departureGB22).value)
+      await(repository.insert(GetMovementsSetup.departureGB27).value)
+      await(repository.insert(GetMovementsSetup.departureGB20).value)
+      await(repository.insert(GetMovementsSetup.departureGB24).value)
+      await(repository.insert(GetMovementsSetup.departureGB31).value)
+      await(repository.insert(GetMovementsSetup.departureXi2).value)
+      await(repository.insert(GetMovementsSetup.arrivalGB2).value)
+      await(repository.insert(GetMovementsSetup.departureGB29).value)
+      await(repository.insert(GetMovementsSetup.departureGB25).value)
+      await(repository.insert(GetMovementsSetup.departureGB26).value)
+      await(repository.insert(GetMovementsSetup.departureGB28).value)
+      await(repository.insert(GetMovementsSetup.departureGB23).value)
     }
 
   }
