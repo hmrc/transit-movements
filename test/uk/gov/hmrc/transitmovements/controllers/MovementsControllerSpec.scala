@@ -87,7 +87,7 @@ import scala.concurrent.duration.DurationInt
 import scala.xml.NodeSeq
 
 class MovementsControllerSpec
-  extends SpecBase
+    extends SpecBase
     with TestActorSystem
     with Matchers
     with OptionValues
@@ -99,21 +99,21 @@ class MovementsControllerSpec
 
   implicit val timeout: Timeout = 5.seconds
 
-  val mockMessagesXmlParsingService: MessagesXmlParsingService = mock[MessagesXmlParsingService]
+  val mockMessagesXmlParsingService: MessagesXmlParsingService   = mock[MessagesXmlParsingService]
   val mockMovementsXmlParsingService: MovementsXmlParsingService = mock[MovementsXmlParsingService]
-  val mockPersistenceService: PersistenceService = mock[PersistenceService]
-  val mockMessageFactory: MessageService = mock[MessageService]
-  val mockMovementFactory: MovementFactory = mock[MovementFactory]
+  val mockPersistenceService: PersistenceService                 = mock[PersistenceService]
+  val mockMessageFactory: MessageService                         = mock[MessageService]
+  val mockMovementFactory: MovementFactory                       = mock[MovementFactory]
 
-  val mockObjectStoreService: ObjectStoreService = mock[ObjectStoreService]
+  val mockObjectStoreService: ObjectStoreService              = mock[ObjectStoreService]
   implicit val mockTemporaryFileCreator: TemporaryFileCreator = mock[TemporaryFileCreator]
-  val mockAppConfig: AppConfig = mock[AppConfig]
+  val mockAppConfig: AppConfig                                = mock[AppConfig]
 
   val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
 
   val movementId = arbitraryMovementId.arbitrary.sample.get
-  val messageId = arbitraryMessageId.arbitrary.sample.get
-  val triggerId = arbitraryMessageId.arbitrary.sample.get
+  val messageId  = arbitraryMessageId.arbitrary.sample.get
+  val triggerId  = arbitraryMessageId.arbitrary.sample.get
 
   when(mockMessageFactory.generateId()).thenReturn(messageId.value)
   when(mockMovementFactory.generateId()).thenReturn(movementId.value)
@@ -139,8 +139,8 @@ class MovementsControllerSpec
     super.afterEach()
   }
 
-  val instant: OffsetDateTime = OffsetDateTime.of(2022, 8, 26, 9, 0, 0, 0, ZoneOffset.UTC)
-  implicit val clock: Clock = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
+  val instant: OffsetDateTime         = OffsetDateTime.of(2022, 8, 26, 9, 0, 0, 0, ZoneOffset.UTC)
+  implicit val clock: Clock           = Clock.fixed(instant.toInstant, ZoneOffset.UTC)
   private val sourceManagementService = new SourceManagementServiceImpl()
 
   val controller =
@@ -157,13 +157,13 @@ class MovementsControllerSpec
     )
 
   def fakeRequest[A](
-                      method: String,
-                      body: A,
-                      movementId: MovementId,
-                      triggerId: Option[MessageId],
-                      messageType: Option[String],
-                      headers: FakeHeaders = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
-                    ): Request[A] =
+    method: String,
+    body: A,
+    movementId: MovementId,
+    triggerId: Option[MessageId],
+    messageType: Option[String],
+    headers: FakeHeaders = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
+  ): Request[A] =
     FakeRequest(
       method = method,
       uri = routes.MovementsController.updateMovement(movementId, triggerId).url,
@@ -181,16 +181,16 @@ class MovementsControllerSpec
         </CC015C>
 
       val validXmlStream: Source[ByteString, ?] = Source.single(ByteString(validXml.mkString))
-      val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-      val lrn: LocalReferenceNumber = arbitraryLRN.arbitrary.sample.get
-      val messageSender: MessageSender = arbitraryMessageSender.arbitrary.sample.get
-      val declarationData = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn, messageSender)
+      val eoriNumber: EORINumber                = arbitrary[EORINumber].sample.get
+      val lrn: LocalReferenceNumber             = arbitraryLRN.arbitrary.sample.get
+      val messageSender: MessageSender          = arbitraryMessageSender.arbitrary.sample.get
+      val declarationData                       = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn, messageSender)
 
       val departureDataEither: EitherT[Future, ParseError, DeclarationData] = EitherT.rightT(declarationData)
 
-      val received = OffsetDateTime.now(ZoneId.of("UTC"))
-      val uri = new URI("test")
-      val size = Gen.chooseNum[Long](1L, 25000L).sample.getOrElse(1L) // <- This is safer, as it handles None case
+      val received             = OffsetDateTime.now(ZoneId.of("UTC"))
+      val uri                  = new URI("test")
+      val size                 = Gen.chooseNum[Long](1L, 25000L).sample.getOrElse(1L) // <- This is safer, as it handles None case
       val messageId: MessageId = MessageId("0123456789abcdef")
       val message =
         Message(
@@ -210,7 +210,6 @@ class MovementsControllerSpec
 
       val tempFile = SingletonTemporaryFileCreator.create()
 
-
       val now: OffsetDateTime = OffsetDateTime.now
 
       val movement: Movement = arbitrary[Movement].sample.value.copy(
@@ -222,7 +221,6 @@ class MovementsControllerSpec
         messages = Vector(message),
         isTransitional = false
       )
-
 
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -275,7 +273,7 @@ class MovementsControllerSpec
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
         "movementId" -> movementId.value,
-        "messageId" -> messageId.value
+        "messageId"  -> messageId.value
       )
 
       verify(mockMessageFactory, times(1)).create(
@@ -303,17 +301,17 @@ class MovementsControllerSpec
         </CC015C>
 
       val validXmlStream: Source[ByteString, ?] = Source.single(ByteString(validXml.mkString))
-      val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-      val lrn: LocalReferenceNumber = arbitraryLRN.arbitrary.sample.get
-      val messageSender: MessageSender = arbitraryMessageSender.arbitrary.sample.get
-      val declarationData = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn, messageSender)
+      val eoriNumber: EORINumber                = arbitrary[EORINumber].sample.get
+      val lrn: LocalReferenceNumber             = arbitraryLRN.arbitrary.sample.get
+      val messageSender: MessageSender          = arbitraryMessageSender.arbitrary.sample.get
+      val declarationData                       = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn, messageSender)
 
       val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
         EitherT.rightT(declarationData)
 
-      val received = OffsetDateTime.now(ZoneId.of("UTC"))
-      val uri = new URI("test")
-      val size = Gen.chooseNum[Long](1L, 25000L).sample.getOrElse(1L) // <- This is safer, as it handles None case
+      val received             = OffsetDateTime.now(ZoneId.of("UTC"))
+      val uri                  = new URI("test")
+      val size                 = Gen.chooseNum[Long](1L, 25000L).sample.getOrElse(1L) // <- This is safer, as it handles None case
       val messageId: MessageId = MessageId("0123456789abcdef")
       val message =
         Message(
@@ -333,7 +331,6 @@ class MovementsControllerSpec
 
       val tempFile = SingletonTemporaryFileCreator.create()
 
-
       val now: OffsetDateTime = OffsetDateTime.now
 
       val movement: Movement = arbitrary[Movement].sample.value.copy(
@@ -345,7 +342,6 @@ class MovementsControllerSpec
         messages = Vector(message),
         isTransitional = true
       )
-
 
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -390,7 +386,7 @@ class MovementsControllerSpec
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
         "movementId" -> movementId.value,
-        "messageId" -> messageId.value
+        "messageId"  -> messageId.value
       )
 
       verify(mockMessageFactory, times(1)).create(
@@ -418,17 +414,17 @@ class MovementsControllerSpec
         </CC015C>
 
       val validXmlStream: Source[ByteString, ?] = Source.single(ByteString(validXml.mkString))
-      val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-      val lrn: LocalReferenceNumber = arbitraryLRN.arbitrary.sample.get
-      val messageSender: MessageSender = arbitraryMessageSender.arbitrary.sample.get
-      val declarationData = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn, messageSender)
+      val eoriNumber: EORINumber                = arbitrary[EORINumber].sample.get
+      val lrn: LocalReferenceNumber             = arbitraryLRN.arbitrary.sample.get
+      val messageSender: MessageSender          = arbitraryMessageSender.arbitrary.sample.get
+      val declarationData                       = DeclarationData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), lrn, messageSender)
 
       val departureDataEither: EitherT[Future, ParseError, DeclarationData] =
         EitherT.liftF(Future.successful(declarationData))
 
-      val received = OffsetDateTime.now(ZoneId.of("UTC"))
-      val uri = new URI("test")
-      val size = Gen.chooseNum[Long](1L, 25000L).sample.getOrElse(1L) // <- This is safer, as it handles None case
+      val received             = OffsetDateTime.now(ZoneId.of("UTC"))
+      val uri                  = new URI("test")
+      val size                 = Gen.chooseNum[Long](1L, 25000L).sample.getOrElse(1L) // <- This is safer, as it handles None case
       val messageId: MessageId = MessageId("0123456789abcdef")
       val message =
         Message(
@@ -448,7 +444,6 @@ class MovementsControllerSpec
 
       val tempFile = SingletonTemporaryFileCreator.create()
 
-
       val now: OffsetDateTime = OffsetDateTime.now
 
       val movement: Movement = arbitrary[Movement].sample.value.copy(
@@ -460,7 +455,6 @@ class MovementsControllerSpec
         messages = Vector(message),
         isTransitional = true
       )
-
 
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -514,7 +508,7 @@ class MovementsControllerSpec
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
         "movementId" -> movementId.value,
-        "messageId" -> messageId.value
+        "messageId"  -> messageId.value
       )
 
       verify(mockMessageFactory, times(1)).create(
@@ -543,7 +537,6 @@ class MovementsControllerSpec
 
         val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
 
-
         when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, ?]]))
           .thenReturn(EitherT.leftT[Future, DeclarationData](ParseError.NoElementFound("messageSender")))
 
@@ -556,7 +549,7 @@ class MovementsControllerSpec
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "BAD_REQUEST",
+          "code"    -> "BAD_REQUEST",
           "message" -> "Element messageSender not found"
         )
 
@@ -574,9 +567,7 @@ class MovementsControllerSpec
             <messageSender>XI1234</messageSender>
           </CC015C>
 
-
         val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-
 
         when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, ?]]))
           .thenReturn(EitherT.leftT[Future, DeclarationData](ParseError.TooManyElementsFound("messageSender")))
@@ -590,7 +581,7 @@ class MovementsControllerSpec
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "BAD_REQUEST",
+          "code"    -> "BAD_REQUEST",
           "message" -> "Found too many elements of type messageSender"
         )
 
@@ -612,7 +603,6 @@ class MovementsControllerSpec
 
         val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
 
-
         when(mockMovementsXmlParsingService.extractDeclarationData(any[Source[ByteString, ?]]))
           .thenReturn(
             EitherT.leftT[Future, DeclarationData](
@@ -629,7 +619,7 @@ class MovementsControllerSpec
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "BAD_REQUEST",
+          "code"    -> "BAD_REQUEST",
           "message" -> "Could not parse datetime for preparationDateAndTime: Text 'no' could not be parsed at index 0"
         )
 
@@ -665,7 +655,7 @@ class MovementsControllerSpec
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "INTERNAL_SERVER_ERROR",
+          "code"    -> "INTERNAL_SERVER_ERROR",
           "message" -> "Internal server error"
         )
 
@@ -694,10 +684,10 @@ class MovementsControllerSpec
     val validXmlStream = Source.single(ByteString(validXml.mkString))
 
     val mrn: MovementReferenceNumber = arbitraryMovementReferenceNumber.arbitrary.sample.get
-    val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
+    val eoriNumber: EORINumber       = arbitrary[EORINumber].sample.get
 
     val now: OffsetDateTime = OffsetDateTime.now
-    val arrivalData = ArrivalData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), mrn)
+    val arrivalData         = ArrivalData(Some(eoriNumber), OffsetDateTime.now(ZoneId.of("UTC")), mrn)
 
     val message: Message =
       arbitraryMessage.arbitrary.sample.get.copy(
@@ -779,7 +769,7 @@ class MovementsControllerSpec
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
         "movementId" -> movementId.value,
-        "messageId" -> messageId.value
+        "messageId"  -> messageId.value
       )
 
       verify(mockMessageFactory, times(1)).create(
@@ -801,7 +791,6 @@ class MovementsControllerSpec
     "must return OK if XML data extraction is successful and mark the movement as 'transitional' with a final header that does not specify 'final' as the value" in {
 
       val tempFile = SingletonTemporaryFileCreator.create()
-
 
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -857,7 +846,7 @@ class MovementsControllerSpec
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
         "movementId" -> movementId.value,
-        "messageId" -> messageId.value
+        "messageId"  -> messageId.value
       )
 
       verify(mockMessageFactory, times(1)).create(
@@ -879,7 +868,6 @@ class MovementsControllerSpec
     "must return OK if XML data extraction is successful and mark the movement as 'final' with a 'final' final header" in {
 
       val tempFile = SingletonTemporaryFileCreator.create()
-
 
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -934,7 +922,7 @@ class MovementsControllerSpec
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
         "movementId" -> movementId.value,
-        "messageId" -> messageId.value
+        "messageId"  -> messageId.value
       )
 
       verify(mockMessageFactory, times(1)).create(
@@ -961,7 +949,6 @@ class MovementsControllerSpec
         val elementNotFoundXml: NodeSeq =
           <CC007C></CC007C>
 
-
         when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, ?]]))
           .thenReturn(EitherT.leftT[Future, ArrivalData](ParseError.NoElementFound("messageSender")))
 
@@ -982,7 +969,7 @@ class MovementsControllerSpec
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "BAD_REQUEST",
+          "code"    -> "BAD_REQUEST",
           "message" -> "Element messageSender not found"
         )
 
@@ -999,7 +986,6 @@ class MovementsControllerSpec
             <messageSender>GB1234</messageSender>
             <messageSender>XI1234</messageSender>
           </CC007C>
-
 
         when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, ?]]))
           .thenReturn(EitherT.leftT[Future, ArrivalData](ParseError.TooManyElementsFound("messageSender")))
@@ -1020,7 +1006,7 @@ class MovementsControllerSpec
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "BAD_REQUEST",
+          "code"    -> "BAD_REQUEST",
           "message" -> "Found too many elements of type messageSender"
         )
 
@@ -1039,7 +1025,6 @@ class MovementsControllerSpec
           </CC007C>
 
         val cs: CharSequence = "no"
-
 
         when(mockMovementsXmlParsingService.extractArrivalData(any[Source[ByteString, ?]]))
           .thenReturn(
@@ -1064,7 +1049,7 @@ class MovementsControllerSpec
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "BAD_REQUEST",
+          "code"    -> "BAD_REQUEST",
           "message" -> "Could not parse datetime for preparationDateAndTime: Text 'no' could not be parsed at index 0"
         )
 
@@ -1099,7 +1084,7 @@ class MovementsControllerSpec
 
         //status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "INTERNAL_SERVER_ERROR",
+          "code"    -> "INTERNAL_SERVER_ERROR",
           "message" -> "Internal server error"
         )
 
@@ -1166,7 +1151,6 @@ class MovementsControllerSpec
       )
         .thenReturn(movement)
 
-
       when(mockPersistenceService.insertMovement(eqTo(movement)))
         .thenReturn(EitherT.liftF(Future.unit))
 
@@ -1176,7 +1160,7 @@ class MovementsControllerSpec
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
         "movementId" -> movementId.value,
-        "messageId" -> messageId.value
+        "messageId"  -> messageId.value
       )
 
       verify(mockInternalAuthActionProvider, times(1)).apply(
@@ -1199,7 +1183,6 @@ class MovementsControllerSpec
       )
         .thenReturn(movement)
 
-
       when(mockPersistenceService.insertMovement(eqTo(movement)))
         .thenReturn(EitherT.liftF(Future.unit))
 
@@ -1211,7 +1194,7 @@ class MovementsControllerSpec
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
         "movementId" -> movementId.value,
-        "messageId" -> messageId.value
+        "messageId"  -> messageId.value
       )
 
       verify(mockInternalAuthActionProvider, times(1)).apply(
@@ -1234,7 +1217,6 @@ class MovementsControllerSpec
       )
         .thenReturn(movement)
 
-
       when(mockPersistenceService.insertMovement(eqTo(movement)))
         .thenReturn(EitherT.liftF(Future.unit))
 
@@ -1246,7 +1228,7 @@ class MovementsControllerSpec
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.obj(
         "movementId" -> movementId.value,
-        "messageId" -> messageId.value
+        "messageId"  -> messageId.value
       )
 
       verify(mockInternalAuthActionProvider, times(1)).apply(
@@ -1256,7 +1238,6 @@ class MovementsControllerSpec
     }
 
     "must return INTERNAL_SERVICE_ERROR when insert fails" in {
-
 
       when(
         mockMovementFactory.createEmptyMovement(
@@ -1279,7 +1260,7 @@ class MovementsControllerSpec
 
       status(result) mustBe INTERNAL_SERVER_ERROR
       contentAsJson(result) mustBe Json.obj(
-        "code" -> "INTERNAL_SERVER_ERROR",
+        "code"    -> "INTERNAL_SERVER_ERROR",
         "message" -> "Insert failed"
       )
 
@@ -1317,7 +1298,6 @@ class MovementsControllerSpec
         val request = FakeRequest("GET", routes.MovementsController.getMovementWithoutMessages(eoriNumber, movementType, movementId).url)
 
         "must return OK if departure found" in {
-
 
           when(mockPersistenceService.getMovementWithoutMessages(EORINumber(any()), MovementId(any()), eqTo(movementType)))
             .thenReturn(EitherT.rightT[Future, MovementWithoutMessages](MovementWithoutMessages.fromMovement(movement)))
@@ -1365,7 +1345,7 @@ class MovementsControllerSpec
       "getMessage" - {
 
         val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-        val now: OffsetDateTime = OffsetDateTime.now
+        val now: OffsetDateTime    = OffsetDateTime.now
         val message: Message =
           arbitraryMessage.arbitrary.sample.get.copy(
             id = messageId,
@@ -1388,7 +1368,6 @@ class MovementsControllerSpec
         "must return OK if message found in the correct format" in {
           val messageResponse = MessageResponse.fromMessageWithBody(movement.messages.head)
 
-
           when(mockPersistenceService.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
             .thenReturn(EitherT.rightT[Future, MessageResponse](messageResponse))
 
@@ -1405,7 +1384,6 @@ class MovementsControllerSpec
 
         "must return OK along with uri if message found in the correct format" in {
           val messageResponse = MessageResponse.fromMessageWithoutBody(movement.messages.head)
-
 
           when(mockPersistenceService.getSingleMessage(EORINumber(any()), MovementId(any()), MessageId(any()), eqTo(movementType)))
             .thenReturn(EitherT.rightT[Future, MessageResponse](messageResponse))
@@ -1456,10 +1434,9 @@ class MovementsControllerSpec
 
         "must return OK and a list of message ids" in {
 
-
           val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-          val now: OffsetDateTime = OffsetDateTime.now
-          val request = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
+          val now: OffsetDateTime    = OffsetDateTime.now
+          val request                = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
           val message: Message =
             arbitraryMessage.arbitrary.sample.get.copy(
               id = messageId,
@@ -1480,9 +1457,8 @@ class MovementsControllerSpec
 
           val messageResponses = MessageResponse.fromMessageWithoutBody(movement.messages.head)
 
-          lazy val messageResponseList = Vector(messageResponses)
+          lazy val messageResponseList       = Vector(messageResponses)
           lazy val paginationMesssageSummary = PaginationMessageSummary(TotalCount(0), messageResponseList)
-
 
           when(
             mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
@@ -1509,8 +1485,7 @@ class MovementsControllerSpec
         "must return empty list if no messages found for given movement" in {
 
           val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-          val request = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
-
+          val request                = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
 
           when(
             mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
@@ -1550,7 +1525,7 @@ class MovementsControllerSpec
         "must return NOT_FOUND if no departure found" in {
 
           val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-          val request = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
+          val request                = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
 
           when(mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType)))
             .thenReturn(EitherT.leftT[Future, MovementWithoutMessages](MongoError.DocumentNotFound("test")))
@@ -1568,7 +1543,7 @@ class MovementsControllerSpec
         "must return INTERNAL_SERVER_ERROR when a database error is thrown" in {
 
           val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-          val request = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
+          val request                = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
 
           when(
             mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eoriNumber.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
@@ -1827,7 +1802,7 @@ class MovementsControllerSpec
 
     val validXmlStream = Source.single(ByteString(validXml.mkString))
 
-    val clientId: ClientId = arbClientId.arbitrary.sample.get
+    val clientId: ClientId  = arbClientId.arbitrary.sample.get
     val now: OffsetDateTime = OffsetDateTime.now
     val message: Message =
       arbitraryMessage.arbitrary.sample.get.copy(
@@ -1856,7 +1831,6 @@ class MovementsControllerSpec
     "must return OK if XML data extraction is successful" in {
 
       val tempFile = SingletonTemporaryFileCreator.create()
-
 
       when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -1929,7 +1903,7 @@ class MovementsControllerSpec
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "BAD_REQUEST",
+          "code"    -> "BAD_REQUEST",
           "message" -> "Could not parse datetime for preparationDateAndTime: Text 'invalid' could not be parsed at index 0"
         )
 
@@ -1961,7 +1935,6 @@ class MovementsControllerSpec
         )
           .thenReturn(messageFactoryEither)
 
-
         when(
           mockPersistenceService.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime])
         )
@@ -1974,7 +1947,7 @@ class MovementsControllerSpec
 
         status(result) mustBe NOT_FOUND
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "NOT_FOUND",
+          "code"    -> "NOT_FOUND",
           "message" -> s"No departure found with the given id: ${movementId.value}"
         )
 
@@ -1987,7 +1960,6 @@ class MovementsControllerSpec
       "contains message to indicate message type header not supplied" in {
 
         val tempFile = SingletonTemporaryFileCreator.create()
-
 
         when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -2005,7 +1977,7 @@ class MovementsControllerSpec
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "BAD_REQUEST",
+          "code"    -> "BAD_REQUEST",
           "message" -> "Missing X-Message-Type header value"
         )
 
@@ -2018,7 +1990,6 @@ class MovementsControllerSpec
       "contains message to indicate the given message type is invalid" in {
 
         val tempFile = SingletonTemporaryFileCreator.create()
-
 
         when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -2037,7 +2008,7 @@ class MovementsControllerSpec
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "BAD_REQUEST",
+          "code"    -> "BAD_REQUEST",
           "message" -> "Invalid X-Message-Type header value: invalid"
         )
 
@@ -2056,7 +2027,6 @@ class MovementsControllerSpec
         val unknownErrorXml: String =
           "<CC007C><messageSender/>GB1234"
 
-
         when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], any[MessageType]))
           .thenReturn(EitherT.leftT[Future, MessageData](ParseError.UnexpectedError(Some(new IllegalArgumentException()))))
 
@@ -2074,7 +2044,7 @@ class MovementsControllerSpec
 
         status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "INTERNAL_SERVER_ERROR",
+          "code"    -> "INTERNAL_SERVER_ERROR",
           "message" -> "Internal server error"
         )
 
@@ -2089,7 +2059,6 @@ class MovementsControllerSpec
 
   "updateMovement for an empty message" - {
 
-
     lazy val message =
       arbitraryMessage.arbitrary.sample.get.copy(
         messageId,
@@ -2101,9 +2070,9 @@ class MovementsControllerSpec
         status = Some(MessageStatus.Pending)
       )
 
-    val now: OffsetDateTime = OffsetDateTime.now
+    val now: OffsetDateTime    = OffsetDateTime.now
     val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
-    val clientId: ClientId = arbitrary[ClientId].sample.get
+    val clientId: ClientId     = arbitrary[ClientId].sample.get
     val movement: Movement = arbitrary[Movement].sample.value.copy(
       _id = movementId,
       enrollmentEORINumber = eoriNumber,
@@ -2122,7 +2091,6 @@ class MovementsControllerSpec
     )
 
     "must return OK if successfully attaches an empty message to a movement" in {
-
 
       when(
         mockMessageFactory.createEmptyMessage(
@@ -2154,7 +2122,6 @@ class MovementsControllerSpec
 
     "must return NOT_FOUND when movement cannot be found in DB" in {
 
-
       when(
         mockMessageFactory.createEmptyMessage(
           any[Option[MessageType]],
@@ -2173,7 +2140,7 @@ class MovementsControllerSpec
 
       status(result) mustBe NOT_FOUND
       contentAsJson(result) mustBe Json.obj(
-        "code" -> "NOT_FOUND",
+        "code"    -> "NOT_FOUND",
         "message" -> errorMessage
       )
 
@@ -2184,7 +2151,6 @@ class MovementsControllerSpec
     }
 
     "must return INTERNAL_SERVER_ERROR when an unexpected failure happens during message creation in the DB" in {
-
 
       when(
         mockMessageFactory.createEmptyMessage(
@@ -2202,7 +2168,7 @@ class MovementsControllerSpec
 
       status(result) mustBe INTERNAL_SERVER_ERROR
       contentAsJson(result) mustBe Json.obj(
-        "code" -> "INTERNAL_SERVER_ERROR",
+        "code"    -> "INTERNAL_SERVER_ERROR",
         "message" -> "Internal server error"
       )
 
@@ -2255,8 +2221,7 @@ class MovementsControllerSpec
             }
 
             val generatedTime: OffsetDateTime = now.minusMinutes(1)
-            val tempFile = SingletonTemporaryFileCreator.create()
-
+            val tempFile                      = SingletonTemporaryFileCreator.create()
 
             when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -2326,9 +2291,9 @@ class MovementsControllerSpec
 
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
             val body = Json.obj(
-              "messageType" -> messageType.code,
+              "messageType"    -> messageType.code,
               "objectStoreURI" -> "transit-movements/movements/abcdef0123456789/abc.xml",
-              "status" -> "Success"
+              "status"         -> "Success"
             )
             val request = FakeRequest(
               method = POST,
@@ -2372,11 +2337,10 @@ class MovementsControllerSpec
           (eori, movementId, messageId, mrn, messageType) =>
             resetInternalAuth()
 
-            val now: OffsetDateTime = OffsetDateTime.now
+            val now: OffsetDateTime           = OffsetDateTime.now
             val generatedTime: OffsetDateTime = now.minusMinutes(1)
 
             val tempFile = SingletonTemporaryFileCreator.create()
-
 
             when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -2446,9 +2410,9 @@ class MovementsControllerSpec
 
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
             val body = Json.obj(
-              "messageType" -> messageType.code,
+              "messageType"    -> messageType.code,
               "objectStoreURI" -> "transit-movements/movements/abcdef0123456789/abc.xml",
-              "status" -> "Success"
+              "status"         -> "Success"
             )
             val request = FakeRequest(
               method = POST,
@@ -2492,10 +2456,9 @@ class MovementsControllerSpec
         ) {
           (eori, movementId, messageId, movementType, lrn, messageSender) =>
             resetInternalAuth()
-            val now: OffsetDateTime = OffsetDateTime.now
+            val now: OffsetDateTime           = OffsetDateTime.now
             val generatedTime: OffsetDateTime = now.minusMinutes(1)
-            val tempFile = SingletonTemporaryFileCreator.create()
-
+            val tempFile                      = SingletonTemporaryFileCreator.create()
 
             when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
 
@@ -2561,8 +2524,8 @@ class MovementsControllerSpec
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
             val body = Json.obj(
               "objectStoreURI" -> "transit-movements/movements/abcdef0123456789/abc.xml",
-              "status" -> "Success",
-              "messageType" -> messageType.code
+              "status"         -> "Success",
+              "messageType"    -> messageType.code
             )
             val request = FakeRequest(
               method = POST,
@@ -2610,14 +2573,13 @@ class MovementsControllerSpec
           (eori, movementId, messageId, movementType, lrn, messageSender) =>
             resetInternalAuth()
 
-            val now: OffsetDateTime = OffsetDateTime.now
-            val mrn: MovementReferenceNumber = arbitraryMovementReferenceNumber.arbitrary.sample.get
+            val now: OffsetDateTime           = OffsetDateTime.now
+            val mrn: MovementReferenceNumber  = arbitraryMovementReferenceNumber.arbitrary.sample.get
             val generatedTime: OffsetDateTime = now.minusMinutes(1)
             val messageType: MessageType = {
               if (movementType == MovementType.Departure) Gen.oneOf(MessageType.departureRequestValues)
               else Gen.oneOf(MessageType.arrivalRequestValues)
             }.sample.get
-
 
             when(
               mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
@@ -2677,8 +2639,8 @@ class MovementsControllerSpec
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
             val body = Json.obj(
               "objectStoreURI" -> "something/movements/abcdef0123456789/abc.xml",
-              "status" -> "Success",
-              "messageType" -> messageType.code
+              "status"         -> "Success",
+              "messageType"    -> messageType.code
             )
             val request = FakeRequest(
               method = POST,
@@ -2692,7 +2654,7 @@ class MovementsControllerSpec
 
             status(result) mustBe BAD_REQUEST
             contentAsJson(result) mustBe Json.obj(
-              "code" -> "BAD_REQUEST",
+              "code"    -> "BAD_REQUEST",
               "message" -> "Provided Object Store URI is not owned by transit-movements"
             )
             verify(mockPersistenceService, times(0)).updateMessage(
@@ -2729,7 +2691,6 @@ class MovementsControllerSpec
           val expectedUpdateData = UpdateMessageData(status = messageStatus)
 
           val now: OffsetDateTime = OffsetDateTime.now
-
 
           when(
             mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(movementType))
@@ -2816,7 +2777,7 @@ class MovementsControllerSpec
 
           status(result) mustBe BAD_REQUEST
           contentAsJson(result) mustBe Json.obj(
-            "code" -> "BAD_REQUEST",
+            "code"    -> "BAD_REQUEST",
             "message" -> "Could not parse the request"
           )
           verify(mockInternalAuthActionProvider, times(1)).apply(
@@ -2831,7 +2792,6 @@ class MovementsControllerSpec
       ) {
         (eori, messageType) =>
           resetInternalAuth()
-
 
           when(
             mockPersistenceService.updateMessage(
@@ -2876,11 +2836,10 @@ class MovementsControllerSpec
         ) {
           (eori, movementId, messageId, lrn, messageSender) =>
             resetInternalAuth()
-            val movementType = MovementType.Departure
-            val now: OffsetDateTime = OffsetDateTime.now
+            val movementType                  = MovementType.Departure
+            val now: OffsetDateTime           = OffsetDateTime.now
             val generatedTime: OffsetDateTime = now.minusMinutes(1)
-            val mrn: MovementReferenceNumber = arbitraryMovementReferenceNumber.arbitrary.sample.get
-
+            val mrn: MovementReferenceNumber  = arbitraryMovementReferenceNumber.arbitrary.sample.get
 
             when(
               mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
@@ -2921,7 +2880,7 @@ class MovementsControllerSpec
 
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
             val body = Json.obj(
-              "status" -> "Success",
+              "status"      -> "Success",
               "messageType" -> "IE015"
             )
             val request = FakeRequest(
@@ -2963,10 +2922,9 @@ class MovementsControllerSpec
         ) {
           (eori, movementId, messageId, mrn) =>
             resetInternalAuth()
-            val movementType = MovementType.Arrival
-            val messageType = MessageType.ArrivalNotification
+            val movementType        = MovementType.Arrival
+            val messageType         = MessageType.ArrivalNotification
             val now: OffsetDateTime = OffsetDateTime.now
-
 
             when(
               mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Arrival))
@@ -2999,7 +2957,7 @@ class MovementsControllerSpec
 
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
             val body = Json.obj(
-              "status" -> "Success",
+              "status"      -> "Success",
               "messageType" -> "IE007"
             )
             val request = FakeRequest(
@@ -3041,10 +2999,9 @@ class MovementsControllerSpec
           resetInternalAuth()
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
           val body = Json.obj(
-            "status" -> "Success",
+            "status"      -> "Success",
             "messageType" -> "IE007"
           )
-
 
           val request = FakeRequest(
             method = POST,
@@ -3058,7 +3015,7 @@ class MovementsControllerSpec
 
           status(result) mustBe BAD_REQUEST
           contentAsJson(result) mustBe Json.obj(
-            "code" -> "BAD_REQUEST",
+            "code"    -> "BAD_REQUEST",
             "message" -> "Invalid messageType value: ArrivalNotification"
           )
 
@@ -3078,11 +3035,10 @@ class MovementsControllerSpec
       ) {
         (eori, movementId, messageId, messageType, lrn, messageSender) =>
           resetInternalAuth()
-          val movementType = MovementType.Departure
-          val now: OffsetDateTime = OffsetDateTime.now
+          val movementType                  = MovementType.Departure
+          val now: OffsetDateTime           = OffsetDateTime.now
           val generatedTime: OffsetDateTime = now.minusMinutes(1)
-          val mrn: MovementReferenceNumber = arbitraryMovementReferenceNumber.arbitrary.sample.get
-
+          val mrn: MovementReferenceNumber  = arbitraryMovementReferenceNumber.arbitrary.sample.get
 
           when(
             mockPersistenceService.getMovementWithoutMessages(EORINumber(eqTo(eori.value)), MovementId(eqTo(movementId.value)), eqTo(MovementType.Departure))
@@ -3128,8 +3084,8 @@ class MovementsControllerSpec
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
           val body = Json.obj(
             "objectStoreURI" -> "transit-movements/test/abc.xml",
-            "status" -> "Success",
-            "messageType" -> messageType.code
+            "status"         -> "Success",
+            "messageType"    -> messageType.code
           )
           val request = FakeRequest(
             method = POST,
@@ -3142,7 +3098,7 @@ class MovementsControllerSpec
 
           status(result) mustBe BAD_REQUEST
           contentAsJson(result) mustBe Json.obj(
-            "code" -> "BAD_REQUEST",
+            "code"    -> "BAD_REQUEST",
             "message" -> "Message type does not match"
           )
           verify(mockPersistenceService, times(0)).updateMessage(
@@ -3171,7 +3127,7 @@ class MovementsControllerSpec
           resetInternalAuth()
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
           val body = Json.obj(
-            "status" -> "Success",
+            "status"      -> "Success",
             "messageType" -> "IE015"
           )
 
@@ -3182,13 +3138,12 @@ class MovementsControllerSpec
             body = body
           )
 
-
           val result: Future[Result] =
             controller.updateMessage(eori, MovementType.Arrival, movementId, messageId)(request)
 
           status(result) mustBe BAD_REQUEST
           contentAsJson(result) mustBe Json.obj(
-            "code" -> "BAD_REQUEST",
+            "code"    -> "BAD_REQUEST",
             "message" -> "Invalid messageType value: DeclarationData"
           )
 
@@ -3263,13 +3218,12 @@ class MovementsControllerSpec
           body = body
         )
 
-
         val result: Future[Result] =
           controller.updateMessageStatus(movementId, messageId)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "BAD_REQUEST",
+          "code"    -> "BAD_REQUEST",
           "message" -> "Could not parse the request"
         )
 
@@ -3311,7 +3265,7 @@ class MovementsControllerSpec
 
         status(result) mustBe NOT_FOUND
         contentAsJson(result) mustBe Json.obj(
-          "code" -> "NOT_FOUND",
+          "code"    -> "NOT_FOUND",
           "message" -> s"No movement found with the given id: ${movementId.value}"
         )
 
