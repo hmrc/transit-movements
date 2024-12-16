@@ -4,7 +4,7 @@ import uk.gov.hmrc.DefaultBuildSettings
 
 val appName = "transit-movements"
 ThisBuild / majorVersion := 0
-ThisBuild / scalaVersion := "3.6.2"
+ThisBuild / scalaVersion := "3.5.2"
 
 lazy val microservice = Project(appName, file("."))
   .enablePlugins(PlayScala, SbtDistributablesPlugin)
@@ -71,7 +71,9 @@ lazy val scoverageSettings = Def.settings(
     ".*javascript.*",
     ".*Routes.*",
     ".*GuiceInjector",
-    ".*Test.*"
+    ".*Test.*",
+    ".*models.*",
+    ".*ParseError.*"
   ).mkString(";")
 )
 

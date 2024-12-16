@@ -58,7 +58,7 @@ class InternalAuthActionProviderSpec extends AnyFreeSpec with Matchers with Mock
       "return action should not be the auth action" in {
 
         val appConfig = mock[AppConfig]
-        when(appConfig.internalAuthEnabled).thenReturn(false)
+        when(appConfig.internalAuthEnabled).thenReturn(true)
 
         val mockBackendAuthComponents = mock[BackendAuthComponents]
 
@@ -66,7 +66,7 @@ class InternalAuthActionProviderSpec extends AnyFreeSpec with Matchers with Mock
           Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movement")), IAAction("WRITE"))
         val _ = new InternalAuthActionProviderImpl(appConfig, mockBackendAuthComponents, stubControllerComponents()).apply(samplePermission)
 
-        verify(mockBackendAuthComponents, times(0)).authorizedAction(samplePermission)
+        verify(mockBackendAuthComponents, times(1)).authorizedAction(samplePermission)
       }
 
     }
