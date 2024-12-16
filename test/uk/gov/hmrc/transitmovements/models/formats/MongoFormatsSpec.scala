@@ -16,13 +16,13 @@
 
 package uk.gov.hmrc.transitmovements.models.formats
 
-import org.mockito.MockitoSugar.mock
-import org.mockito.MockitoSugar.when
+import org.mockito.Mockito.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest.OptionValues
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.libs.json.JsError
 import play.api.libs.json.JsString
@@ -40,11 +40,11 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-class MongoFormatsSpec extends AnyFreeSpec with Matchers with ModelGenerators with OptionValues with ScalaCheckDrivenPropertyChecks {
+class MongoFormatsSpec extends AnyFreeSpec with MockitoSugar with Matchers with ModelGenerators with OptionValues with ScalaCheckDrivenPropertyChecks {
 
   "OffsetDateTime" - {
-    implicit val crypto: Encrypter with Decrypter = NoEncryption
-    val appConfig: AppConfig                      = mock[AppConfig]
+    implicit val crypto: Encrypter & Decrypter = NoEncryption
+    val appConfig: AppConfig                   = mock[AppConfig]
     when(appConfig.encryptionTolerantRead).thenReturn(true)
 
     val sut: MongoFormats = new MongoFormats(appConfig)
@@ -62,7 +62,7 @@ class MongoFormatsSpec extends AnyFreeSpec with Matchers with ModelGenerators wi
     }
 
     "An OffsetDateTime can be constructed when returned from Mongo" in {
-      val long = Gen.chooseNum(0, Long.MaxValue).sample.value
+      val long = Gen.chooseNum(0L, Long.MaxValue).sample.value
       val mongoDateTimeFormat = Json.obj(
         "$date" -> Json.obj(
           "$numberLong" -> long.toString
@@ -75,8 +75,8 @@ class MongoFormatsSpec extends AnyFreeSpec with Matchers with ModelGenerators wi
   }
 
   "Sensitive String with fallback" - {
-    implicit val crypto: Encrypter with Decrypter = AddEncEncrypter
-    val appConfig: AppConfig                      = mock[AppConfig]
+    implicit val crypto: Encrypter & Decrypter = AddEncEncrypter
+    val appConfig: AppConfig                   = mock[AppConfig]
     when(appConfig.encryptionTolerantRead).thenReturn(true)
 
     val sut: MongoFormats = new MongoFormats(appConfig)
@@ -104,8 +104,8 @@ class MongoFormatsSpec extends AnyFreeSpec with Matchers with ModelGenerators wi
   }
 
   "Sensitive String without fallback" - {
-    implicit val crypto: Encrypter with Decrypter = AddEncEncrypter
-    val appConfig: AppConfig                      = mock[AppConfig]
+    implicit val crypto: Encrypter & Decrypter = AddEncEncrypter
+    val appConfig: AppConfig                   = mock[AppConfig]
     when(appConfig.encryptionTolerantRead).thenReturn(false)
 
     val sut: MongoFormats = new MongoFormats(appConfig)

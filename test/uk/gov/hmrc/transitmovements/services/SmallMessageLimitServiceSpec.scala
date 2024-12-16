@@ -19,7 +19,7 @@ package uk.gov.hmrc.transitmovements.services
 import org.mockito.Mockito.when
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
-import org.scalatest.matchers.must.Matchers.convertToAnyMustWrapper
+import org.scalatest.matchers.must.Matchers.mustBe
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.transitmovements.config.AppConfig
