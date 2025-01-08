@@ -80,7 +80,7 @@ class MovementsController @Inject() (
     with ContentTypeRouting
     with ObjectStoreURIHelpers {
 
-  def createMovement(eori: EORINumber, movementType: MovementType): Action[Source[ByteString, _]] =
+  def createMovement(eori: EORINumber, movementType: MovementType): Action[Source[ByteString, ?]] =
     contentTypeRoute {
       case Some(_) =>
         movementType match {
@@ -90,12 +90,12 @@ class MovementsController @Inject() (
       case None => createEmptyMovement(eori, movementType)
     }
 
-  def isTransitional(implicit request: Request[_]): Boolean =
+  def isTransitional(implicit request: Request[?]): Boolean =
     !request.headers
       .get(Constants.APIVersionHeaderKey)
       .contains(Constants.APIVersionFinalHeaderValue)
 
-  private def createArrival(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).async(streamFromMemory) {
+  private def createArrival(eori: EORINumber): Action[Source[ByteString, ?]] = internalAuth(WRITE_MOVEMENT).async(streamFromMemory) {
     implicit request =>
       {
         val clientId = request.headers.get(Constants.XClientIdHeader).map(ClientId(_))
@@ -114,7 +114,7 @@ class MovementsController @Inject() (
       }.fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), response => Ok(Json.toJson(response)))
   }
 
-  private def createDeparture(eori: EORINumber): Action[Source[ByteString, _]] = internalAuth(WRITE_MOVEMENT).async(streamFromMemory) {
+  private def createDeparture(eori: EORINumber): Action[Source[ByteString, ?]] = internalAuth(WRITE_MOVEMENT).async(streamFromMemory) {
     implicit request =>
       {
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
@@ -166,7 +166,7 @@ class MovementsController @Inject() (
       )
   }
 
-  def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, _]] =
+  def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, ?]] =
     contentTypeRoute {
       case Some(_) => updateMovementWithStream(movementId, triggerId)
       case None    => attachEmptyMessage(movementId)
@@ -247,7 +247,7 @@ class MovementsController @Inject() (
     }
   }
 
-  private def updateMovementWithStream(movementId: MovementId, triggerId: Option[MessageId]): Action[Source[ByteString, _]] =
+  private def updateMovementWithStream(movementId: MovementId, triggerId: Option[MessageId]): Action[Source[ByteString, ?]] =
     internalAuth(WRITE_MESSAGE).async(streamFromMemory) {
       implicit request =>
         {
@@ -347,7 +347,7 @@ class MovementsController @Inject() (
     hasEoriAlready: Boolean
   )(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, OffsetDateTime] = {
 
-    def extractAndUpdate(source: Source[ByteString, _]): EitherT[Future, PresentationError, OffsetDateTime] =
+    def extractAndUpdate(source: Source[ByteString, ?]): EitherT[Future, PresentationError, OffsetDateTime] =
       for {
         source               <- sourceManagementService.replicateSource(source, 4)
         extractedData        <- movementsXmlParsingService.extractData(messageType, source(1)).asPresentation

@@ -48,9 +48,9 @@ trait ObjectStoreService {
 
   def getObjectStoreFile(
     objectStoreResourceLocation: ObjectStoreResourceLocation
-  )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]]
+  )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, ?]]
 
-  def putObjectStoreFile(movementId: MovementId, messageId: MessageId, source: Source[ByteString, _])(implicit
+  def putObjectStoreFile(movementId: MovementId, messageId: MessageId, source: Source[ByteString, ?])(implicit
     ec: ExecutionContext,
     hc: HeaderCarrier
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
@@ -62,7 +62,7 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
 
   override def getObjectStoreFile(
     objectStoreResourceLocation: ObjectStoreResourceLocation
-  )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, _]] =
+  )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, Source[ByteString, ?]] =
     EitherT(
       client
         .getObject[Source[ByteString, NotUsed]](
@@ -83,7 +83,7 @@ class ObjectStoreServiceImpl @Inject() (implicit materializer: Materializer, clo
   override def putObjectStoreFile(
     movementId: MovementId,
     messageId: MessageId,
-    source: Source[ByteString, _]
+    source: Source[ByteString, ?]
   )(implicit ec: ExecutionContext, hc: HeaderCarrier): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
     EitherT {
       val formattedDateTime = dateTimeFormatter.format(OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
