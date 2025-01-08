@@ -41,6 +41,7 @@ import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.base.TestSourceProvider
+import uk.gov.hmrc.transitmovements.stream.StreamingParsers
 
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
@@ -48,15 +49,15 @@ import scala.concurrent.Future
 
 class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSystem with OptionValues with TestSourceProvider {
 
-  lazy val headers: FakeHeaders = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "text/plain", HeaderNames.ACCEPT -> "application/vnd.hmrc.2.0+json"))
+  lazy val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "text/plain", HeaderNames.ACCEPT -> "application/vnd.hmrc.2.0+json"))
 
   object Harness extends BaseController with StreamingParsers with Logging {
 
     override val controllerComponents: ControllerComponents                     = stubControllerComponents()
     implicit val temporaryFileCreator: Files.SingletonTemporaryFileCreator.type = SingletonTemporaryFileCreator
-    implicit val materializer: Materializer                                     = Materializer(system)
+    implicit val materializer: Materializer                                     = Materializer(TestActorSystem.system)
 
-    def testFromMemory: Action[Source[ByteString, ?]] = Action.async(streamFromMemory) {
+    def testFromMemory: Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
       request => result.apply(request).run(request.body)(materializer)
     }
 
@@ -65,7 +66,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
         Future.successful(Ok(request.body))
     }
 
-    def resultStream: Action[Source[ByteString, ?]] = Action.stream {
+    def resultStream: Action[Source[ByteString, _]] = Action.stream {
       request =>
         (for {
           a <- request.body.runWith(Sink.head)

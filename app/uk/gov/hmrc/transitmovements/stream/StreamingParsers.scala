@@ -41,7 +41,7 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 trait StreamingParsers {
-  self: BaseControllerHelpers & Logging =>
+  self: BaseControllerHelpers with Logging =>
 
   implicit val materializer: Materializer
 
@@ -52,12 +52,12 @@ trait StreamingParsers {
   implicit val materializerExecutionContext: ExecutionContext =
     ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
-  lazy val streamFromMemory: BodyParser[Source[ByteString, ?]] = BodyParser {
+  lazy val streamFromMemory: BodyParser[Source[ByteString, _]] = BodyParser {
     _ =>
       Accumulator.source[ByteString].map(Right.apply)
   }
 
-  implicit class ActionBuilderStreamHelpers(actionBuilder: ActionBuilder[Request, ?]) {
+  implicit class ActionBuilderStreamHelpers(actionBuilder: ActionBuilder[Request, _]) {
 
     /** Updates the [[Source]] in the [[Request]] with a version that can be used
       * multiple times via the use of a temporary file.
@@ -69,15 +69,15 @@ trait StreamingParsers {
     // Doing it like this ensures that we can make sure that the source we pass is the file based one,
     // and only when it's ready.
     def stream(
-      block: (Request[Source[ByteString, ?]]) => Future[Result]
-    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, ?]] =
+      block: (Request[Source[ByteString, _]]) => Future[Result]
+    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
       streamWithSize(
         request => _ => block(request)
       )
 
     def streamWithSize(
-      block: Request[Source[ByteString, ?]] => Long => Future[Result]
-    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, ?]] =
+      block: Request[Source[ByteString, _]] => Long => Future[Result]
+    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
       actionBuilder.async(streamFromMemory) {
         request =>
           // This is outside the for comprehension because we need access to the file

@@ -18,8 +18,13 @@ package uk.gov.hmrc.transitmovements.base
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
+import org.scalatest.Suite
 
-trait TestActorSystem {
-  implicit val system: ActorSystem        = ActorSystem("test")
-  implicit val materializer: Materializer = Materializer(system)
+object TestActorSystem {
+  val system: ActorSystem = ActorSystem("test")
+}
+
+trait TestActorSystem { self: Suite =>
+  implicit val system: ActorSystem        = TestActorSystem.system
+  implicit val materializer: Materializer = Materializer(TestActorSystem.system)
 }

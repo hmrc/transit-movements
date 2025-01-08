@@ -36,7 +36,7 @@ import java.time.ZoneOffset
 import scala.util.Try
 import scala.util.control.NonFatal
 
-class MongoFormats @Inject() (appConfig: AppConfig)(implicit crypto: Encrypter & Decrypter)
+class MongoFormats @Inject() (appConfig: AppConfig)(implicit crypto: Encrypter with Decrypter)
     extends CommonFormats
     with MongoBinaryFormats.Implicits
     with MongoUuidFormats.Implicits {

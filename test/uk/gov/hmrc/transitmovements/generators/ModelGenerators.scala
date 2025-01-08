@@ -66,12 +66,12 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =
     Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MovementId.apply)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MovementId(_))
     }
 
   implicit lazy val arbitraryMessageId: Arbitrary[MessageId] =
     Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MessageId.apply)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MessageId(_))
     }
 
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
@@ -106,7 +106,7 @@ trait ModelGenerators extends BaseGenerators {
   implicit lazy val arbitraryOffsetDateTime: Arbitrary[OffsetDateTime] =
     Arbitrary {
       for {
-        millis <- Gen.chooseNum(0L, Long.MaxValue / 1000L)
+        millis <- Gen.chooseNum(0, Long.MaxValue / 1000L)
       } yield OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
     }
 
@@ -166,7 +166,7 @@ trait ModelGenerators extends BaseGenerators {
       lastModified      = Instant.now()
       formattedDateTime = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC).format(lastModified)
       contentLen <- Gen.long
-      hash       <- Gen.alphaNumStr.map(Md5Hash.apply)
+      hash       <- Gen.alphaNumStr.map(Md5Hash)
     } yield ObjectSummaryWithMd5(
       Path.Directory("xxxxx").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
       contentLen,
@@ -218,7 +218,7 @@ trait ModelGenerators extends BaseGenerators {
       for {
         objectStoreUri <- Gen.option(arbitrary[ObjectStoreURI])
         body           <- Gen.option(Gen.stringOfN(20, Gen.alphaNumChar))
-        size           <- Gen.option(Gen.choose(0L, Long.MaxValue))
+        size           <- Gen.option(Gen.choose(0, Long.MaxValue))
         status         <- arbitrary[MessageStatus]
         messageType    <- Gen.option(arbitrary[MessageType])
         generationDate <- Gen.option(arbitrary[OffsetDateTime])

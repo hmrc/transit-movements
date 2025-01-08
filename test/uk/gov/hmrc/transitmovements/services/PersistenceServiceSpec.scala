@@ -18,17 +18,13 @@ package uk.gov.hmrc.transitmovements.services
 
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.{eq => eqTo}
-import org.mockito.Mockito.times
-import org.mockito.Mockito.verify
-import org.mockito.Mockito.verifyNoMoreInteractions
-import org.mockito.Mockito.when
+import org.mockito.MockitoSugar
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
-import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.models.EORINumber
@@ -59,14 +55,16 @@ import uk.gov.hmrc.transitmovements.repositories.MovementsRepository
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 
 import java.time.OffsetDateTime
+import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
+@nowarn("msg=implicit numeric widening")
 class PersistenceServiceSpec
     extends AnyFreeSpec
     with Matchers
-    with BeforeAndAfterEach
     with MockitoSugar
+    with BeforeAndAfterEach
     with ModelGenerators
     with ScalaCheckDrivenPropertyChecks
     with ScalaFutures {
@@ -491,7 +489,7 @@ class PersistenceServiceSpec
           count => Gen.listOfN(count, arbitrary[MongoMessageMetadata])
         )
         .map(
-          x => Vector(x *)
+          x => Vector(x: _*)
         )
     ) {
       (eori, movementId, movementType, messageList) =>
@@ -597,7 +595,7 @@ class PersistenceServiceSpec
           count => Gen.listOfN(count, arbitrary[MongoMovementSummary])
         )
         .map(
-          x => Vector(x *)
+          x => Vector(x: _*)
         )
     ) {
       (enrolmentEORI, movementType, movementList) =>

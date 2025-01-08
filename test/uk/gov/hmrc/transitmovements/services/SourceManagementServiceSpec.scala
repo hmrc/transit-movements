@@ -59,7 +59,7 @@ class SourceManagementServiceSpec extends AnyWordSpec with Matchers with ScalaFu
 
   ".replicateRequestSource" should {
     "replicate the source that is wrapped in a request" in new Setup {
-      val request: FakeRequest[Source[ByteString, ?]] = FakeRequest(
+      val request: FakeRequest[Source[ByteString, _]] = FakeRequest(
         method = POST,
         uri = routes.MovementsController.createMovement(EORINumber("GB123456789012"), MovementType.Arrival).url,
         headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> MessageType.ArrivalNotification.code)),
@@ -93,12 +93,12 @@ class SourceManagementServiceSpec extends AnyWordSpec with Matchers with ScalaFu
 
   trait Setup extends StreamTestHelpers {
 
-    def convertSource(source: Source[ByteString, ?]): Future[String] = source.runFold("")(
+    def convertSource(source: Source[ByteString, _]): Future[String] = source.runFold("")(
       (acc, byteString) => acc + byteString.utf8String
     )
 
     val expectedBody                  = "successful"
-    val source: Source[ByteString, ?] = createStream(expectedBody)
+    val source: Source[ByteString, _] = createStream(expectedBody)
     val service                       = new SourceManagementServiceImpl
   }
 }

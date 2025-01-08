@@ -24,7 +24,7 @@ import org.mockito.ArgumentMatchers.{eq => eqTo}
 import org.mockito.Mockito.reset
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.when
+import org.mockito.MockitoSugar.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest.concurrent.ScalaFutures
@@ -52,7 +52,6 @@ import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 
 class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers with TestActorSystem with ModelGenerators with ScalaCheckDrivenPropertyChecks {
   "create" - {
@@ -108,7 +107,7 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
         val stream               = Source.single(ByteString("test"))
 
         when(objectStoreServiceMock.putObjectStoreFile(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(stream))(any(), any()))
-          .thenReturn(EitherT.rightT[Future, ObjectSummaryWithMd5](objectSummaryWithMd5))
+          .thenReturn(EitherT.rightT(objectSummaryWithMd5))
         val result = sut.create(movementId, messageType, instant, instant, triggerId, 4, stream, Received)(HeaderCarrier())
 
         whenReady(result.value) {
@@ -170,7 +169,7 @@ class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers wi
         val error  = new IllegalStateException()
         val stream = Source.empty[ByteString]
         when(objectStoreServiceMock.putObjectStoreFile(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(stream))(any(), any()))
-          .thenReturn(EitherT.leftT[Future, ObjectSummaryWithMd5](ObjectStoreError.UnexpectedError(Some(error))))
+          .thenReturn(EitherT.leftT(ObjectStoreError.UnexpectedError(Some(error))))
 
         val result = sut.create(movementId, messageType, instant, instant, triggerId, 4, stream, Received)(HeaderCarrier())
 

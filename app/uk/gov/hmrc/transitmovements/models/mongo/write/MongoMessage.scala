@@ -35,7 +35,7 @@ object MongoMessage {
       message.messageType,
       message.triggerId,
       message.uri,
-      message.body.map(SensitiveString.apply),
+      message.body.map(SensitiveString),
       message.size,
       message.status
     )
