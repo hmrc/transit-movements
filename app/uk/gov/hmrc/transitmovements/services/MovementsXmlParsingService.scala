@@ -53,13 +53,13 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[MovementsXmlParsingServiceImpl])
 trait MovementsXmlParsingService {
 
-  def extractData(messageType: MessageType, source: Source[ByteString, ?]): EitherT[Future, ParseError, Option[ExtractedData]]
+  def extractData(messageType: MessageType, source: Source[ByteString, _]): EitherT[Future, ParseError, Option[ExtractedData]]
 
-  def extractData(movementType: MovementType, source: Source[ByteString, ?]): EitherT[Future, ParseError, ExtractedData]
+  def extractData(movementType: MovementType, source: Source[ByteString, _]): EitherT[Future, ParseError, ExtractedData]
 
-  def extractDeclarationData(source: Source[ByteString, ?]): EitherT[Future, ParseError, DeclarationData]
+  def extractDeclarationData(source: Source[ByteString, _]): EitherT[Future, ParseError, DeclarationData]
 
-  def extractArrivalData(source: Source[ByteString, ?]): EitherT[Future, ParseError, ArrivalData]
+  def extractArrivalData(source: Source[ByteString, _]): EitherT[Future, ParseError, ArrivalData]
 
 }
 
@@ -151,7 +151,7 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
       mrn            <- mrnMaybe
     } yield ArrivalData(eoriNumber, generationDate, mrn)
 
-  override def extractDeclarationData(source: Source[ByteString, ?]): EitherT[Future, ParseError, DeclarationData] =
+  override def extractDeclarationData(source: Source[ByteString, _]): EitherT[Future, ParseError, DeclarationData] =
     EitherT(
       source
         .via(declarationFlow)
@@ -161,7 +161,7 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
         .runWith(Sink.head[Either[ParseError, DeclarationData]])
     )
 
-  override def extractArrivalData(source: Source[ByteString, ?]): EitherT[Future, ParseError, ArrivalData] =
+  override def extractArrivalData(source: Source[ByteString, _]): EitherT[Future, ParseError, ArrivalData] =
     EitherT(
       source
         .via(arrivalFlow)
@@ -171,14 +171,14 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
         .runWith(Sink.head[Either[ParseError, ArrivalData]])
     )
 
-  override def extractData(messageType: MessageType, source: Source[ByteString, ?]): EitherT[Future, ParseError, Option[ExtractedData]] =
+  override def extractData(messageType: MessageType, source: Source[ByteString, _]): EitherT[Future, ParseError, Option[ExtractedData]] =
     messageType match {
       case MessageType.DeclarationData     => extractDeclarationData(source).widen[ExtractedData].map(Some.apply)
       case MessageType.ArrivalNotification => extractArrivalData(source).widen[ExtractedData].map(Some.apply)
       case _                               => EitherT.rightT(None)
     }
 
-  override def extractData(movementType: MovementType, source: Source[ByteString, ?]): EitherT[Future, ParseError, ExtractedData] =
+  override def extractData(movementType: MovementType, source: Source[ByteString, _]): EitherT[Future, ParseError, ExtractedData] =
     movementType match {
       case MovementType.Departure => extractDeclarationData(source).widen[ExtractedData]
       case MovementType.Arrival   => extractArrivalData(source).widen[ExtractedData]

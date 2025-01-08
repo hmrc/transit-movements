@@ -25,7 +25,7 @@ import org.mockito.ArgumentMatchers.argThat
 import org.mockito.ArgumentMatchers.{eq => eqTo}
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.when
+import org.mockito.MockitoSugar.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
@@ -33,7 +33,7 @@ import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-import play.api.http.Status.*
+import play.api.http.Status._
 import play.api.libs.json.Json
 import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Result
@@ -45,15 +45,15 @@ import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.internalauth.client.*
+import uk.gov.hmrc.internalauth.client._
 import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
 import uk.gov.hmrc.transitmovements.matchers.UpdateMessageDataMatcher
-import uk.gov.hmrc.transitmovements.models.*
+import uk.gov.hmrc.transitmovements.models._
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
-import uk.gov.hmrc.transitmovements.services.*
+import uk.gov.hmrc.transitmovements.services._
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
 import uk.gov.hmrc.transitmovements.services.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovements.services.errors.ParseError
@@ -200,7 +200,7 @@ class MessageBodyControllerSpec
 
         val mockObjectStoreService = mock[ObjectStoreService]
         when(mockObjectStoreService.getObjectStoreFile(ObjectStoreResourceLocation(eqTo(objectStoreUri.asResourceLocation.get.value)))(any(), any()))
-          .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](Source.single(ByteString(xml))))
+          .thenReturn(EitherT.rightT(Source.single(ByteString(xml))))
 
         val mockMessagesXmlParsingSerivce  = mock[MessagesXmlParsingService]
         val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
@@ -385,11 +385,7 @@ class MessageBodyControllerSpec
             eqTo(movementType)
           )
         )
-          .thenReturn(
-            EitherT.leftT[Future, MessageResponse](
-              MongoError.DocumentNotFound(s"Body of message ID ${messageId.value} for movement ID ${movementId.value} was not found")
-            )
-          )
+          .thenReturn(EitherT.leftT(MongoError.DocumentNotFound(s"Body of message ID ${messageId.value} for movement ID ${movementId.value} was not found")))
 
         val mockObjectStoreService = mock[ObjectStoreService]
 
@@ -466,7 +462,7 @@ class MessageBodyControllerSpec
 
         val mockObjectStoreService = mock[ObjectStoreService]
         when(mockObjectStoreService.getObjectStoreFile(ObjectStoreResourceLocation(eqTo(objectStoreUri.asResourceLocation.get.value)))(any(), any()))
-          .thenReturn(EitherT.leftT[Future, Source[ByteString, ?]](ObjectStoreError.FileNotFound("...")))
+          .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound("...")))
 
         val mockMessagesXmlParsingSerivce  = mock[MessagesXmlParsingService]
         val mockMovementsXmlParsingSerivce = mock[MovementsXmlParsingService]
@@ -550,7 +546,7 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(
-            EitherT.rightT[Future, MessageResponse](
+            EitherT.rightT(
               MessageResponse(
                 messageId,
                 now,
@@ -562,16 +558,16 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], eqTo(messageType)))
-          .thenReturn(EitherT.rightT[Future, MessageData](MessageData(now, None)))
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.rightT(MessageData(now, None)))
 
-        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, ?]]))
+        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(extractDataEither)
 
         when(
           messageService
-            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, ?]])(any[HeaderCarrier])
-        ).thenReturn(EitherT.rightT[Future, BodyStorage](BodyStorage.mongo(string)))
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+        ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
 
         when(
           movementsRepository.updateMessage(
@@ -580,7 +576,7 @@ class MessageBodyControllerSpec
             argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
             eqTo(now)
           )
-        ).thenReturn(EitherT.rightT[Future, Unit]((): Unit))
+        ).thenReturn(EitherT.rightT((): Unit))
 
         when(
           movementsRepository.updateMovement(
@@ -592,7 +588,7 @@ class MessageBodyControllerSpec
             eqTo(now)
           )
         )
-          .thenReturn(EitherT.rightT[Future, Unit]((): Unit))
+          .thenReturn(EitherT.rightT((): Unit))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -623,7 +619,7 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(
-            EitherT.rightT[Future, MessageResponse](
+            EitherT.rightT(
               MessageResponse(
                 messageId,
                 now,
@@ -635,16 +631,16 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], eqTo(messageType)))
-          .thenReturn(EitherT.rightT[Future, MessageData](MessageData(now, None)))
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.rightT(MessageData(now, None)))
 
-        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, ?]]))
-          .thenReturn(EitherT.rightT[Future, ExtractedData](Some(ArrivalData(Some(movementEori), nowMinusOne, movementReferenceNumber))))
+        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
+          .thenReturn(EitherT.rightT(Some(ArrivalData(Some(movementEori), nowMinusOne, movementReferenceNumber))))
 
         when(
           messageService
-            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, ?]])(any[HeaderCarrier])
-        ).thenReturn(EitherT.rightT[Future, BodyStorage](BodyStorage.mongo(string)))
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+        ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
 
         when(
           movementsRepository.updateMessage(
@@ -653,7 +649,7 @@ class MessageBodyControllerSpec
             argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
             eqTo(now)
           )
-        ).thenReturn(EitherT.rightT[Future, Unit]((): Unit))
+        ).thenReturn(EitherT.rightT((): Unit))
 
         when(
           movementsRepository.updateMovement(
@@ -665,7 +661,7 @@ class MessageBodyControllerSpec
             eqTo(now)
           )
         )
-          .thenReturn(EitherT.rightT[Future, Unit]((): Unit))
+          .thenReturn(EitherT.rightT((): Unit))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -698,7 +694,7 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(
-            EitherT.rightT[Future, MessageResponse](
+            EitherT.rightT(
               MessageResponse(
                 messageId,
                 now,
@@ -710,20 +706,20 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], eqTo(messageType)))
-          .thenReturn(EitherT.rightT[Future, MessageData](MessageData(now, None)))
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.rightT(MessageData(now, None)))
 
-        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, ?]]))
+        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(
-            EitherT.rightT[Future, Option[ExtractedData]](
+            EitherT.rightT(
               Some(DeclarationData(Some(movementEori), now, lrn, messageSender))
             )
           )
 
         when(
           messageService
-            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, ?]])(any[HeaderCarrier])
-        ).thenReturn(EitherT.rightT[Future, BodyStorage](BodyStorage.mongo(string)))
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+        ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
 
         when(
           movementsRepository.updateMessage(
@@ -732,7 +728,7 @@ class MessageBodyControllerSpec
             argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
             eqTo(now)
           )
-        ).thenReturn(EitherT.rightT[Future, Unit]((): Unit))
+        ).thenReturn(EitherT.rightT((): Unit))
 
         when(
           movementsRepository.updateMovement(
@@ -744,7 +740,7 @@ class MessageBodyControllerSpec
             eqTo(now)
           )
         )
-          .thenReturn(EitherT.rightT[Future, Unit]((): Unit))
+          .thenReturn(EitherT.rightT((): Unit))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -776,7 +772,7 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(
-            EitherT.rightT[Future, MessageResponse](
+            EitherT.rightT(
               MessageResponse(
                 messageId,
                 now,
@@ -788,20 +784,20 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], eqTo(messageType)))
-          .thenReturn(EitherT.rightT[Future, MessageData](MessageData(now, None)))
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.rightT(MessageData(now, None)))
 
-        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, ?]]))
+        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(
-            EitherT.rightT[Future, ExtractedData](
+            EitherT.rightT(
               Some(DeclarationData(Some(movementEori), now, lrn, messageSender))
             )
           )
 
         when(
           messageService
-            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, ?]])(any[HeaderCarrier])
-        ).thenReturn(EitherT.rightT[Future, BodyStorage](BodyStorage.mongo(string)))
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+        ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
 
         when(
           movementsRepository.updateMessage(
@@ -810,7 +806,7 @@ class MessageBodyControllerSpec
             argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
             eqTo(now)
           )
-        ).thenReturn(EitherT.rightT[Future, Unit]((): Unit))
+        ).thenReturn(EitherT.rightT((): Unit))
 
         when(
           movementsRepository.updateMovement(
@@ -822,7 +818,7 @@ class MessageBodyControllerSpec
             eqTo(now)
           )
         )
-          .thenReturn(EitherT.rightT[Future, Unit]((): Unit))
+          .thenReturn(EitherT.rightT((): Unit))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -850,7 +846,7 @@ class MessageBodyControllerSpec
             eqTo(movementType)
           )
         )
-          .thenReturn(EitherT.leftT[Future, MessageResponse](MongoError.DocumentNotFound("test")))
+          .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -878,7 +874,7 @@ class MessageBodyControllerSpec
             eqTo(movementType)
           )
         )
-          .thenReturn(EitherT.leftT[Future, MessageResponse](MongoError.DocumentNotFound("test")))
+          .thenReturn(EitherT.leftT(MongoError.DocumentNotFound("test")))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -907,7 +903,7 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(
-            EitherT.rightT[Future, MessageResponse](
+            EitherT.rightT(
               MessageResponse(
                 messageId,
                 now,
@@ -947,7 +943,7 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(
-            EitherT.rightT[Future, MessageResponse](
+            EitherT.rightT(
               MessageResponse(
                 messageId,
                 now,
@@ -959,8 +955,8 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], eqTo(messageType)))
-          .thenReturn(EitherT.leftT[Future, MessageData](ex))
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.leftT(ex))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -989,7 +985,7 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(
-            EitherT.rightT[Future, MessageResponse](
+            EitherT.rightT(
               MessageResponse(
                 messageId,
                 now,
@@ -1001,8 +997,8 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], eqTo(messageType)))
-          .thenReturn(EitherT.leftT[Future, MessageData](ParseError.UnexpectedError(None)))
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.leftT(ParseError.UnexpectedError(None)))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -1032,7 +1028,7 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(
-            EitherT.rightT[Future, MessageResponse](
+            EitherT.rightT(
               MessageResponse(
                 messageId,
                 now,
@@ -1044,11 +1040,11 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], eqTo(messageType)))
-          .thenReturn(EitherT.rightT[Future, MessageData](MessageData(now, None)))
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.rightT(MessageData(now, None)))
 
-        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, ?]]))
-          .thenReturn(EitherT.leftT[Future, Option[ExtractedData]](ex))
+        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
+          .thenReturn(EitherT.leftT(ex))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -1077,7 +1073,7 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(
-            EitherT.rightT[Future, MessageResponse](
+            EitherT.rightT(
               MessageResponse(
                 messageId,
                 now,
@@ -1089,11 +1085,11 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], eqTo(messageType)))
-          .thenReturn(EitherT.rightT[Future, MessageData](MessageData(now, None)))
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.rightT(MessageData(now, None)))
 
-        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, ?]]))
-          .thenReturn(EitherT.leftT[Future, Option[ExtractedData]](ParseError.UnexpectedError(None)))
+        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
+          .thenReturn(EitherT.leftT(ParseError.UnexpectedError(None)))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -1125,7 +1121,7 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(
-            EitherT.rightT[Future, MessageResponse](
+            EitherT.rightT(
               MessageResponse(
                 messageId,
                 now,
@@ -1137,20 +1133,20 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], eqTo(messageType)))
-          .thenReturn(EitherT.rightT[Future, MessageData](MessageData(now, Some(movementReferenceNumber))))
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.rightT(MessageData(now, Some(movementReferenceNumber))))
 
-        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, ?]]))
+        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(
-            EitherT.rightT[Future, Option[ExtractedData]](
+            EitherT.rightT(
               Some(DeclarationData(Some(movementEori), nowMinusOne, LocalReferenceNumber(string), messageSender))
             )
           )
 
         when(
           messageService
-            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, ?]])(any[HeaderCarrier])
-        ).thenReturn(EitherT.leftT[Future, BodyStorage](StreamError.UnexpectedError(None)))
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+        ).thenReturn(EitherT.leftT(StreamError.UnexpectedError(None)))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)
@@ -1182,7 +1178,7 @@ class MessageBodyControllerSpec
           )
         )
           .thenReturn(
-            EitherT.rightT[Future, MessageResponse](
+            EitherT.rightT(
               MessageResponse(
                 messageId,
                 now,
@@ -1194,20 +1190,20 @@ class MessageBodyControllerSpec
             )
           )
 
-        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], eqTo(messageType)))
-          .thenReturn(EitherT.rightT[Future, MessageData](MessageData(now, Some(movementReferenceNumber))))
+        when(messagesXmlParsingService.extractMessageData(any[Source[ByteString, _]], eqTo(messageType)))
+          .thenReturn(EitherT.rightT(MessageData(now, Some(movementReferenceNumber))))
 
-        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, ?]]))
+        when(movementsXmlParsingService.extractData(eqTo(messageType), any[Source[ByteString, _]]))
           .thenReturn(
-            EitherT.rightT[Future, ExtractedData](
+            EitherT.rightT(
               Some(DeclarationData(Some(movementEori), nowMinusOne, LocalReferenceNumber(string), messageSender))
             )
           )
 
         when(
           messageService
-            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, ?]])(any[HeaderCarrier])
-        ).thenReturn(EitherT.rightT[Future, BodyStorage](BodyStorage.mongo(string)))
+            .storeIfLarge(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Long], any[Source[ByteString, _]])(any[HeaderCarrier])
+        ).thenReturn(EitherT.rightT(BodyStorage.mongo(string)))
 
         when(
           movementsRepository.updateMessage(
@@ -1216,7 +1212,7 @@ class MessageBodyControllerSpec
             argThat(UpdateMessageDataMatcher(None, Some(string), messageType.statusOnAttach, Some(messageType), Some(now))),
             eqTo(now)
           )
-        ).thenReturn(EitherT.leftT[Future, Unit](MongoError.UnexpectedError(None)))
+        ).thenReturn(EitherT.leftT(MongoError.UnexpectedError(None)))
 
         when(
           movementsRepository.updateMovement(
@@ -1228,7 +1224,7 @@ class MessageBodyControllerSpec
             eqTo(now)
           )
         )
-          .thenReturn(EitherT.rightT[Future, Unit]((): Unit))
+          .thenReturn(EitherT.rightT((): Unit))
 
         val request                = FakeRequest("POST", "/", FakeHeaders(Seq("x-message-type" -> messageType.code)), Source.single(ByteString(string)))
         val result: Future[Result] = sut.createBody(eori, movementType, movementId, messageId)(request)

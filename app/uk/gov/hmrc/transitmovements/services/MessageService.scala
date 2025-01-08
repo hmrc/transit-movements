@@ -55,7 +55,7 @@ trait MessageService {
     received: OffsetDateTime,
     triggerId: Option[MessageId],
     size: Long,
-    source: Source[ByteString, ?],
+    source: Source[ByteString, _],
     status: MessageStatus
   )(implicit hc: HeaderCarrier): EitherT[Future, StreamError, Message]
 
@@ -64,7 +64,7 @@ trait MessageService {
     received: OffsetDateTime
   ): Message
 
-  def storeIfLarge(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, ?])(implicit
+  def storeIfLarge(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, _])(implicit
     hc: HeaderCarrier
   ): EitherT[Future, StreamError, BodyStorage]
 
@@ -89,7 +89,7 @@ class MessageServiceImpl @Inject() (
     received: OffsetDateTime,
     triggerId: Option[MessageId],
     size: Long,
-    source: Source[ByteString, ?],
+    source: Source[ByteString, _],
     status: MessageStatus
   )(implicit hc: HeaderCarrier): EitherT[Future, StreamError, Message] = {
     val messageId = generateId()
@@ -127,13 +127,13 @@ class MessageServiceImpl @Inject() (
       status = Some(MessageStatus.Pending)
     )
 
-  override def storeIfLarge(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, ?])(implicit
+  override def storeIfLarge(movementId: MovementId, messageId: MessageId, size: Long, src: Source[ByteString, _])(implicit
     hc: HeaderCarrier
   ): EitherT[Future, StreamError, BodyStorage] =
     if (smallMessageLimitService.isLarge(size)) createObjectStoreObject(movementId, messageId, src).map(BodyStorage.objectStore)
     else getMessageBody(src).map(BodyStorage.mongo)
 
-  private def createObjectStoreObject(movementId: MovementId, messageId: MessageId, src: Source[ByteString, ?])(implicit
+  private def createObjectStoreObject(movementId: MovementId, messageId: MessageId, src: Source[ByteString, _])(implicit
     hc: HeaderCarrier
   ): EitherT[Future, StreamError, ObjectStoreURI] =
     objectStoreService
@@ -146,7 +146,7 @@ class MessageServiceImpl @Inject() (
         summary => ObjectStoreURI(summary.location.asUri)
       )
 
-  private def getMessageBody(src: Source[ByteString, ?]): EitherT[Future, StreamError, String] =
+  private def getMessageBody(src: Source[ByteString, _]): EitherT[Future, StreamError, String] =
     EitherT {
       src
         .fold("")(

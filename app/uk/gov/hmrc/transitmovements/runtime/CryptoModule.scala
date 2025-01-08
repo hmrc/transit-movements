@@ -50,7 +50,7 @@ class CryptoModule extends AbstractModule with Logging {
 
   @Provides
   @Singleton
-  def provideCrypto(config: AppConfig): Encrypter & Decrypter =
+  def provideCrypto(config: AppConfig): Encrypter with Decrypter =
     if (config.encryptionEnabled) SymmetricCryptoFactory.aesGcmCrypto(config.encryptionKey)
     else {
       logger.error(

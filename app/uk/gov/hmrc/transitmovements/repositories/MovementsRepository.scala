@@ -34,8 +34,6 @@ import org.bson.conversions.Bson
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Sorts.descending
 import org.mongodb.scala.model._
-import org.mongodb.scala.SingleObservableFuture
-import org.mongodb.scala.ObservableFuture
 import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
@@ -63,11 +61,13 @@ import java.util.Collections
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import scala.annotation.nowarn
 import scala.concurrent._
 import scala.reflect.ClassTag
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[MovementsRepositoryImpl])
 trait MovementsRepository {
@@ -141,6 +141,7 @@ object MovementsRepositoryImpl {
 }
 
 @Singleton
+@nowarn("msg=It would fail on the following input: Failure\\(_\\)") // this would be fatal exceptions -- we don't want to catch those
 class MovementsRepositoryImpl @Inject() (
   appConfig: AppConfig,
   mongoComponent: MongoComponent,
@@ -189,11 +190,11 @@ class MovementsRepositoryImpl @Inject() (
               Left(InsertNotAcknowledged(s"Insert failed for movement $movement"))
             }
         }
-      case Failure(ex) =>
+      case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def getMovementWithoutMessages(
+  override def getMovementWithoutMessages(
     eoriNumber: EORINumber,
     movementId: MovementId,
     movementType: MovementType
@@ -219,12 +220,12 @@ class MovementsRepositoryImpl @Inject() (
             case Some(opt) => Right(opt)
             case None      => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
-      case Failure(ex) =>
+      case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
   }
 
-  def getMovementEori(
+  override def getMovementEori(
     movementId: MovementId
   ): EitherT[Future, MongoError, MongoMovementEori] = {
 
@@ -246,12 +247,12 @@ class MovementsRepositoryImpl @Inject() (
             case Some(opt) => Right(opt.copy(isTransitional = opt.isTransitional.fold(true.some)(_.some)))
             case None      => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
-      case Failure(ex) =>
+      case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
   }
 
-  def getMessages(
+  override def getMessages(
     eoriNumber: EORINumber,
     movementId: MovementId,
     movementType: MovementType,
@@ -303,11 +304,11 @@ class MovementsRepositoryImpl @Inject() (
             response => Right(response.toVector)
           }
 
-      case Failure(ex) =>
+      case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
-  def getSingleMessage(
+  override def getSingleMessage(
     eoriNumber: EORINumber,
     movementId: MovementId,
     messageId: MessageId,
@@ -336,7 +337,7 @@ class MovementsRepositoryImpl @Inject() (
           case Some(opt) => Right(opt)
           case None      => Left(DocumentNotFound(s"Message ID ${messageId.value} for movement ID ${movementId.value} was not found"))
         }
-      case Failure(ex) =>
+      case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
   }
@@ -349,7 +350,7 @@ class MovementsRepositoryImpl @Inject() (
       )
     }
 
-  def getMovements(
+  override def getMovements(
     eoriNumber: EORINumber,
     movementType: MovementType,
     updatedSince: Option[OffsetDateTime],
@@ -401,7 +402,7 @@ class MovementsRepositoryImpl @Inject() (
               )
               .getOrElse(Right(0L))
           )
-      case Failure(ex) =>
+      case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 
@@ -435,7 +436,7 @@ class MovementsRepositoryImpl @Inject() (
       case _                          => empty()
     }
 
-  def attachMessage(
+  override def attachMessage(
     movementId: MovementId,
     message: MongoMessage,
     mrn: Option[MovementReferenceNumber],
@@ -453,7 +454,7 @@ class MovementsRepositoryImpl @Inject() (
       )
       .getOrElse(Seq())
 
-    mongoRetry(Try(collection.updateOne(filter, mCombine(combined *))) match {
+    mongoRetry(Try(collection.updateOne(filter, mCombine(combined: _*))) match {
       case Success(obs) =>
         obs.toFuture().map {
           result =>
@@ -464,12 +465,12 @@ class MovementsRepositoryImpl @Inject() (
               Left(UpdateNotAcknowledged(s"Message update failed for movement: $movementId"))
             }
         }
-      case Failure(ex) =>
+      case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
   }
 
-  def updateMessage(
+  override def updateMessage(
     movementId: MovementId,
     messageId: MessageId,
     message: MongoMessageUpdateData,
@@ -500,7 +501,7 @@ class MovementsRepositoryImpl @Inject() (
       )
       .getOrElse(Seq.empty)
 
-  def updateMovement(
+  override def updateMovement(
     movementId: MovementId,
     movementEORI: Option[EORINumber],
     mrn: Option[MovementReferenceNumber],
@@ -543,7 +544,7 @@ class MovementsRepositoryImpl @Inject() (
     updates: Seq[Bson],
     updateOptions: UpdateOptions = new UpdateOptions()
   ): EitherT[Future, MongoError, Unit] =
-    mongoRetry(Try(collection.updateOne(filter, mCombine(updates *), updateOptions)) match {
+    mongoRetry(Try(collection.updateOne(filter, mCombine(updates: _*), updateOptions)) match {
       case Success(obs) =>
         obs.toFuture().map {
           result =>
@@ -554,7 +555,7 @@ class MovementsRepositoryImpl @Inject() (
               Left(UpdateNotAcknowledged(s"Message update failed for movement: $movementId"))
             }
         }
-      case Failure(ex) =>
+      case Failure(NonFatal(ex)) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
     })
 

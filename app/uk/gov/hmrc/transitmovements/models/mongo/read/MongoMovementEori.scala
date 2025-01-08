@@ -18,6 +18,9 @@ package uk.gov.hmrc.transitmovements.models.mongo.read
 
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
+import uk.gov.hmrc.transitmovements.models.EORINumber
+import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.MovementWithEori
 import uk.gov.hmrc.transitmovements.models._
 
 object MongoMovementEori {

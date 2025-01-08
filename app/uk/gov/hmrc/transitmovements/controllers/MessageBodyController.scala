@@ -89,7 +89,7 @@ class MessageBodyController @Inject() (
           )
     }
 
-  def createBody(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, ?]] =
+  def createBody(eori: EORINumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
     internalAuth(WRITE_MESSAGE).async(streamFromMemory) {
       implicit request =>
         val received = OffsetDateTime.now(clock)
@@ -130,7 +130,7 @@ class MessageBodyController @Inject() (
 
   private def body(messageResponse: MessageResponse, messageId: MessageId, movementId: MovementId)(implicit
     hc: HeaderCarrier
-  ): EitherT[Future, PresentationError, Source[ByteString, ?]] =
+  ): EitherT[Future, PresentationError, Source[ByteString, _]] =
     messageResponse match {
       case MessageResponse(_, _, _, Some(body), _, _) => EitherT.rightT(Source.single(ByteString(body)))
       case MessageResponse(_, _, _, None, _, Some(uri)) =>

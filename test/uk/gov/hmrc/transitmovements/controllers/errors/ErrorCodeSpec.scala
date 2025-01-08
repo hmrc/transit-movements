@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.transitmovements.controllers.errors
 
-import org.scalatestplus.mockito.MockitoSugar
+import org.mockito.scalatest.MockitoSugar
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import play.api.libs.json.JsError
