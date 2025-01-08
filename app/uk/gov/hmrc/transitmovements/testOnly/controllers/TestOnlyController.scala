@@ -16,6 +16,8 @@
 
 package uk.gov.hmrc.transitmovements.testOnly.controllers
 
+import org.mongodb.scala.SingleObservableFuture
+
 import play.api.mvc.Action
 import play.api.mvc.AnyContent
 import play.api.mvc.ControllerComponents

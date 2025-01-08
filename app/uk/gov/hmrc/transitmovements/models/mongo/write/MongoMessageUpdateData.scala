@@ -29,7 +29,7 @@ object MongoMessageUpdateData {
   def from(updateMessageData: UpdateMessageData): MongoMessageUpdateData =
     MongoMessageUpdateData(
       updateMessageData.objectStoreURI,
-      updateMessageData.body.map(SensitiveString),
+      updateMessageData.body.map(SensitiveString.apply),
       updateMessageData.size,
       updateMessageData.status,
       updateMessageData.messageType,

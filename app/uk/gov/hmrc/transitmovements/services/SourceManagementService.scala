@@ -31,25 +31,25 @@ import scala.concurrent.Future
 
 @ImplementedBy(classOf[SourceManagementServiceImpl])
 trait SourceManagementService {
-  def replicateRequestSource(request: Request[Source[ByteString, _]], count: Int): EitherT[Future, PresentationError, List[Source[ByteString, _]]]
-  def replicateSource(source: Source[ByteString, _], count: Int): EitherT[Future, PresentationError, List[Source[ByteString, _]]]
-  def calculateSize(source: Source[ByteString, _]): EitherT[Future, PresentationError, Long]
+  def replicateRequestSource(request: Request[Source[ByteString, ?]], count: Int): EitherT[Future, PresentationError, List[Source[ByteString, ?]]]
+  def replicateSource(source: Source[ByteString, ?], count: Int): EitherT[Future, PresentationError, List[Source[ByteString, ?]]]
+  def calculateSize(source: Source[ByteString, ?]): EitherT[Future, PresentationError, Long]
 }
 
 class SourceManagementServiceImpl @Inject() (implicit materializer: Materializer, executionContext: ExecutionContext) extends SourceManagementService {
 
-  private def createReusableSource(seq: Seq[ByteString]): Source[ByteString, _] = Source(seq.toList)
+  private def createReusableSource(seq: Seq[ByteString]): Source[ByteString, ?] = Source(seq.toList)
 
-  def replicateSource(source: Source[ByteString, _], count: Int): EitherT[Future, PresentationError, List[Source[ByteString, _]]] =
+  def replicateSource(source: Source[ByteString, ?], count: Int): EitherT[Future, PresentationError, List[Source[ByteString, ?]]] =
     for {
       byteStringSeq <- materializeSource(source)
       reusableSource = createReusableSource(byteStringSeq)
     } yield List.fill(count)(reusableSource)
 
-  def replicateRequestSource(request: Request[Source[ByteString, _]], count: Int): EitherT[Future, PresentationError, List[Source[ByteString, _]]] =
+  def replicateRequestSource(request: Request[Source[ByteString, ?]], count: Int): EitherT[Future, PresentationError, List[Source[ByteString, ?]]] =
     replicateSource(request.body, count)
 
-  private def materializeSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, Seq[ByteString]] =
+  private def materializeSource(source: Source[ByteString, ?]): EitherT[Future, PresentationError, Seq[ByteString]] =
     EitherT(
       source
         .runWith(Sink.seq)
@@ -60,7 +60,7 @@ class SourceManagementServiceImpl @Inject() (implicit materializer: Materializer
         }
     )
 
-  def calculateSize(source: Source[ByteString, _]): EitherT[Future, PresentationError, Long] = {
+  def calculateSize(source: Source[ByteString, ?]): EitherT[Future, PresentationError, Long] = {
     val sizeFuture: Future[Either[PresentationError, Long]] = source
       .map(_.size.toLong)
       .runWith(Sink.fold(0L)(_ + _))

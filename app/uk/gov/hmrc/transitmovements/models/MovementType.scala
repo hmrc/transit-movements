@@ -19,8 +19,8 @@ package uk.gov.hmrc.transitmovements.models
 sealed abstract class MovementType(val value: String, val urlFragment: String)
 
 object MovementType {
-  final case object Departure extends MovementType("departure", "departures")
-  final case object Arrival   extends MovementType("arrival", "arrivals")
+  case object Departure extends MovementType("departure", "departures")
+  case object Arrival   extends MovementType("arrival", "arrivals")
 
   lazy val movementTypes: Set[MovementType] = Set(Arrival, Departure)
 }

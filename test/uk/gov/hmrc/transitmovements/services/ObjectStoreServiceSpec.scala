@@ -24,12 +24,12 @@ import org.mockito.ArgumentMatchers.{eq => eqTo}
 import org.mockito.Mockito.reset
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
-import org.mockito.MockitoSugar.when
+import org.mockito.Mockito.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.ScalaFutures.whenReady
 import org.scalatest.freespec.AnyFreeSpec
-import org.scalatest.matchers.must.Matchers.convertToAnyMustWrapper
+import org.scalatest.matchers.must.Matchers.mustBe
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
@@ -134,7 +134,7 @@ class ObjectStoreServiceSpec
       (movementId, messageId) =>
         val objectSummary: ObjectSummaryWithMd5 = arbitraryObjectSummaryWithMd5.arbitrary.sample.get
 
-        val source: Source[ByteString, _] = Source.single(ByteString("<test>test</test>"))
+        val source: Source[ByteString, ?] = Source.single(ByteString("<test>test</test>"))
 
         when(
           mockObjectStoreClient.putObject(
@@ -171,7 +171,7 @@ class ObjectStoreServiceSpec
 
     "on a failed submission of content in Object store, should return a left" in forAll(arbitrary[MovementId], arbitrary[MessageId]) {
       (movementId, messageId) =>
-        val source: Source[ByteString, _] = Source.single(ByteString("<test>test</test>"))
+        val source: Source[ByteString, ?] = Source.single(ByteString("<test>test</test>"))
 
         val error = ObjectStoreError.UnexpectedError(Some(new Throwable("test")))
         when(

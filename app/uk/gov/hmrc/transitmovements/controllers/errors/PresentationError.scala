@@ -78,14 +78,14 @@ object PresentationError extends CommonFormats with Logging {
     (
       (__ \ MessageFieldName).read[String] and
         (__ \ CodeFieldName).read[ErrorCode]
-    )(StandardError.apply _)
+    )(StandardError.apply)
 
   implicit val duplicateLRNErrorFormat: OFormat[DuplicateLRNError] =
     (
       (__ \ MessageFieldName).format[String] and
         (__ \ CodeFieldName).format[ErrorCode] and
         (__ \ "lrn").format[LocalReferenceNumber]
-    )(DuplicateLRNError.apply, unlift(DuplicateLRNError.unapply))
+    )(DuplicateLRNError.apply, v => (v.message, v.code, v.lrn))
 
   implicit val baseErrorWrites: OWrites[PresentationError] = OWrites {
     case duplicateLRNError: DuplicateLRNError => duplicateLRNErrorFormat.writes(duplicateLRNError)
