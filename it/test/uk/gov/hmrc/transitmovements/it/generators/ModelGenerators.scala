@@ -98,7 +98,7 @@ trait ModelGenerators extends BaseGenerators {
   implicit lazy val ArbitraryOffsetDateTime: Arbitrary[OffsetDateTime] =
     Arbitrary {
       for {
-        millis <- Gen.chooseNum(0, Long.MaxValue / 1000L)
+        millis <- Gen.chooseNum(0L, Long.MaxValue / 1000L)
       } yield OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
     }
 
