@@ -1834,9 +1834,8 @@ class MovementsControllerSpec
       messages = Vector(message1),
       clientId = Some(clientId)
     )
-    val messageResponses1 = MessageResponse.fromMessageWithoutBody(movement.messages.head)
 
-    lazy val messageResponseList = Vector(messageResponses1)
+    lazy val messageResponseList = Vector(MessageResponse.fromMessageWithoutBody(movement.messages.head))
 
     lazy val messageFactoryEither: EitherT[Future, StreamError, Message] =
       EitherT.rightT(message2)
