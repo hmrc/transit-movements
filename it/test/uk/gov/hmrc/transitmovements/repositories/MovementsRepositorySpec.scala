@@ -583,9 +583,9 @@ class MovementsRepositorySpec
     result.toOption.get.totalCount should be(TotalCount(0))
   }
 
-  "getMessageIdsAndType" should "return message ids and type responses if there are messages" in {
+  "getMessageIdsAndType" should "return messages id, type if there are matching messages" in {
 
-    val dateTime = instant // mongo doesn't (generally) like arbitrary datetime values
+    val dateTime = instant
     val messages = GetMovementsSetup
       .setupMessagesWithOutBody(dateTime)
       .sortBy(_.received)
@@ -602,6 +602,18 @@ class MovementsRepositorySpec
     messageIdsAndType should be(
       departure.messages.map(expectedMessageMetadata)
     )
+  }
+
+  "getMessageIdsAndType" should "return error if there is no matching movement with the given id" in {
+
+    val movementId = arbitrary[MovementId].sample.value
+
+    val result = await(
+      repository.getMessageIdsAndType(movementId).value
+    )
+
+    result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
+
   }
 
   "getMovements (Departures)" should

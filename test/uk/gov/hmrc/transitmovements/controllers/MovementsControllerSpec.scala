@@ -1976,7 +1976,7 @@ class MovementsControllerSpec
         status(result) mustBe NOT_FOUND
         contentAsJson(result) mustBe Json.obj(
           "code"    -> "NOT_FOUND",
-          "message" -> "Record not found in database"
+          "message" -> s"Message ID ${triggerId.value} for movement ID ${movementId.value} was not found"
         )
 
         verify(mockInternalAuthActionProvider, times(1)).apply(

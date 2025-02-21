@@ -253,10 +253,9 @@ class MovementsController @Inject() (
         {
           implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
           for {
-            messageType <- extract(request.headers).asPresentation
-            source      <- sourceManagementService.replicateRequestSource(request, 4)
-            messageData <- messagesXmlParsingService.extractMessageData(source(1), messageType).asPresentation
-            received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+            messageType      <- extract(request.headers).asPresentation
+            source           <- sourceManagementService.replicateRequestSource(request, 4)
+            messageData      <- messagesXmlParsingService.extractMessageData(source(1), messageType).asPresentation
             size             <- sourceManagementService.calculateSize(source(2))
             messageIdAndType <- repo.getMessageIdsAndType(movementId).asPresentation
             messageRegenData = MessageRegenData(messageType, source(3), messageData, size, messageIdAndType)
@@ -281,27 +280,9 @@ class MovementsController @Inject() (
     (triggerId, messageRegenData) match {
       case (triggerId, messageRegenData)
           if messageRegenData.messageResponse
-            .exists(_.id == triggerId) && !messageRegenData.messageResponse.exists(_.messageType.get.code == messageRegenData.messageType.code) =>
-        val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-        for {
-          message <- messageService
-            .create(
-              movementId,
-              messageRegenData.messageType,
-              messageRegenData.messageData.generationDate,
-              received,
-              Some(triggerId),
-              messageRegenData.size,
-              messageRegenData.source,
-              messageRegenData.messageType.statusOnAttach
-            )
-            .asPresentation
-          _ <- repo.attachMessage(movementId, message, messageRegenData.messageData.mrn, received).asPresentation
-        } yield MessageRegenNotification(message.id, true)
-
-      case (triggerId, messageRegenData)
-          if messageRegenData.messageResponse
-            .exists(_.id == triggerId) && MessageType.deplicateMessageType.exists(_.code == messageRegenData.messageType.code) =>
+            .exists(_.id == triggerId) && (!messageRegenData.messageResponse.exists(
+            _.messageType.get.code == messageRegenData.messageType.code
+          ) || MessageType.deplicateMessageType.exists(_.code == messageRegenData.messageType.code)) =>
         val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
         for {
           message <- messageService
@@ -326,7 +307,7 @@ class MovementsController @Inject() (
           ) && !MessageType.deplicateMessageType.exists(_.code == messageRegenData.messageType.code) =>
         EitherT.rightT(MessageRegenNotification(triggerId, false))
       case (_, _) =>
-        EitherT.leftT(PresentationError.notFoundError("Record not found in database"))
+        EitherT.leftT(PresentationError.notFoundError(s"Message ID ${triggerId.value} for movement ID ${movementId.value} was not found"))
     }
 
   def getMovementsForEori(

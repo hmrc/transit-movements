@@ -316,7 +316,8 @@ class MovementsRepositoryImpl @Inject() (
         obs
           .toFuture()
           .map {
-            response => Right(response.toVector)
+            case messages if messages.nonEmpty => Right(messages.toVector)
+            case _                             => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
 
       case Failure(ex) =>
