@@ -583,6 +583,27 @@ class MovementsRepositorySpec
     result.toOption.get.totalCount should be(TotalCount(0))
   }
 
+  "getMessageIdsAndType" should "return message ids and type responses if there are messages" in {
+
+    val dateTime = instant // mongo doesn't (generally) like arbitrary datetime values
+    val messages = GetMovementsSetup
+      .setupMessagesWithOutBody(dateTime)
+      .sortBy(_.received)
+      .reverse
+
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
+
+    await(repository.collection.insertOne(departure).toFuture())
+
+    val result = await(repository.getMessageIdsAndType(departure._id).value)
+
+    val messageIdsAndType = result.toOption.get
+
+    messageIdsAndType should be(
+      departure.messages.map(expectedMessageMetadata)
+    )
+  }
+
   "getMovements (Departures)" should
     "return a list of departure movement responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()

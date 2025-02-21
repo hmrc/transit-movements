@@ -123,6 +123,10 @@ trait MovementsRepository {
     receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, MongoPaginatedMessages]
 
+  def getMessageIdsAndType(
+    movementId: MovementId
+  ): EitherT[Future, MongoError, Vector[MongoMessageMetadata]]
+
   def getMovements(
     eoriNumber: EORINumber,
     movementType: MovementType,
@@ -291,6 +295,33 @@ class MovementsRepositoryImpl @Inject() (
       perPageMessages <- filterPerPage[MongoMessageMetadata](aggregates)
       totalCount      <- countItems(filterAggregates)
     } yield MongoPaginatedMessages(TotalCount(totalCount), perPageMessages)
+
+  }
+
+  def getMessageIdsAndType(
+    movementId: MovementId
+  ): EitherT[Future, MongoError, Vector[MongoMessageMetadata]] = {
+    val selector =
+      mEq("_id", movementId.value)
+    val projection = MongoMessageMetadata.simpleMetadataProjection
+    val aggregates = Seq(
+      Aggregates.filter(selector),
+      Aggregates.unwind("$messages"),
+      Aggregates.replaceRoot("$messages"),
+      Aggregates.project(projection)
+    )
+
+    mongoRetry(Try(collection.aggregate[MongoMessageMetadata](aggregates)) match {
+      case Success(obs) =>
+        obs
+          .toFuture()
+          .map {
+            response => Right(response.toVector)
+          }
+
+      case Failure(ex) =>
+        Future.successful(Left(UnexpectedError(Some(ex))))
+    })
 
   }
 

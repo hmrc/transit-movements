@@ -110,9 +110,10 @@ class MovementsControllerSpec
 
   val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
 
-  val movementId = arbitraryMovementId.arbitrary.sample.get
-  val messageId  = arbitraryMessageId.arbitrary.sample.get
-  val triggerId  = arbitraryMessageId.arbitrary.sample.get
+  val movementId        = arbitraryMovementId.arbitrary.sample.get
+  val messageId         = arbitraryMessageId.arbitrary.sample.get
+  val previousMessageId = arbitraryMessageId.arbitrary.sample.get
+  val triggerId         = arbitraryMessageId.arbitrary.sample.get
 
   when(mockMessageFactory.generateId()).thenReturn(messageId.value)
   when(mockMovementFactory.generateId()).thenReturn(movementId.value)
@@ -1803,13 +1804,23 @@ class MovementsControllerSpec
 
     val clientId: ClientId  = arbClientId.arbitrary.sample.get
     val now: OffsetDateTime = OffsetDateTime.now
-    val message: Message =
+    val message1: Message =
+      arbitraryMessage.arbitrary.sample.get.copy(
+        id = previousMessageId,
+        generated = Some(now),
+        received = now,
+        uri = Some(new URI("http://www.google.com")),
+        messageType = Some(messageType)
+      )
+
+    val message2: Message =
       arbitraryMessage.arbitrary.sample.get.copy(
         id = messageId,
         generated = Some(now),
         received = now,
-        triggerId = Some(triggerId),
-        uri = Some(new URI("http://www.google.com"))
+        triggerId = Some(previousMessageId),
+        uri = Some(new URI("http://www.google.com")),
+        messageType = Some(MessageType.ReleaseForTransit)
       )
 
     val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
@@ -1820,14 +1831,17 @@ class MovementsControllerSpec
       movementEORINumber = Some(eoriNumber),
       created = now,
       updated = now,
-      messages = Vector(message),
+      messages = Vector(message1),
       clientId = Some(clientId)
     )
+    val messageResponses1 = MessageResponse.fromMessageWithoutBody(movement.messages.head)
+
+    lazy val messageResponseList = Vector(messageResponses1)
 
     lazy val messageFactoryEither: EitherT[Future, StreamError, Message] =
-      EitherT.rightT(message)
+      EitherT.rightT(message2)
 
-    "must return OK if XML data extraction is successful" in {
+    "must return OK and insert record in db if inserting new message type" in {
 
       val tempFile = SingletonTemporaryFileCreator.create()
 
@@ -1835,6 +1849,9 @@ class MovementsControllerSpec
 
       when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], any[MessageType]))
         .thenReturn(messageDataEither)
+
+      when(mockPersistenceService.getMessageIdsAndType(MovementId(eqTo(movementId.value))))
+        .thenReturn(EitherT.rightT[Future, Vector[MessageResponse]](messageResponseList))
 
       when(
         mockMessageFactory.create(
@@ -1856,14 +1873,14 @@ class MovementsControllerSpec
       when(mockPersistenceService.getMovementEori(any[String].asInstanceOf[MovementId]))
         .thenReturn(EitherT.rightT[Future, MovementWithEori](MovementWithEori.fromMovement(movement)))
 
-      val request = fakeRequest(POST, validXmlStream, movementId, Some(triggerId), Some(messageType.code))
+      val request = fakeRequest(POST, validXmlStream, movementId, Some(previousMessageId), Some(MessageType.ReleaseForTransit.code))
 
       val result: Future[Result] =
-        controller.updateMovement(movementId, Some(triggerId))(request)
+        controller.updateMovement(movementId, Some(previousMessageId))(request)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.toJson(
-        UpdateMovementResponse(messageId = messageId, eori = eoriNumber, clientId = Some(clientId), isTransitional = movement.isTransitional)
+        UpdateMovementResponse(messageId = message2.id, eori = eoriNumber, clientId = Some(clientId), isTransitional = movement.isTransitional, true)
       )
 
       verify(mockInternalAuthActionProvider, times(1)).apply(
@@ -1872,7 +1889,38 @@ class MovementsControllerSpec
       verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
 
-    "must return BAD_REQUEST when XML data extraction fails" - {
+    "must return OK without inserting in db if inserting existing message type" in {
+
+      val tempFile = SingletonTemporaryFileCreator.create()
+
+      when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
+
+      when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], any[MessageType]))
+        .thenReturn(messageDataEither)
+
+      when(mockPersistenceService.getMessageIdsAndType(MovementId(eqTo(movementId.value))))
+        .thenReturn(EitherT.rightT[Future, Vector[MessageResponse]](messageResponseList))
+
+      when(mockPersistenceService.getMovementEori(any[String].asInstanceOf[MovementId]))
+        .thenReturn(EitherT.rightT[Future, MovementWithEori](MovementWithEori.fromMovement(movement)))
+
+      val request = fakeRequest(POST, validXmlStream, movementId, Some(previousMessageId), Some(messageType.code))
+
+      val result: Future[Result] =
+        controller.updateMovement(movementId, Some(previousMessageId))(request)
+
+      status(result) mustBe OK
+      contentAsJson(result) mustBe Json.toJson(
+        UpdateMovementResponse(messageId = message1.id, eori = eoriNumber, clientId = Some(clientId), isTransitional = movement.isTransitional, false)
+      )
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements"), ResourceLocation("movements/messages")), IAAction("WRITE")))
+      )(any[ExecutionContext])
+      verifyNoMoreInteractions(mockInternalAuthActionProvider)
+    }
+
+    "must return BAD_REQUEST, NOT_FOUND when XML data extraction fails, Record not found in database" - {
 
       "contains message to indicate date time failure" in {
 
@@ -1914,30 +1962,11 @@ class MovementsControllerSpec
 
       "contains message to indicate update failed due to document with given id not found" in {
 
-        val tempFile = SingletonTemporaryFileCreator.create()
-        when(mockTemporaryFileCreator.create()).thenReturn(tempFile)
-
         when(mockMessagesXmlParsingService.extractMessageData(any[Source[ByteString, ?]], any[MessageType]))
           .thenReturn(messageDataEither)
 
-        when(
-          mockMessageFactory.create(
-            MovementId(eqTo(movementId.value)),
-            any[MessageType],
-            any[OffsetDateTime],
-            any[OffsetDateTime],
-            eqTo(Some(triggerId)),
-            any[Long],
-            any[Source[ByteString, ?]],
-            any[MessageStatus]
-          )(any[HeaderCarrier])
-        )
-          .thenReturn(messageFactoryEither)
-
-        when(
-          mockPersistenceService.attachMessage(any[String].asInstanceOf[MovementId], any[Message], any[Option[MovementReferenceNumber]], any[OffsetDateTime])
-        )
-          .thenReturn(EitherT.leftT[Future, Unit](MongoError.DocumentNotFound(s"No departure found with the given id: ${movementId.value}")))
+        when(mockPersistenceService.getMessageIdsAndType(MovementId(eqTo(movementId.value))))
+          .thenReturn(EitherT.rightT[Future, Vector[MessageResponse]](messageResponseList))
 
         val request = fakeRequest(POST, validXmlStream, movementId, Some(triggerId), Some(messageType.code))
 
@@ -1947,7 +1976,7 @@ class MovementsControllerSpec
         status(result) mustBe NOT_FOUND
         contentAsJson(result) mustBe Json.obj(
           "code"    -> "NOT_FOUND",
-          "message" -> s"No departure found with the given id: ${movementId.value}"
+          "message" -> "Record not found in database"
         )
 
         verify(mockInternalAuthActionProvider, times(1)).apply(
@@ -2110,7 +2139,7 @@ class MovementsControllerSpec
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.toJson(
-        UpdateMovementResponse(messageId = messageId, eori = eoriNumber, clientId = Some(clientId), isTransitional = movement.isTransitional)
+        UpdateMovementResponse(messageId = messageId, eori = eoriNumber, clientId = Some(clientId), isTransitional = movement.isTransitional, true)
       )
 
       verify(mockInternalAuthActionProvider, times(1)).apply(
