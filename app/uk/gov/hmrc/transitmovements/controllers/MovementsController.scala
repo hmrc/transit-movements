@@ -300,7 +300,7 @@ class MovementsController @Inject() (
           if messageRegenData.messageResponse
             .exists(_.id == triggerId) && (!messageRegenData.messageResponse.exists(
             _.messageType.get.code == messageRegenData.messageType.code
-          ) || MessageType.deplicateMessageType.exists(_.code == messageRegenData.messageType.code)) =>
+          ) || MessageType.duplicateMessageType.exists(_.code == messageRegenData.messageType.code)) =>
         val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
         for {
           message <- messageService
@@ -322,7 +322,7 @@ class MovementsController @Inject() (
           if messageRegenData.messageResponse
             .exists(_.id == triggerId) && messageRegenData.messageResponse.exists(
             _.messageType.get.code == messageRegenData.messageType.code
-          ) && !MessageType.deplicateMessageType.exists(_.code == messageRegenData.messageType.code) =>
+          ) && !MessageType.duplicateMessageType.exists(_.code == messageRegenData.messageType.code) =>
         EitherT.rightT(MessageRegenNotification(triggerId, false))
       case (Some(triggerId), _) =>
         EitherT.leftT(PresentationError.notFoundError(s"Message ID ${triggerId.value} for movement ID ${movementId.value} was not found"))

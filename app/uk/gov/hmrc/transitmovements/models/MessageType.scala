@@ -232,7 +232,7 @@ object MessageType {
 
   val values: Set[MessageType] = arrivalValues ++ departureValues ++ errorValues
 
-  val deplicateMessageType: Set[MessageType] = Set(
+  val duplicateMessageType: Set[MessageType] = Set(
     GoodsReleaseNotification,
     UnloadingPermission,
     GuaranteeInvalid,
