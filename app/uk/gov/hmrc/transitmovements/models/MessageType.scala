@@ -232,6 +232,13 @@ object MessageType {
 
   val values: Set[MessageType] = arrivalValues ++ departureValues ++ errorValues
 
+  val duplicateMessageType: Set[MessageType] = Set(
+    GoodsReleaseNotification,
+    UnloadingPermission,
+    GuaranteeInvalid,
+    ControlDecisionNotification
+  )
+
   def fromHeaderValue(headerValue: String): Option[MessageType] = values.find(_.code == headerValue)
 
   def checkDepartureMessageType(messageType: String): Option[MessageType] = departureRequestValues.find(_.code == messageType)

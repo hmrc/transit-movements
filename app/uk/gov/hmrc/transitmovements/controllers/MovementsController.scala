@@ -253,30 +253,79 @@ class MovementsController @Inject() (
         {
           implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
           for {
-            messageType <- extract(request.headers).asPresentation
-            source      <- sourceManagementService.replicateRequestSource(request, 4)
-            messageData <- messagesXmlParsingService.extractMessageData(source(1), messageType).asPresentation
-            received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-            size <- sourceManagementService.calculateSize(source(2))
-            message <- messageService
-              .create(
-                movementId,
-                messageType,
-                messageData.generationDate,
-                received,
-                triggerId,
-                size,
-                source(3),
-                messageType.statusOnAttach
-              )
-              .asPresentation
-            _                <- repo.attachMessage(movementId, message, messageData.mrn, received).asPresentation
-            movementWithEori <- repo.getMovementEori(movementId).asPresentation
-          } yield UpdateMovementResponse(message.id, movementWithEori.enrollmentEORINumber, movementWithEori.clientId, movementWithEori.isTransitional)
+            messageType      <- extract(request.headers).asPresentation
+            source           <- sourceManagementService.replicateRequestSource(request, 4)
+            messageData      <- messagesXmlParsingService.extractMessageData(source(1), messageType).asPresentation
+            size             <- sourceManagementService.calculateSize(source(2))
+            messageIdAndType <- repo.getMessageIdsAndType(movementId).asPresentation
+            messageRegenData = MessageRegenData(messageType, source(3), messageData, size, messageIdAndType)
+            messageRegenNotification <- messageRegen(movementId, triggerId, messageRegenData)
+            movementWithEori         <- repo.getMovementEori(movementId).asPresentation
+          } yield UpdateMovementResponse(
+            messageRegenNotification.messageId,
+            movementWithEori.enrollmentEORINumber,
+            movementWithEori.clientId,
+            movementWithEori.isTransitional,
+            messageRegenNotification.isInserted
+          )
         }.fold[Result](
           baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
           result => Ok(Json.toJson(result))
         )
+    }
+
+  private def messageRegen(movementId: MovementId, triggerId: Option[MessageId], messageRegenData: MessageRegenData)(implicit
+    hc: HeaderCarrier
+  ): EitherT[Future, PresentationError, MessageRegenNotification] =
+    (triggerId, messageRegenData) match {
+      case (None, messageRegenData) =>
+        val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+        for {
+          message <- messageService
+            .create(
+              movementId,
+              messageRegenData.messageType,
+              messageRegenData.messageData.generationDate,
+              received,
+              None,
+              messageRegenData.size,
+              messageRegenData.source,
+              messageRegenData.messageType.statusOnAttach
+            )
+            .asPresentation
+          _ <- repo.attachMessage(movementId, message, messageRegenData.messageData.mrn, received).asPresentation
+        } yield MessageRegenNotification(message.id, true)
+
+      case (Some(triggerId), messageRegenData)
+          if messageRegenData.messageResponse
+            .exists(_.id == triggerId) && (!messageRegenData.messageResponse.exists(
+            _.messageType.get.code == messageRegenData.messageType.code
+          ) || MessageType.duplicateMessageType.exists(_.code == messageRegenData.messageType.code)) =>
+        val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+        for {
+          message <- messageService
+            .create(
+              movementId,
+              messageRegenData.messageType,
+              messageRegenData.messageData.generationDate,
+              received,
+              Some(triggerId),
+              messageRegenData.size,
+              messageRegenData.source,
+              messageRegenData.messageType.statusOnAttach
+            )
+            .asPresentation
+          _ <- repo.attachMessage(movementId, message, messageRegenData.messageData.mrn, received).asPresentation
+        } yield MessageRegenNotification(message.id, true)
+
+      case (Some(triggerId), messageRegenData)
+          if messageRegenData.messageResponse
+            .exists(_.id == triggerId) && messageRegenData.messageResponse.exists(
+            _.messageType.get.code == messageRegenData.messageType.code
+          ) && !MessageType.duplicateMessageType.exists(_.code == messageRegenData.messageType.code) =>
+        EitherT.rightT(MessageRegenNotification(triggerId, false))
+      case (Some(triggerId), _) =>
+        EitherT.leftT(PresentationError.notFoundError(s"Message ID ${triggerId.value} for movement ID ${movementId.value} was not found"))
     }
 
   def getMovementsForEori(
@@ -421,9 +470,10 @@ class MovementsController @Inject() (
     (for {
       _                <- repo.attachMessage(movementId, message, None, received).asPresentation
       movementWithEori <- repo.getMovementEori(movementId).asPresentation
-    } yield UpdateMovementResponse(message.id, movementWithEori.enrollmentEORINumber, movementWithEori.clientId, movementWithEori.isTransitional)).fold[Result](
-      baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-      result => Ok(Json.toJson(result))
-    )
+    } yield UpdateMovementResponse(message.id, movementWithEori.enrollmentEORINumber, movementWithEori.clientId, movementWithEori.isTransitional, true))
+      .fold[Result](
+        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+        result => Ok(Json.toJson(result))
+      )
   }
 }

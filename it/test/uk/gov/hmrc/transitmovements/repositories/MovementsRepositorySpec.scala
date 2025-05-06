@@ -583,6 +583,39 @@ class MovementsRepositorySpec
     result.toOption.get.totalCount should be(TotalCount(0))
   }
 
+  "getMessageIdsAndType" should "return messages id, type if there are matching messages" in {
+
+    val dateTime = instant
+    val messages = GetMovementsSetup
+      .setupMessagesWithOutBody(dateTime)
+      .sortBy(_.received)
+      .reverse
+
+    val departure = arbitrary[MongoMovement].sample.value.copy(messages = messages)
+
+    await(repository.collection.insertOne(departure).toFuture())
+
+    val result = await(repository.getMessageIdsAndType(departure._id).value)
+
+    val messageIdsAndType = result.toOption.get
+
+    messageIdsAndType should be(
+      departure.messages.map(expectedMessageMetadata)
+    )
+  }
+
+  "getMessageIdsAndType" should "return error if there is no matching movement with the given id" in {
+
+    val movementId = arbitrary[MovementId].sample.value
+
+    val result = await(
+      repository.getMessageIdsAndType(movementId).value
+    )
+
+    result should be(Left(MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
+
+  }
+
   "getMovements (Departures)" should
     "return a list of departure movement responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()

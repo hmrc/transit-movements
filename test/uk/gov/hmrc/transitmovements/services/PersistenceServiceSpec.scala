@@ -586,6 +586,68 @@ class PersistenceServiceSpec
     }
   }
 
+  "getMessageIdsAndType" - {
+
+    "getting a series of messages back from Mongo will perform the correct transformation" in forAll(
+      arbitrary[MovementId],
+      Gen
+        .choose(1, 5)
+        .flatMap(
+          count => Gen.listOfN(count, arbitrary[MongoMessageMetadata])
+        )
+        .map(
+          x => Vector(x *)
+        )
+    ) {
+      (movementId, messageList) =>
+        val (sut, movementsRepository) = createService()
+        when(
+          movementsRepository.getMessageIdsAndType(
+            movementId
+          )
+        ).thenReturn(
+          EitherT.rightT[Future, MongoError](
+            messageList
+          )
+        )
+
+        whenReady(sut.getMessageIdsAndType(movementId).value) {
+          result =>
+            result mustBe Right(
+              messageList.map(_.asMessageResponse)
+            )
+            verify(movementsRepository, times(1)).getMessageIdsAndType(
+              MovementId(eqTo(movementId.value))
+            )
+            verifyNoMoreInteractions(movementsRepository)
+        }
+    }
+
+    "failing to get the list of messages from Mongo will return the error from the repository layer" in forAll(
+      arbitrary[MovementId]
+    ) {
+      movementId =>
+        val error = MongoError.UnexpectedError(Some(new IllegalStateException()))
+
+        val (sut, movementsRepository) = createService()
+        when(
+          movementsRepository.getMessageIdsAndType(
+            MovementId(eqTo(movementId.value))
+          )
+        ).thenReturn(EitherT.leftT[Future, MongoPaginatedMessages](error))
+
+        whenReady(sut.getMessageIdsAndType(movementId).value) {
+          case Left(actual: MongoError.UnexpectedError) =>
+            actual must be theSameInstanceAs error
+            verify(movementsRepository, times(1)).getMessageIdsAndType(
+              MovementId(eqTo(movementId.value))
+            )
+            verifyNoMoreInteractions(movementsRepository)
+          case value => fail(s"Expected a Left of MongoError.UnexpectedError, got $value")
+        }
+    }
+  }
+
   "getMovements" - {
 
     "getting a series of movements back from Mongo will perform the correct transformation" in forAll(

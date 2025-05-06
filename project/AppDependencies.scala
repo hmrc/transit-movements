@@ -4,7 +4,7 @@ object AppDependencies {
 
   private val catsVersion          = "2.12.0"
   private val hmrcMongoVersion     = "2.2.0"
-  private val hmrcBootstrapVersion = "9.3.0"
+  private val hmrcBootstrapVersion = "9.7.0"
 
   val compile: Seq[ModuleID] = Seq(
     "uk.gov.hmrc"             %% "bootstrap-backend-play-30"    % hmrcBootstrapVersion,
@@ -17,10 +17,10 @@ object AppDependencies {
     "org.apache.pekko"        %% "pekko-connectors-xml"         % "1.0.2",
     "uk.gov.hmrc"             %% "internal-auth-client-play-30" % "3.0.0",
     "uk.gov.hmrc"             %% "crypto-json-play-30"          % "8.0.0",
-    "org.apache.pekko" %% "pekko-protobuf-v3" % "1.1.2",
-    "org.apache.pekko" %% "pekko-serialization-jackson" % "1.1.2",
-    "org.apache.pekko" %% "pekko-stream" % "1.1.2",
-    "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
+    "org.apache.pekko"        %% "pekko-protobuf-v3"            % "1.1.2",
+    "org.apache.pekko"        %% "pekko-serialization-jackson"  % "1.1.2",
+    "org.apache.pekko"        %% "pekko-stream"                 % "1.1.2",
+    "org.apache.pekko"        %% "pekko-actor-typed"            % "1.1.2"
   )
 
   val test: Seq[ModuleID] = Seq(
@@ -34,7 +34,6 @@ object AppDependencies {
     "org.mockito"        % "mockito-core"            % "5.14.2",
     "org.scalatestplus" %% "mockito-5-12"            % "3.2.19.0",
     "org.scalacheck"    %% "scalacheck"              % "1.18.1",
-    "org.scalatestplus" %% "scalacheck-1-18"         % "3.2.19.0",
-
+    "org.scalatestplus" %% "scalacheck-1-18"         % "3.2.19.0"
   ).map(_ % Test)
 }

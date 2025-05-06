@@ -19,22 +19,7 @@ package uk.gov.hmrc.transitmovements.services
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.ItemCount
-import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.PageNumber
-import uk.gov.hmrc.transitmovements.models.MessageSender
-import uk.gov.hmrc.transitmovements.models.Movement
-import uk.gov.hmrc.transitmovements.models.MovementType
-import uk.gov.hmrc.transitmovements.models.MovementWithEori
-import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
-import uk.gov.hmrc.transitmovements.models.PaginationMessageSummary
-import uk.gov.hmrc.transitmovements.models.PaginationMovementSummary
-import uk.gov.hmrc.transitmovements.models.UpdateMessageData
+import uk.gov.hmrc.transitmovements.models.*
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
@@ -102,6 +87,10 @@ trait PersistenceService {
     count: Option[ItemCount] = None,
     receivedUntil: Option[OffsetDateTime] = None
   ): EitherT[Future, MongoError, PaginationMessageSummary]
+
+  def getMessageIdsAndType(
+    movementId: MovementId
+  ): EitherT[Future, MongoError, Vector[MessageResponse]]
 
   def getMovements(
     eoriNumber: EORINumber,
@@ -183,6 +172,16 @@ class PersistenceServiceImpl @Inject() (movementsRespository: MovementsRepositor
           messages.totalCount,
           messages.messageSummary.map(_.asMessageResponse)
         )
+    }
+
+  override def getMessageIdsAndType(
+    movementId: MovementId
+  ): EitherT[Future, MongoError, Vector[MessageResponse]] =
+    movementsRespository.getMessageIdsAndType(movementId).map {
+      messages =>
+        messages.map {
+          message => message.asMessageResponse
+        }
     }
 
   override def getMovements(
