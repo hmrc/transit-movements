@@ -32,6 +32,7 @@ case class MessageResponse(
   messageType: Option[MessageType],
   body: Option[String],
   status: Option[MessageStatus],
+  triggerId: Option[MessageId],
   uri: Option[URI] = None
 )
 
@@ -46,6 +47,7 @@ object MessageResponse {
       message.messageType,
       message.body,
       message.status,
+      message.triggerId,
       None
     )
 
@@ -56,6 +58,7 @@ object MessageResponse {
       message.messageType,
       None,
       message.status,
+      message.triggerId,
       message.uri
     )
 }
