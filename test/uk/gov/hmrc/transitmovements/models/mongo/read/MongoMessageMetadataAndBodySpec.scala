@@ -37,6 +37,7 @@ class MongoMessageMetadataAndBodySpec extends AnyFreeSpec with Matchers with Sca
           message.messageType,
           Some(body),
           message.status,
+          message.triggerId,
           message.uri
         )
     }
@@ -49,6 +50,7 @@ class MongoMessageMetadataAndBodySpec extends AnyFreeSpec with Matchers with Sca
           message.messageType,
           None,
           message.status,
+          message.triggerId,
           message.uri
         )
     }

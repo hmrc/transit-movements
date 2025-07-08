@@ -191,6 +191,7 @@ class MessageBodyControllerSpec
                     Some(messageType),
                     None,
                     Some(MessageStatus.Success),
+                    None,
                     Some(new URI(objectStoreUri.value))
                   )
                 )
@@ -459,6 +460,7 @@ class MessageBodyControllerSpec
                 Some(messageType),
                 None,
                 Some(MessageStatus.Success),
+                None,
                 Some(new URI(objectStoreUri.value))
               )
             )

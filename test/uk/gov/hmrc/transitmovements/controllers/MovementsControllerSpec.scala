@@ -1840,11 +1840,11 @@ class MovementsControllerSpec
       movementEORINumber = Some(eoriNumber),
       created = now,
       updated = now,
-      messages = Vector(message1),
+      messages = Vector(message1, message2),
       clientId = Some(clientId)
     )
 
-    lazy val messageResponseList = Vector(MessageResponse.fromMessageWithoutBody(movement.messages.head))
+    lazy val messageResponseList = movement.messages.map(MessageResponse.fromMessageWithoutBody)
 
     lazy val messageFactoryEither: EitherT[Future, StreamError, Message] =
       EitherT.rightT(message2)
@@ -1862,7 +1862,7 @@ class MovementsControllerSpec
         .thenReturn(messageDataEither)
 
       when(mockPersistenceService.getMessageIdsAndType(MovementId(eqTo(movementId.value))))
-        .thenReturn(EitherT.rightT[Future, Vector[MessageResponse]](messageResponseList))
+        .thenReturn(EitherT.rightT[Future, Vector[MessageResponse]](Vector(messageResponseList.head)))
 
       when(
         mockMessageFactory.create(
@@ -1944,7 +1944,7 @@ class MovementsControllerSpec
       verifyNoMoreInteractions(mockInternalAuthActionProvider)
     }
 
-    "must return OK without inserting in db if inserting existing message type" in {
+    "must return OK without inserting in db if inserting a duplicate message" in {
 
       val tempFile = SingletonTemporaryFileCreator.create()
 
@@ -1959,10 +1959,10 @@ class MovementsControllerSpec
       when(mockPersistenceService.getMovementEori(any[String].asInstanceOf[MovementId]))
         .thenReturn(EitherT.rightT[Future, MovementWithEori](MovementWithEori.fromMovement(movement)))
 
-      val request = fakeRequest(POST, validXmlStream, movementId, Some(previousMessageId), Some(messageType.code))
+      val request = fakeRequest(POST, validXmlStream, movementId, message2.triggerId, message2.messageType.map(_.code))
 
       val result: Future[Result] =
-        controller.updateMovement(movementId, Some(previousMessageId))(request)
+        controller.updateMovement(movementId, message2.triggerId)(request)
 
       status(result) mustBe OK
       contentAsJson(result) mustBe Json.toJson(

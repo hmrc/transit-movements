@@ -111,6 +111,7 @@ class MovementsRepositorySpec
       original.messageType,
       original.uri,
       original.body,
+      original.triggerId,
       original.status
     )
 

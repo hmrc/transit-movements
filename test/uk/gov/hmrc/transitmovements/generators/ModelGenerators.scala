@@ -149,7 +149,7 @@ trait ModelGenerators extends BaseGenerators {
         offsetDateTime <- arbitrary[OffsetDateTime]
         messageType    <- Gen.option(arbitrary[MessageType])
         status         <- Gen.oneOf(MessageStatus.statusValues)
-      } yield MessageResponse(id, offsetDateTime, messageType, None, Some(status))
+      } yield MessageResponse(id, offsetDateTime, messageType, None, Some(status), None)
     }
 
   implicit lazy val arbitraryUpdateMessageMetadata: Arbitrary[UpdateMessageMetadata] =
@@ -251,7 +251,7 @@ trait ModelGenerators extends BaseGenerators {
         status         <- Gen.oneOf(MessageStatus.statusValues)
         osUrl          <- Gen.option(arbitrary[URI])
         body           <- Gen.option(Gen.alphaNumStr.map(SensitiveString.apply))
-      } yield MongoMessageMetadataAndBody(id, offsetDateTime, messageType, osUrl, body, Some(status))
+      } yield MongoMessageMetadataAndBody(id, offsetDateTime, messageType, osUrl, body, None, Some(status))
     }
 
   implicit lazy val arbitraryMongoMovementSummary: Arbitrary[MongoMovementSummary] =

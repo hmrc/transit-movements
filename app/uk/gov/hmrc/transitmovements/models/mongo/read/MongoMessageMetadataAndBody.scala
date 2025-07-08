@@ -36,6 +36,7 @@ object MongoMessageMetadataAndBody {
       "messageType" -> 1,
       "status"      -> 1,
       "uri"         -> 1,
+      "triggerId"   -> 1,
       "body"        -> 1
     )
 
@@ -47,6 +48,7 @@ case class MongoMessageMetadataAndBody(
   messageType: Option[MessageType],
   uri: Option[URI],
   body: Option[SensitiveString],
+  triggerId: Option[MessageId],
   status: Option[MessageStatus]
 ) {
 
@@ -57,6 +59,7 @@ case class MongoMessageMetadataAndBody(
       messageType,
       body.map(_.decryptedValue),
       status,
+      triggerId,
       uri
     )
 }

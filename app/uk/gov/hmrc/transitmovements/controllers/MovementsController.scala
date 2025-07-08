@@ -274,58 +274,44 @@ class MovementsController @Inject() (
         )
     }
 
+  private def unmatchedMessageId(messageRegenData: MessageRegenData, triggerId: MessageId): Boolean =
+    !messageRegenData.messageResponse.exists(_.id == triggerId)
+
+  private def isValidDuplicate(messageRegenData: MessageRegenData, triggerId: Option[MessageId]): Boolean =
+    MessageType.duplicateMessageType.exists(_.code == messageRegenData.messageType.code) || !messageRegenData.messageResponse.exists(
+      value => value.messageType.get.code == messageRegenData.messageType.code && value.triggerId == triggerId
+    )
+
+  private def storeMessage(messageRegenData: MessageRegenData, movementId: MovementId, triggerId: Option[MessageId])(implicit
+    hc: HeaderCarrier
+  ): EitherT[Future, PresentationError, MessageRegenNotification] = {
+    val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+    for {
+      message <- messageService
+        .create(
+          movementId,
+          messageRegenData.messageType,
+          messageRegenData.messageData.generationDate,
+          received,
+          triggerId,
+          messageRegenData.size,
+          messageRegenData.source,
+          messageRegenData.messageType.statusOnAttach
+        )
+        .asPresentation
+      _ <- repo.attachMessage(movementId, message, messageRegenData.messageData.mrn, received).asPresentation
+    } yield MessageRegenNotification(message.id, true)
+  }
+
   private def messageRegen(movementId: MovementId, triggerId: Option[MessageId], messageRegenData: MessageRegenData)(implicit
     hc: HeaderCarrier
   ): EitherT[Future, PresentationError, MessageRegenNotification] =
     (triggerId, messageRegenData) match {
-      case (None, messageRegenData) =>
-        val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-        for {
-          message <- messageService
-            .create(
-              movementId,
-              messageRegenData.messageType,
-              messageRegenData.messageData.generationDate,
-              received,
-              None,
-              messageRegenData.size,
-              messageRegenData.source,
-              messageRegenData.messageType.statusOnAttach
-            )
-            .asPresentation
-          _ <- repo.attachMessage(movementId, message, messageRegenData.messageData.mrn, received).asPresentation
-        } yield MessageRegenNotification(message.id, true)
-
-      case (Some(triggerId), messageRegenData)
-          if messageRegenData.messageResponse
-            .exists(_.id == triggerId) && (!messageRegenData.messageResponse.exists(
-            _.messageType.get.code == messageRegenData.messageType.code
-          ) || MessageType.duplicateMessageType.exists(_.code == messageRegenData.messageType.code)) =>
-        val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-        for {
-          message <- messageService
-            .create(
-              movementId,
-              messageRegenData.messageType,
-              messageRegenData.messageData.generationDate,
-              received,
-              Some(triggerId),
-              messageRegenData.size,
-              messageRegenData.source,
-              messageRegenData.messageType.statusOnAttach
-            )
-            .asPresentation
-          _ <- repo.attachMessage(movementId, message, messageRegenData.messageData.mrn, received).asPresentation
-        } yield MessageRegenNotification(message.id, true)
-
-      case (Some(triggerId), messageRegenData)
-          if messageRegenData.messageResponse
-            .exists(_.id == triggerId) && messageRegenData.messageResponse.exists(
-            _.messageType.get.code == messageRegenData.messageType.code
-          ) && !MessageType.duplicateMessageType.exists(_.code == messageRegenData.messageType.code) =>
-        EitherT.rightT(MessageRegenNotification(triggerId, false))
-      case (Some(triggerId), _) =>
+      case (Some(triggerId), _) if unmatchedMessageId(messageRegenData, triggerId) =>
         EitherT.leftT(PresentationError.notFoundError(s"Message ID ${triggerId.value} for movement ID ${movementId.value} was not found"))
+      case (None, messageRegenData)                                                     => storeMessage(messageRegenData, movementId, triggerId)
+      case (Some(_), messageRegenData) if isValidDuplicate(messageRegenData, triggerId) => storeMessage(messageRegenData, movementId, triggerId)
+      case (Some(tId), _)                                                               => EitherT.rightT(MessageRegenNotification(tId, false))
     }
 
   def getMovementsForEori(
