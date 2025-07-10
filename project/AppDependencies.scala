@@ -4,12 +4,12 @@ object AppDependencies {
 
   private val catsVersion          = "2.13.0"
   private val hmrcMongoVersion     = "2.6.0"
-  private val hmrcBootstrapVersion = "9.11.0"
+  private val hmrcBootstrapVersion = "9.13.0"
 
   val compile: Seq[ModuleID] = Seq(
     "uk.gov.hmrc"             %% "bootstrap-backend-play-30"    % hmrcBootstrapVersion,
     "uk.gov.hmrc.mongo"       %% "hmrc-mongo-play-30"           % hmrcMongoVersion,
-    "uk.gov.hmrc.objectstore" %% "object-store-client-play-30"  % "2.1.0",
+    "uk.gov.hmrc.objectstore" %% "object-store-client-play-30"  % "2.2.0",
     "org.typelevel"           %% "cats-core"                    % catsVersion,
     "org.json"                 % "json"                         % "20250107",
     "io.lemonlabs"            %% "scala-uri"                    % "4.0.3",
@@ -29,7 +29,6 @@ object AppDependencies {
     "uk.gov.hmrc"       %% "bootstrap-test-play-30"  % hmrcBootstrapVersion,
     "uk.gov.hmrc.mongo" %% "hmrc-mongo-test-play-30" % hmrcMongoVersion,
     "org.typelevel"     %% "cats-core"               % catsVersion,
-    "org.pegdown"        % "pegdown"                 % "1.6.0",
     "org.scalacheck"    %% "scalacheck"              % "1.18.1",
     "org.mockito"        % "mockito-core"            % "5.17.0",
     "org.scalatestplus" %% "mockito-5-12"            % "3.2.19.0",
