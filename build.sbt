@@ -21,7 +21,6 @@ lazy val microservice = Project(appName, file("."))
   )
   .settings(scoverageSettings)
   .settings(scalacSettings)
-  .settings(resolvers += Resolver.jcenterRepo)
   .settings(inThisBuild(buildSettings))
 
 lazy val it = project
