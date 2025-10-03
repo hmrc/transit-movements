@@ -157,7 +157,8 @@ class MovementsRepositoryImpl @Inject() (
       indexes = Seq(
         IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS)),
         IndexModel(Indexes.ascending("localReferenceNumber"), IndexOptions().background(true)),
-        IndexModel(Indexes.ascending("movementReferenceNumber"), IndexOptions().background(true))
+        IndexModel(Indexes.ascending("movementReferenceNumber"), IndexOptions().background(true)),
+        IndexModel(Indexes.ascending("enrollmentEORINumber"), IndexOptions().unique(false).background(true))
       ),
       extraCodecs = Seq(
         Codecs.playFormatCodec(mongoFormats.movementFormat),
