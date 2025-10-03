@@ -243,8 +243,17 @@ class MovementsRepositorySpec
     result.toOption.isEmpty should be(true)
   }
 
-  "getMovementEori" should "return MovementWithEori if it exists" in {
-    val movement = arbitrary[MongoMovement].sample.value
+  "getMovementEori" should "return MovementWithEori if it exists if is transitional is true" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = true.some)
+
+    await(repository.collection.insertOne(movement).toFuture())
+
+    val result = await(repository.getMovementEori(movement._id).value)
+    result.toOption.get should be(expectedMovementWithEori(movement))
+  }
+
+  "getMovementEori" should "return MovementWithEori if it exists if is transitional is false" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = false.some)
 
     await(repository.collection.insertOne(movement).toFuture())
 
