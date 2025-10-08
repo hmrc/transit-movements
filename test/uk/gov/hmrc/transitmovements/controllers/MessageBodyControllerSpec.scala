@@ -98,7 +98,7 @@ class MessageBodyControllerSpec
           )
           .sample
           .get
-        val mockMovementsRepo = mock[PersistenceService]
+        val mockMovementsRepo                                              = mock[PersistenceService]
         val expectedResponse: EitherT[Future, MongoError, MessageResponse] = EitherT.rightT[Future, MongoError](
           MessageResponse(
             messageId,
@@ -165,7 +165,7 @@ class MessageBodyControllerSpec
     ) {
       (eori, movementType, movementId, messageId, messageType) =>
         val objectStoreUri = testObjectStoreURI(movementId, messageId, now)
-        val xml = Gen
+        val xml            = Gen
           .stringOfN(15, Gen.alphaNumChar)
           .map(
             s => s"<test>$s</test>"
@@ -523,25 +523,21 @@ class MessageBodyControllerSpec
     ) {
       (eori, movementId, messageId, messageType, movementType, string) =>
         val ControllerAndMocks(sut, movementsRepository, _, messagesXmlParsingService, movementsXmlParsingService, messageService) = createController()
-        val extractDataEither: EitherT[Future, ParseError, Option[ExtractedData]] = {
+        val extractDataEither: EitherT[Future, ParseError, Option[ExtractedData]]                                                  =
           if (messageType == MessageType.DeclarationData)
             EitherT.rightT(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), LocalReferenceNumber(string), MessageSender(string))))
           else EitherT.rightT(None)
-        }
-        val lrnOption: Option[LocalReferenceNumber] = {
+        val lrnOption: Option[LocalReferenceNumber] =
           if (messageType == MessageType.DeclarationData) Some(LocalReferenceNumber(string))
           else None
-        }
 
-        val eoriOption: Option[EORINumber] = {
+        val eoriOption: Option[EORINumber] =
           if (messageType == MessageType.DeclarationData) Some(eori)
           else None
-        }
 
-        val messageSenderOption: Option[MessageSender] = {
+        val messageSenderOption: Option[MessageSender] =
           if (messageType == MessageType.DeclarationData) Some(MessageSender(string))
           else None
-        }
 
         when(
           movementsRepository.getSingleMessage(

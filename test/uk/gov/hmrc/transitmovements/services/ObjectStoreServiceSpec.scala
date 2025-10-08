@@ -108,7 +108,7 @@ class ObjectStoreServiceSpec
       val result = service.getObjectStoreFile(ObjectStoreResourceLocation("abc/movement/abc.xml"))
       whenReady(result.value) {
         case Left(_: ObjectStoreError.FileNotFound) => succeed
-        case x =>
+        case x                                      =>
           fail(s"Expected Left(ObjectStoreError.FileNotFound), instead got $x")
 
       }
@@ -122,7 +122,7 @@ class ObjectStoreServiceSpec
       val result  = service.getObjectStoreFile(ObjectStoreResourceLocation("abc/movement/abc.xml"))
       whenReady(result.value) {
         case Left(_: ObjectStoreError.UnexpectedError) => succeed
-        case x =>
+        case x                                         =>
           fail(s"Expected Left(ObjectStoreError.UnexpectedError), instead got $x")
       }
     }

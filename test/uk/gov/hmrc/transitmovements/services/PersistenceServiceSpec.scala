@@ -491,7 +491,7 @@ class PersistenceServiceSpec
           count => Gen.listOfN(count, arbitrary[MongoMessageMetadata])
         )
         .map(
-          x => Vector(x *)
+          x => Vector(x*)
         )
     ) {
       (eori, movementId, movementType, messageList) =>
@@ -596,7 +596,7 @@ class PersistenceServiceSpec
           count => Gen.listOfN(count, arbitrary[MongoMessageMetadata])
         )
         .map(
-          x => Vector(x *)
+          x => Vector(x*)
         )
     ) {
       (movementId, messageList) =>
@@ -659,7 +659,7 @@ class PersistenceServiceSpec
           count => Gen.listOfN(count, arbitrary[MongoMovementSummary])
         )
         .map(
-          x => Vector(x *)
+          x => Vector(x*)
         )
     ) {
       (enrolmentEORI, movementType, movementList) =>

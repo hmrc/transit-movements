@@ -192,7 +192,7 @@ class MovementsControllerSpec
       val uri                  = new URI("test")
       val size                 = Gen.chooseNum[Long](1L, 25000L).sample.getOrElse(1L) // <- This is safer, as it handles None case
       val messageId: MessageId = MessageId("0123456789abcdef")
-      val message =
+      val message              =
         Message(
           messageId,
           received,
@@ -313,7 +313,7 @@ class MovementsControllerSpec
       val uri                  = new URI("test")
       val size                 = Gen.chooseNum[Long](1L, 25000L).sample.getOrElse(1L) // <- This is safer, as it handles None case
       val messageId: MessageId = MessageId("0123456789abcdef")
-      val message =
+      val message              =
         Message(
           messageId,
           received,
@@ -426,7 +426,7 @@ class MovementsControllerSpec
       val uri                  = new URI("test")
       val size                 = Gen.chooseNum[Long](1L, 25000L).sample.getOrElse(1L) // <- This is safer, as it handles None case
       val messageId: MessageId = MessageId("0123456789abcdef")
-      val message =
+      val message              =
         Message(
           messageId,
           received,
@@ -1082,7 +1082,7 @@ class MovementsControllerSpec
         val result: Future[Result] =
           controller.createMovement(eoriNumber, MovementType.Arrival)(request)
 
-        //status(result) mustBe INTERNAL_SERVER_ERROR
+        // status(result) mustBe INTERNAL_SERVER_ERROR
         contentAsJson(result) mustBe Json.obj(
           "code"    -> "INTERNAL_SERVER_ERROR",
           "message" -> "Internal server error"
@@ -1101,7 +1101,7 @@ class MovementsControllerSpec
     val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
 
     val now: OffsetDateTime = OffsetDateTime.now
-    lazy val emptyMovement = arbitrary[Movement].sample.value.copy(
+    lazy val emptyMovement  = arbitrary[Movement].sample.value.copy(
       _id = movementId,
       enrollmentEORINumber = eoriNumber,
       movementEORINumber = None,
@@ -1278,7 +1278,7 @@ class MovementsControllerSpec
         val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
 
         val now: OffsetDateTime = OffsetDateTime.now
-        val message: Message =
+        val message: Message    =
           arbitraryMessage.arbitrary.sample.get.copy(
             id = messageId,
             generated = Some(now),
@@ -1346,7 +1346,7 @@ class MovementsControllerSpec
 
         val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
         val now: OffsetDateTime    = OffsetDateTime.now
-        val message: Message =
+        val message: Message       =
           arbitraryMessage.arbitrary.sample.get.copy(
             id = messageId,
             generated = Some(now),
@@ -1437,7 +1437,7 @@ class MovementsControllerSpec
           val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
           val now: OffsetDateTime    = OffsetDateTime.now
           val request                = FakeRequest("GET", routes.MovementsController.getMessages(eoriNumber, movementType, movementId).url)
-          val message: Message =
+          val message: Message       =
             arbitraryMessage.arbitrary.sample.get.copy(
               id = messageId,
               generated = Some(now),
@@ -1581,7 +1581,7 @@ class MovementsControllerSpec
 
         "must return OK if departures were found" in {
           val now: OffsetDateTime = OffsetDateTime.now
-          val message: Message =
+          val message: Message    =
             arbitraryMessage.arbitrary.sample.get.copy(
               id = messageId,
               generated = Some(now),
@@ -1640,7 +1640,7 @@ class MovementsControllerSpec
             resetInternalAuth()
 
             val now: OffsetDateTime = OffsetDateTime.now
-            val message: Message =
+            val message: Message    =
               arbitraryMessage.arbitrary.sample.get.copy(
                 id = messageId,
                 generated = Some(now),
@@ -1804,7 +1804,7 @@ class MovementsControllerSpec
 
     val clientId: ClientId  = arbClientId.arbitrary.sample.get
     val now: OffsetDateTime = OffsetDateTime.now
-    val message1: Message =
+    val message1: Message   =
       arbitraryMessage.arbitrary.sample.get.copy(
         id = previousMessageId,
         generated = Some(now),
@@ -2156,7 +2156,7 @@ class MovementsControllerSpec
     val now: OffsetDateTime    = OffsetDateTime.now
     val eoriNumber: EORINumber = arbitrary[EORINumber].sample.get
     val clientId: ClientId     = arbitrary[ClientId].sample.get
-    val movement: Movement = arbitrary[Movement].sample.value.copy(
+    val movement: Movement     = arbitrary[Movement].sample.value.copy(
       _id = movementId,
       enrollmentEORINumber = eoriNumber,
       movementEORINumber = Some(eoriNumber),
@@ -2279,29 +2279,25 @@ class MovementsControllerSpec
         ) {
           (eori, movementId, messageId, messageType, lrn, messageSender) =>
             resetInternalAuth()
-            val extractDataEither: EitherT[Future, ParseError, Option[ExtractedData]] = {
+            val extractDataEither: EitherT[Future, ParseError, Option[ExtractedData]] =
               if (messageType == MessageType.DeclarationData)
                 EitherT.liftF(Future.successful(Some(DeclarationData(Some(eori), OffsetDateTime.now(clock), lrn, messageSender))))
               else
                 EitherT.liftF(Future.successful(None))
-            }
 
             val now: OffsetDateTime = OffsetDateTime.now
 
-            val lrnOption: Option[LocalReferenceNumber] = {
+            val lrnOption: Option[LocalReferenceNumber] =
               if (messageType == MessageType.DeclarationData) Some(lrn)
               else None
-            }
 
-            val messageSenderOption: Option[MessageSender] = {
+            val messageSenderOption: Option[MessageSender] =
               if (messageType == MessageType.DeclarationData) Some(messageSender)
               else None
-            }
 
-            val eoriOption: Option[EORINumber] = {
+            val eoriOption: Option[EORINumber] =
               if (messageType == MessageType.DeclarationData) Some(eori)
               else None
-            }
 
             val generatedTime: OffsetDateTime = now.minusMinutes(1)
             val tempFile                      = SingletonTemporaryFileCreator.create()
@@ -2373,7 +2369,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT[Future, Unit](()))
 
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-            val body = Json.obj(
+            val body    = Json.obj(
               "messageType"    -> messageType.code,
               "objectStoreURI" -> "transit-movements/movements/abcdef0123456789/abc.xml",
               "status"         -> "Success"
@@ -2492,7 +2488,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT[Future, Unit](()))
 
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-            val body = Json.obj(
+            val body    = Json.obj(
               "messageType"    -> messageType.code,
               "objectStoreURI" -> "transit-movements/movements/abcdef0123456789/abc.xml",
               "status"         -> "Success"
@@ -2605,7 +2601,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT[Future, Unit](()))
 
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-            val body = Json.obj(
+            val body    = Json.obj(
               "objectStoreURI" -> "transit-movements/movements/abcdef0123456789/abc.xml",
               "status"         -> "Success",
               "messageType"    -> messageType.code
@@ -2659,7 +2655,7 @@ class MovementsControllerSpec
             val now: OffsetDateTime           = OffsetDateTime.now
             val mrn: MovementReferenceNumber  = arbitraryMovementReferenceNumber.arbitrary.sample.get
             val generatedTime: OffsetDateTime = now.minusMinutes(1)
-            val messageType: MessageType = {
+            val messageType: MessageType      = {
               if (movementType == MovementType.Departure) Gen.oneOf(MessageType.departureRequestValues)
               else Gen.oneOf(MessageType.arrivalRequestValues)
             }.sample.get
@@ -2720,7 +2716,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT[Future, Unit](()))
 
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-            val body = Json.obj(
+            val body    = Json.obj(
               "objectStoreURI" -> "something/movements/abcdef0123456789/abc.xml",
               "status"         -> "Success",
               "messageType"    -> messageType.code
@@ -2805,7 +2801,7 @@ class MovementsControllerSpec
             .thenReturn(EitherT.rightT[Future, Unit](()))
 
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-          val body = Json.obj(
+          val body    = Json.obj(
             "status" -> messageStatus.toString
           )
           val request = FakeRequest(
@@ -2844,7 +2840,7 @@ class MovementsControllerSpec
         (eori, messageType) =>
           resetInternalAuth()
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-          val body = Json.obj(
+          val body    = Json.obj(
             "objectStoreURI" -> "transit-movements/something.xml"
           )
 
@@ -2887,7 +2883,7 @@ class MovementsControllerSpec
             .thenReturn(EitherT.rightT[Future, Unit](()))
 
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-          val body = Json.obj(
+          val body    = Json.obj(
             "status" -> "123"
           )
           val request = FakeRequest(
@@ -2962,7 +2958,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT[Future, Unit](()))
 
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-            val body = Json.obj(
+            val body    = Json.obj(
               "status"      -> "Success",
               "messageType" -> "IE015"
             )
@@ -3039,7 +3035,7 @@ class MovementsControllerSpec
               .thenReturn(EitherT.rightT[Future, Unit](()))
 
             val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-            val body = Json.obj(
+            val body    = Json.obj(
               "status"      -> "Success",
               "messageType" -> "IE007"
             )
@@ -3081,7 +3077,7 @@ class MovementsControllerSpec
         eori =>
           resetInternalAuth()
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-          val body = Json.obj(
+          val body    = Json.obj(
             "status"      -> "Success",
             "messageType" -> "IE007"
           )
@@ -3165,7 +3161,7 @@ class MovementsControllerSpec
             .thenReturn(EitherT.rightT[Future, Unit](()))
 
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-          val body = Json.obj(
+          val body    = Json.obj(
             "objectStoreURI" -> "transit-movements/test/abc.xml",
             "status"         -> "Success",
             "messageType"    -> messageType.code
@@ -3209,7 +3205,7 @@ class MovementsControllerSpec
         eori =>
           resetInternalAuth()
           val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-          val body = Json.obj(
+          val body    = Json.obj(
             "status"      -> "Success",
             "messageType" -> "IE015"
           )
@@ -3260,7 +3256,7 @@ class MovementsControllerSpec
           .thenReturn(EitherT.rightT[Future, Unit](()))
 
         val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-        val body = Json.obj(
+        val body    = Json.obj(
           "status" -> messageStatus.toString
         )
         val request = FakeRequest(
@@ -3291,7 +3287,7 @@ class MovementsControllerSpec
       (movementId, messageId) =>
         resetInternalAuth()
         val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-        val body = Json.obj(
+        val body    = Json.obj(
           "status" -> "Nope"
         )
         val request = FakeRequest(
@@ -3333,7 +3329,7 @@ class MovementsControllerSpec
           .thenReturn(EitherT.leftT[Future, Unit](MongoError.DocumentNotFound(s"No movement found with the given id: ${movementId.value}")))
 
         val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
-        val body = Json.obj(
+        val body    = Json.obj(
           "status" -> messageStatus.toString
         )
         val request = FakeRequest(

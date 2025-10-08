@@ -1695,7 +1695,7 @@ class MovementsRepositorySpec
       )
 
     def setup(): Either[MongoError, Unit] = {
-      //populate db in non-time order
+      // populate db in non-time order
 
       await(repository.insert(departureXi2).value)
       await(repository.insert(departureGB2).value)
@@ -1757,7 +1757,7 @@ class MovementsRepositorySpec
     val message1 = arbitrary[MongoMessage].sample.value.copy(body = None, messageType = Some(MessageType.DeclarationData), triggerId = None)
 
     val departureID = arbitrary[MovementId].sample.value
-    val departure =
+    val departure   =
       arbitrary[MongoMovement].sample.value
         .copy(
           _id = departureID,
@@ -1801,7 +1801,7 @@ class MovementsRepositorySpec
     val message1 = arbitrary[MongoMessage].sample.value.copy(body = None, messageType = Some(MessageType.MrnAllocated), triggerId = None)
 
     val departureId = arbitrary[MovementId].sample.value
-    val departure =
+    val departure   =
       arbitrary[MongoMovement].sample.value
         .copy(
           _id = departureId,
@@ -1823,7 +1823,7 @@ class MovementsRepositorySpec
         received = receivedInstant
       )
 
-    val mrn = arbitrary[MovementReferenceNumber].sample.value
+    val mrn    = arbitrary[MovementReferenceNumber].sample.value
     val result = await(
       repository.attachMessage(departureId, message2, Some(mrn), receivedInstant).value
     )

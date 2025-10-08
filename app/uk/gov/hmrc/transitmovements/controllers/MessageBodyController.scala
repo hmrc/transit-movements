@@ -102,7 +102,7 @@ class MessageBodyController @Inject() (
           extractedData <- movementsXmlParsingService.extractData(messageType, source(1)).asPresentation
           size          <- sourceManagementService.calculateSize(source(2))
           bodyStorage   <- messageService.storeIfLarge(movementId, messageId, size, source(3)).asPresentation
-          _ <- persistenceService
+          _             <- persistenceService
             .updateMessage(
               movementId,
               messageId,
@@ -132,11 +132,11 @@ class MessageBodyController @Inject() (
     hc: HeaderCarrier
   ): EitherT[Future, PresentationError, Source[ByteString, ?]] =
     messageResponse match {
-      case MessageResponse(_, _, _, Some(body), _, _, _) => EitherT.rightT(Source.single(ByteString(body)))
+      case MessageResponse(_, _, _, Some(body), _, _, _)   => EitherT.rightT(Source.single(ByteString(body)))
       case MessageResponse(_, _, _, None, _, _, Some(uri)) =>
         for {
           resourceLocation <- extractResourceLocation(ObjectStoreURI(uri.toString))
-          source <- objectStoreService
+          source           <- objectStoreService
             .getObjectStoreFile(resourceLocation)
             .asPresentation(objectStoreErrorWithInternalServiceErrorConverter, implicitly[ExecutionContext])
         } yield source

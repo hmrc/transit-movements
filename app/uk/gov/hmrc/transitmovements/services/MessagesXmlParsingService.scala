@@ -69,7 +69,7 @@ class MessagesXmlParsingServiceImpl @Inject() (implicit materializer: Materializ
         import GraphDSL.Implicits._
 
         val broadcastXml = builder.add(Broadcast[ParseEvent](2))
-        val combiner =
+        val combiner     =
           builder.add(
             ZipWith[ParseResult[OffsetDateTime], ParseResult[Option[MovementReferenceNumber]], ParseResult[MessageData]](
               (date, mrn) => buildMessageData(date, mrn)
@@ -84,7 +84,7 @@ class MessagesXmlParsingServiceImpl @Inject() (implicit materializer: Materializ
         broadcastXml.out(0) ~> dateFlow ~> combiner.in0
 
         if (messageType == MrnAllocated) {
-          val mrnFlow = builder.add(XmlParsers.movementReferenceNumberExtractor("CC028C"))
+          val mrnFlow      = builder.add(XmlParsers.movementReferenceNumberExtractor("CC028C"))
           val toOptionFlow = builder.add(Flow[ParseResult[MovementReferenceNumber]].map[ParseResult[Option[MovementReferenceNumber]]] {
             case Right(mrn) => Right(Some(mrn))
             case Left(x)    => Left(x)
