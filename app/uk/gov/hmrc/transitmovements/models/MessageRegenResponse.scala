@@ -16,6 +16,4 @@
 
 package uk.gov.hmrc.transitmovements.models
 
-import java.time.OffsetDateTime
-
 case class MessageRegenResponse(messageId: MessageId, sendNotification: Boolean)

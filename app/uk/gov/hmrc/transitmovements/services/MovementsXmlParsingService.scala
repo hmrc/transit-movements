@@ -89,10 +89,16 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
           import GraphDSL.Implicits._
 
           val broadcast = builder.add(Broadcast[ParseEvent](4))
-          val combiner = builder.add(
-            ZipWith[ParseResult[Option[EORINumber]], ParseResult[OffsetDateTime], ParseResult[LocalReferenceNumber], ParseResult[MessageSender], ParseResult[
-              DeclarationData
-            ]](
+          val combiner  = builder.add(
+            ZipWith[
+              ParseResult[Option[EORINumber]],
+              ParseResult[OffsetDateTime],
+              ParseResult[LocalReferenceNumber],
+              ParseResult[MessageSender],
+              ParseResult[
+                DeclarationData
+              ]
+            ](
               buildDeclarationData
             )
           )
@@ -120,7 +126,7 @@ class MovementsXmlParsingServiceImpl @Inject() (implicit materializer: Materiali
           import GraphDSL.Implicits._
 
           val broadcast = builder.add(Broadcast[ParseEvent](3))
-          val combiner = builder.add(
+          val combiner  = builder.add(
             ZipWith[ParseResult[Option[EORINumber]], ParseResult[OffsetDateTime], ParseResult[MovementReferenceNumber], ParseResult[ArrivalData]](
               buildArrivalData
             )

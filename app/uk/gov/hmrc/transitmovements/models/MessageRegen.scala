@@ -20,6 +20,4 @@ import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 import uk.gov.hmrc.transitmovements.models.responses.MessageResponse
 
-import java.time.OffsetDateTime
-
 case class MessageRegen(messageType: MessageType, source: Source[ByteString, ?], messageData: MessageData, size: Long, messageResponse: Vector[MessageResponse])

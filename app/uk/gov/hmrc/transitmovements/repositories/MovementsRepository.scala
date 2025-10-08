@@ -34,8 +34,6 @@ import org.bson.conversions.Bson
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Sorts.descending
 import org.mongodb.scala.model._
-import org.mongodb.scala.SingleObservableFuture
-import org.mongodb.scala.ObservableFuture
 import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json._
@@ -354,7 +352,7 @@ class MovementsRepositoryImpl @Inject() (
       mEq("movementType", movementType.value)
     )
     val secondarySelector = mEq("messages.id", messageId.value)
-    val aggregates =
+    val aggregates        =
       Seq(
         Aggregates.filter(selector),
         Aggregates.unwind("$messages"),
@@ -408,7 +406,7 @@ class MovementsRepositoryImpl @Inject() (
     )
     val (from, itemCount) = indices(page, count)
     val filterAggregates  = Seq(Aggregates.filter(selector))
-    val aggregates = filterAggregates ++ Seq(
+    val aggregates        = filterAggregates ++ Seq(
       Aggregates.sort(descending("updated")),
       Aggregates.skip(from),
       Aggregates.limit(itemCount),
@@ -486,7 +484,7 @@ class MovementsRepositoryImpl @Inject() (
       )
       .getOrElse(Seq())
 
-    mongoRetry(Try(collection.updateOne(filter, mCombine(combined *))) match {
+    mongoRetry(Try(collection.updateOne(filter, mCombine(combined*))) match {
       case Success(obs) =>
         obs.toFuture().map {
           result =>
@@ -576,7 +574,7 @@ class MovementsRepositoryImpl @Inject() (
     updates: Seq[Bson],
     updateOptions: UpdateOptions = new UpdateOptions()
   ): EitherT[Future, MongoError, Unit] =
-    mongoRetry(Try(collection.updateOne(filter, mCombine(updates *), updateOptions)) match {
+    mongoRetry(Try(collection.updateOne(filter, mCombine(updates*), updateOptions)) match {
       case Success(obs) =>
         obs.toFuture().map {
           result =>

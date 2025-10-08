@@ -104,7 +104,7 @@ class MovementsController @Inject() (
           arrivalData <- movementsXmlParsingService.extractArrivalData(source(1)).asPresentation
           received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
           movementId = movementFactory.generateId()
-          size <- sourceManagementService.calculateSize(source(2))
+          size    <- sourceManagementService.calculateSize(source(2))
           message <- messageService
             .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, source(3), MessageStatus.Processing)
             .asPresentation
@@ -124,7 +124,7 @@ class MovementsController @Inject() (
           declarationData <- movementsXmlParsingService.extractDeclarationData(source(1)).asPresentation
           received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
           movementId = movementFactory.generateId()
-          size <- sourceManagementService.calculateSize(source(2))
+          size    <- sourceManagementService.calculateSize(source(2))
           message <- messageService
             .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, source(3), MessageStatus.Processing)
             .asPresentation
@@ -149,7 +149,7 @@ class MovementsController @Inject() (
 
   private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = internalAuth(WRITE_MOVEMENT).async(parse.anyContent) {
     implicit request =>
-      val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+      val received    = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
       val messageType = movementType match {
         case MovementType.Arrival   => MessageType.ArrivalNotification
         case MovementType.Departure => MessageType.DeclarationData
@@ -180,7 +180,7 @@ class MovementsController @Inject() (
       implicit request =>
         (for {
           updateStatus <- require[UpdateStatus](request.body)
-          _ <- repo
+          _            <- repo
             .updateMessage(movementId, messageId, UpdateMessageData(updateStatus), OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
             .asPresentation
         } yield Ok)
@@ -211,9 +211,9 @@ class MovementsController @Inject() (
       hc: HeaderCarrier
     ) =
       for {
-        movement <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
-        message  <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
-        _        <- verifyMessageType(messageType, message.messageType)
+        movement      <- repo.getMovementWithoutMessages(eori, movementId, movementType).asPresentation
+        message       <- repo.getSingleMessage(eori, movementId, messageId, movementType).asPresentation
+        _             <- verifyMessageType(messageType, message.messageType)
         generatedDate <- updateMetadataIfRequired(
           movementId,
           message.messageType.getOrElse(messageType),
@@ -387,7 +387,7 @@ class MovementsController @Inject() (
         source               <- sourceManagementService.replicateSource(source, 4)
         extractedData        <- movementsXmlParsingService.extractData(messageType, source(1)).asPresentation
         extractedMessageData <- messagesXmlParsingService.extractMessageData(source(2), messageType).asPresentation
-        _ <- repo
+        _                    <- repo
           .updateMovement(
             movementId,
             extractedData

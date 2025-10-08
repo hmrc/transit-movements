@@ -31,7 +31,7 @@ trait MessageTypeHeaderExtractor {
   def extract(headers: Headers): EitherT[Future, MessageTypeExtractError, MessageType] =
     EitherT {
       headers.get(Constants.MessageType) match {
-        case None => Future.successful(Left(NoHeaderFound("Missing X-Message-Type header value")))
+        case None              => Future.successful(Left(NoHeaderFound("Missing X-Message-Type header value")))
         case Some(headerValue) =>
           MessageType.fromHeaderValue(headerValue) match {
             case None              => Future.successful(Left(InvalidMessageType(s"Invalid X-Message-Type header value: $headerValue")))

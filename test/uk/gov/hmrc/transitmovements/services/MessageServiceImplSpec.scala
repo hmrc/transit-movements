@@ -55,6 +55,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class MessageServiceImplSpec extends SpecBase with ScalaFutures with Matchers with TestActorSystem with ModelGenerators with ScalaCheckDrivenPropertyChecks {
+
   "create" - {
 
     val instant: OffsetDateTime      = OffsetDateTime.now(ZoneOffset.UTC)
