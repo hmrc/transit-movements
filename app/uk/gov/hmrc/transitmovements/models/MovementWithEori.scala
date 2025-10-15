@@ -23,7 +23,7 @@ case class MovementWithEori(
   _id: MovementId,
   enrollmentEORINumber: EORINumber,
   clientId: Option[ClientId],
-  isTransitional: Boolean
+  apiVersion: APIVersionHeader
 )
 
 object MovementWithEori {
@@ -34,6 +34,6 @@ object MovementWithEori {
       movement._id,
       movement.enrollmentEORINumber,
       movement.clientId,
-      movement.isTransitional
+      movement.apiVersion
     )
 }

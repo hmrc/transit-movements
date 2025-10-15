@@ -246,7 +246,7 @@ class MovementsRepositoryImpl @Inject() (
         obs
           .headOption()
           .map {
-            case Some(opt) => Right(opt.copy(isTransitional = opt.isTransitional.fold(true.some)(_.some)))
+            case Some(opt) => Right(opt.copy(apiVersion = opt.apiVersion.fold(APIVersionHeader.V2_1.some)(_.some)))
             case None      => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
       case Failure(ex) =>

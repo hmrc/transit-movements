@@ -17,13 +17,14 @@
 package uk.gov.hmrc.transitmovements.models.mongo.write
 
 import cats.implicits.catsSyntaxOptionId
+import uk.gov.hmrc.transitmovements.models.APIVersionHeader
 import uk.gov.hmrc.transitmovements.models.ClientId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.Movement
+import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 
 import java.time.OffsetDateTime
@@ -43,7 +44,7 @@ object MongoMovement {
       movement.updated,
       movement.messages.map(MongoMessage.from),
       movement.clientId,
-      movement.isTransitional.some
+      movement.apiVersion.some
     )
 
 }
@@ -60,5 +61,5 @@ case class MongoMovement(
   updated: OffsetDateTime,
   messages: Vector[MongoMessage],
   clientId: Option[ClientId],
-  isTransitional: Option[Boolean]
+  apiVersion: Option[APIVersionHeader]
 )

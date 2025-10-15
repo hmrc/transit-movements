@@ -18,12 +18,19 @@ package uk.gov.hmrc.transitmovements.models.responses
 
 import play.api.libs.json.Json
 import play.api.libs.json.OFormat
+import uk.gov.hmrc.transitmovements.models.APIVersionHeader
 import uk.gov.hmrc.transitmovements.models.ClientId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 
-case class UpdateMovementResponse(messageId: MessageId, eori: EORINumber, clientId: Option[ClientId], isTransitional: Boolean, sendNotification: Boolean)
+case class UpdateMovementResponse(
+  messageId: MessageId,
+  eori: EORINumber,
+  clientId: Option[ClientId],
+  sendNotification: Boolean,
+  apiVersion: APIVersionHeader
+)
 
 object UpdateMovementResponse extends CommonFormats {
   implicit val declarationResponseFormat: OFormat[UpdateMovementResponse] = Json.format[UpdateMovementResponse]

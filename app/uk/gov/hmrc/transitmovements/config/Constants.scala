@@ -30,8 +30,7 @@ object Constants {
   val ObjectStoreOwner        = "transit-movements"
   val XClientIdHeader: String = "X-Client-Id"
 
-  val APIVersionHeaderKey: String        = "APIVersion"
-  val APIVersionFinalHeaderValue: String = "final"
+  val APIVersionHeaderKey: String = "APIVersion"
 
   object Predicates {
 

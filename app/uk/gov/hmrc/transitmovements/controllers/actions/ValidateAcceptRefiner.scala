@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package uk.gov.hmrc.transitmovements.controllers.actions
 
 import org.apache.pekko.stream.Materializer
@@ -22,17 +38,17 @@ import scala.concurrent.Future
 
 final case class ValidatedVersionRequest[T](
   versionHeader: APIVersionHeader,
-  request: ContentTypeRequest[T]
+  request: Request[T]
 ) extends WrappedRequest[T](request)
 
 final class ValidateAcceptRefiner @Inject() (cc: ControllerComponents)(implicit val ec: ExecutionContext, mat: Materializer)
-    extends ActionRefiner[ContentTypeRequest, ValidatedVersionRequest]
+    extends ActionRefiner[Request, ValidatedVersionRequest]
     with ActionBuilder[ValidatedVersionRequest, AnyContent] {
 
-  private def validateAcceptHeader(request: ContentTypeRequest[?]): Either[PresentationError, APIVersionHeader] =
+  private def validateAcceptHeader(request: Request[?]): Either[PresentationError, APIVersionHeader] =
     for {
       acceptHeaderValue <-
-        request.request.headers
+        request.headers
           .get("APIVersion")
           .toRight(PresentationError.notAcceptableError("An Accept Header is missing."))
 
@@ -42,7 +58,7 @@ final class ValidateAcceptRefiner @Inject() (cc: ControllerComponents)(implicit 
           .toRight(PresentationError.unsupportedMediaTypeError(s"The Accept header $acceptHeaderValue is not supported."))
     } yield version
 
-  def refine[A](request: ContentTypeRequest[A]): Future[Either[Result, ValidatedVersionRequest[A]]] =
+  def refine[A](request: Request[A]): Future[Either[Result, ValidatedVersionRequest[A]]] =
     validateAcceptHeader(request) match {
       case Left(error) =>
         clearSource(request)
@@ -51,8 +67,8 @@ final class ValidateAcceptRefiner @Inject() (cc: ControllerComponents)(implicit 
         Future.successful(Right(ValidatedVersionRequest(versionHeader, request)))
     }
 
-  private def clearSource(request: ContentTypeRequest[?]): Unit =
-    request.request.body match {
+  private def clearSource(request: Request[?]): Unit =
+    request.body match {
       case source: Source[_, _] => val _ = source.runWith(Sink.ignore)
       case _                    => ()
     }

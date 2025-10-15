@@ -17,7 +17,7 @@
 package uk.gov.hmrc.transitmovements.models.formats
 
 import com.google.inject.Inject
-import play.api.libs.json._
+import play.api.libs.json.*
 import uk.gov.hmrc.crypto.Decrypter
 import uk.gov.hmrc.crypto.Encrypter
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
@@ -25,7 +25,8 @@ import uk.gov.hmrc.crypto.json.JsonEncryption
 import uk.gov.hmrc.mongo.play.json.formats.MongoBinaryFormats
 import uk.gov.hmrc.mongo.play.json.formats.MongoUuidFormats
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models.mongo.read._
+import uk.gov.hmrc.transitmovements.models.APIVersionHeader
+import uk.gov.hmrc.transitmovements.models.mongo.read.*
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 
