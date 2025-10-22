@@ -19,13 +19,14 @@ package uk.gov.hmrc.transitmovements.services
 import org.apache.pekko.stream.Materializer
 import com.google.inject.ImplementedBy
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
+import uk.gov.hmrc.transitmovements.models.APIVersionHeader
 import uk.gov.hmrc.transitmovements.models.ArrivalData
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.ClientId
 import uk.gov.hmrc.transitmovements.models.DeclarationData
+import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.Message
 import uk.gov.hmrc.transitmovements.models.Movement
+import uk.gov.hmrc.transitmovements.models.MovementId
 import uk.gov.hmrc.transitmovements.models.MovementType
 
 import java.security.SecureRandom
@@ -47,7 +48,7 @@ trait MovementFactory {
     created: OffsetDateTime,
     updated: OffsetDateTime,
     clientId: Option[ClientId],
-    isTransitional: Boolean
+    apiVersion: APIVersionHeader
   ): Movement
 
   def createArrival(
@@ -59,7 +60,7 @@ trait MovementFactory {
     created: OffsetDateTime,
     updated: OffsetDateTime,
     clientId: Option[ClientId],
-    isTransitional: Boolean
+    apiVersion: APIVersionHeader
   ): Movement
 
   def createEmptyMovement(
@@ -69,7 +70,7 @@ trait MovementFactory {
     created: OffsetDateTime,
     updated: OffsetDateTime,
     clientId: Option[ClientId],
-    isTransitional: Boolean
+    apiVersion: APIVersionHeader
   ): Movement
 
 }
@@ -92,7 +93,7 @@ class MovementFactoryImpl @Inject() (
     created: OffsetDateTime,
     updated: OffsetDateTime,
     clientId: Option[ClientId],
-    isTransitional: Boolean
+    apiVersion: APIVersionHeader
   ): Movement =
     Movement(
       _id = movementId,
@@ -106,7 +107,7 @@ class MovementFactoryImpl @Inject() (
       updated = updated,
       messages = Vector(message),
       clientId = clientId,
-      isTransitional = isTransitional
+      apiVersion = apiVersion
     )
 
   def createArrival(
@@ -118,7 +119,7 @@ class MovementFactoryImpl @Inject() (
     created: OffsetDateTime,
     updated: OffsetDateTime,
     clientId: Option[ClientId],
-    isTransitional: Boolean
+    apiVersion: APIVersionHeader
   ): Movement =
     Movement(
       _id = movementId,
@@ -132,7 +133,7 @@ class MovementFactoryImpl @Inject() (
       updated = updated,
       messages = Vector(message),
       clientId = clientId,
-      isTransitional = isTransitional
+      apiVersion = apiVersion
     )
 
   def createEmptyMovement(
@@ -142,7 +143,7 @@ class MovementFactoryImpl @Inject() (
     created: OffsetDateTime,
     updated: OffsetDateTime,
     clientId: Option[ClientId],
-    isTransitional: Boolean
+    apiVersion: APIVersionHeader
   ): Movement =
     Movement(
       _id = generateId(),
@@ -156,7 +157,7 @@ class MovementFactoryImpl @Inject() (
       updated = updated,
       messages = Vector(message),
       clientId = clientId,
-      isTransitional = isTransitional
+      apiVersion = apiVersion
     )
 
 }

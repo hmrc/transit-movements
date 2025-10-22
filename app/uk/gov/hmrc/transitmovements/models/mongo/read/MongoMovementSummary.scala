@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovements.models.mongo.read
 
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.bson.conversions.Bson
+import uk.gov.hmrc.transitmovements.models.APIVersionHeader
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementId
@@ -36,7 +37,8 @@ object MongoMovementSummary {
       "movementReferenceNumber" -> 1,
       "localReferenceNumber"    -> 1,
       "created"                 -> 1,
-      "updated"                 -> 1
+      "updated"                 -> 1,
+      "apiVersion"              -> 1
     )
 }
 
@@ -47,7 +49,8 @@ case class MongoMovementSummary(
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
   localReferenceNumber: Option[LocalReferenceNumber],
   created: OffsetDateTime,
-  updated: OffsetDateTime
+  updated: OffsetDateTime,
+  apiVersion: Option[APIVersionHeader]
 ) {
 
   @transient lazy val asMovementWithoutMessages: MovementWithoutMessages =
@@ -58,7 +61,8 @@ case class MongoMovementSummary(
       movementReferenceNumber,
       localReferenceNumber,
       created,
-      updated
+      updated,
+      apiVersion.getOrElse(APIVersionHeader.V2_1)
     )
 
 }

@@ -30,5 +30,5 @@ case class Movement(
   updated: OffsetDateTime,
   messages: Vector[Message],
   clientId: Option[ClientId],
-  isTransitional: Boolean
+  apiVersion: APIVersionHeader
 )

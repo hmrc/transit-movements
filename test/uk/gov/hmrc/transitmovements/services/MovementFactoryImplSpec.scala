@@ -25,6 +25,7 @@ import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.BaseGenerators
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
+import uk.gov.hmrc.transitmovements.models.APIVersionHeader.V2_1
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
 import uk.gov.hmrc.transitmovements.models.ArrivalData
 import uk.gov.hmrc.transitmovements.models.EORINumber
@@ -78,7 +79,7 @@ class MovementFactoryImplSpec
             instant,
             instant,
             clientId,
-            isTransitional = true
+            V2_1
           )
 
         departure.messages.length mustBe 1
@@ -112,7 +113,7 @@ class MovementFactoryImplSpec
             instant,
             instant,
             clientId,
-            isTransitional = true
+            V2_1
           )
 
         arrival.messages.length mustBe 1
@@ -136,7 +137,7 @@ class MovementFactoryImplSpec
     ) {
       (movementType, enrollmentEori, message, clientId) =>
         val movement =
-          sut.createEmptyMovement(enrollmentEori, movementType, message, instant, instant, clientId, isTransitional = true)
+          sut.createEmptyMovement(enrollmentEori, movementType, message, instant, instant, clientId, V2_1)
 
         movement.movementType mustBe movementType
         movement.messages.length mustBe 1

@@ -123,7 +123,8 @@ class MovementsRepositorySpec
       original.movementReferenceNumber,
       original.localReferenceNumber,
       original.created,
-      original.updated
+      original.updated,
+      original.apiVersion
     )
 
   def expectedMovementWithEori(original: MongoMovement): MongoMovementEori =
@@ -131,7 +132,7 @@ class MovementsRepositorySpec
       original._id,
       original.enrollmentEORINumber,
       original.clientId,
-      original.isTransitional
+      original.apiVersion
     )
 
   "DepartureMovementRepository" should "have the correct name" in {
@@ -213,7 +214,7 @@ class MovementsRepositorySpec
     firstItem._id.value should be(emptyMovement._id.value)
     firstItem.movementEORINumber should be(None)
     firstItem.messages.isEmpty should be(true)
-    firstItem.isTransitional should be(emptyMovement.isTransitional)
+    firstItem.apiVersion should be(emptyMovement.apiVersion)
   }
 
   "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists" in {
@@ -225,8 +226,8 @@ class MovementsRepositorySpec
     result.toOption.get should be(expectedMovementSummary(movement))
   }
 
-  "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists with the 'isTransitional' flag not populated" in {
-    val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = None)
+  "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists with the 'V2_1' when apiVerison is not populated" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = None)
     await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
@@ -243,8 +244,8 @@ class MovementsRepositorySpec
     result.toOption.isEmpty should be(true)
   }
 
-  "getMovementEori" should "return MovementWithEori if it exists if is transitional is true" in {
-    val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = true.some)
+  "getMovementEori" should "return V2_1 MovementWithEori if movement is V2_1" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = APIVersionHeader.V2_1.some)
 
     await(repository.collection.insertOne(movement).toFuture())
 
@@ -252,8 +253,8 @@ class MovementsRepositorySpec
     result.toOption.get should be(expectedMovementWithEori(movement))
   }
 
-  "getMovementEori" should "return MovementWithEori if it exists if is transitional is false" in {
-    val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = false.some)
+  "getMovementEori" should "return V3_0 MovementWithEori if movement is V3_0" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = APIVersionHeader.V3_0.some)
 
     await(repository.collection.insertOne(movement).toFuture())
 
@@ -261,13 +262,13 @@ class MovementsRepositorySpec
     result.toOption.get should be(expectedMovementWithEori(movement))
   }
 
-  "getMovementEori" should "return MovementWithEori if it exists with the 'isTransitional' flag not populated" in {
-    val movement = arbitrary[MongoMovement].sample.value.copy(isTransitional = None)
+  "getMovementEori" should "return V2_1 MovementWithEori if apiVersion doesn't exist" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = None)
 
     await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementEori(movement._id).value)
-    result.toOption.get should be(expectedMovementWithEori(movement.copy(isTransitional = true.some)))
+    result.toOption.get should be(expectedMovementWithEori(movement.copy(apiVersion = APIVersionHeader.V2_1.some)))
   }
 
   "getMovementEori" should "return none if the movement doesn't exist" in {

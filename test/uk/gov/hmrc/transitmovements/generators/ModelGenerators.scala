@@ -23,21 +23,22 @@ import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.transitmovements.models.APIVersionHeader
 import uk.gov.hmrc.transitmovements.models.ClientId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.ItemCount
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.PageNumber
 import uk.gov.hmrc.transitmovements.models.Message
+import uk.gov.hmrc.transitmovements.models.MessageId
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
 import uk.gov.hmrc.transitmovements.models.Movement
+import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.ObjectStoreURI
+import uk.gov.hmrc.transitmovements.models.PageNumber
 import uk.gov.hmrc.transitmovements.models.UpdateMessageData
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
 import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
@@ -125,6 +126,8 @@ trait ModelGenerators extends BaseGenerators {
       } yield Message(id, received, generated, Some(messageType), triggerId, url, body, Some(size), Some(status))
     }
 
+  implicit lazy val arbApiVersion: Arbitrary[APIVersionHeader] = Arbitrary(Gen.oneOf(APIVersionHeader.values.toIndexedSeq))
+
   implicit lazy val arbitraryMovement: Arbitrary[Movement] =
     Arbitrary {
       for {
@@ -138,8 +141,8 @@ trait ModelGenerators extends BaseGenerators {
         lrn                     <- arbitrary[Option[LocalReferenceNumber]]
         messageSender           <- arbitrary[Option[MessageSender]]
         clientId                <- arbitrary[Option[ClientId]]
-        isTransitional          <- arbitrary[Boolean]
-      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, lrn, messageSender, created, updated, messages, clientId, isTransitional)
+        apiVersion              <- arbitrary[APIVersionHeader]
+      } yield Movement(id, movementType, eori, Some(eori), movementReferenceNumber, lrn, messageSender, created, updated, messages, clientId, apiVersion)
     }
 
   implicit lazy val arbitraryMessageResponse: Arbitrary[MessageResponse] =
@@ -264,16 +267,17 @@ trait ModelGenerators extends BaseGenerators {
         lrn                     <- arbitrary[Option[LocalReferenceNumber]]
         created                 <- arbitrary[OffsetDateTime]
         updated                 <- arbitrary[OffsetDateTime]
-      } yield MongoMovementSummary(id, eori, movementEori, movementReferenceNumber, lrn, created, updated)
+        apiVersion              <- arbitrary[Option[APIVersionHeader]]
+      } yield MongoMovementSummary(id, eori, movementEori, movementReferenceNumber, lrn, created, updated, apiVersion)
     }
 
   implicit lazy val arbitraryMongoMovementEori: Arbitrary[MongoMovementEori] =
     Arbitrary {
       for {
-        id             <- arbitrary[MovementId]
-        eori           <- arbitrary[EORINumber]
-        clientId       <- Gen.option(arbitrary[ClientId])
-        isTransitional <- arbitrary[Option[Boolean]]
-      } yield MongoMovementEori(id, eori, clientId, isTransitional)
+        id         <- arbitrary[MovementId]
+        eori       <- arbitrary[EORINumber]
+        clientId   <- Gen.option(arbitrary[ClientId])
+        apiVersion <- arbitrary[Option[APIVersionHeader]]
+      } yield MongoMovementEori(id, eori, clientId, apiVersion)
     }
 }

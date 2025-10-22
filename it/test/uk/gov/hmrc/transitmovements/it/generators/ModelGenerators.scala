@@ -20,15 +20,16 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
+import uk.gov.hmrc.transitmovements.models.APIVersionHeader
 import uk.gov.hmrc.transitmovements.models.ClientId
 import uk.gov.hmrc.transitmovements.models.EORINumber
 import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageId
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MessageSender
 import uk.gov.hmrc.transitmovements.models.MessageStatus
 import uk.gov.hmrc.transitmovements.models.MessageType
+import uk.gov.hmrc.transitmovements.models.MovementId
+import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
 import uk.gov.hmrc.transitmovements.models.MovementType
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
@@ -117,6 +118,8 @@ trait ModelGenerators extends BaseGenerators {
       } yield MongoMessage(id, received, generated, Some(messageType), triggerId, url, body, Some(size), Some(status))
     }
 
+  implicit lazy val arbApiVersion: Arbitrary[APIVersionHeader] = Arbitrary(Gen.oneOf(APIVersionHeader.values.toIndexedSeq))
+
   implicit lazy val ArbitraryMovement: Arbitrary[MongoMovement] =
     Arbitrary {
       for {
@@ -130,7 +133,7 @@ trait ModelGenerators extends BaseGenerators {
         updated                 <- arbitrary[OffsetDateTime]
         messages                <- arbitrary[Vector[MongoMessage]]
         clientId                <- arbitrary[Option[ClientId]]
-        isTransitional          <- arbitrary[Option[Boolean]]
+        apiVersion              <- arbitrary[Option[APIVersionHeader]]
       } yield MongoMovement(
         id,
         movementType,
@@ -143,7 +146,7 @@ trait ModelGenerators extends BaseGenerators {
         updated,
         messages,
         clientId,
-        isTransitional
+        apiVersion
       )
     }
 

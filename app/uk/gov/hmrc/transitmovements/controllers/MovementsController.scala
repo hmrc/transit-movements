@@ -16,36 +16,33 @@
 
 package uk.gov.hmrc.transitmovements.controllers
 
+import cats.data.EitherT
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
-import cats.data.EitherT
 import play.api.Logging
+import play.api.http.HeaderNames
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import play.api.libs.json.Reads
-import play.api.mvc.Action
-import play.api.mvc.AnyContent
-import play.api.mvc.ControllerComponents
-import play.api.mvc.Request
-import play.api.mvc.Result
+import play.api.mvc.*
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovements.config.Constants
-import uk.gov.hmrc.transitmovements.config.Constants.Predicates._
-import uk.gov.hmrc.transitmovements.controllers.actions.InternalAuthActionProvider
+import uk.gov.hmrc.transitmovements.config.Constants.Predicates.*
+import uk.gov.hmrc.transitmovements.controllers.actions.*
+import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError
-import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
-import uk.gov.hmrc.transitmovements.models._
+import uk.gov.hmrc.transitmovements.models.*
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.requests.UpdateStatus
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
 import uk.gov.hmrc.transitmovements.models.responses.UpdateMovementResponse
-import uk.gov.hmrc.transitmovements.services._
+import uk.gov.hmrc.transitmovements.services.*
 import uk.gov.hmrc.transitmovements.stream.StreamingParsers
 import uk.gov.hmrc.transitmovements.utils.StreamWithFile
 
@@ -66,7 +63,9 @@ class MovementsController @Inject() (
   messagesXmlParsingService: MessagesXmlParsingService,
   sourceManagementService: SourceManagementService,
   objectStoreService: ObjectStoreService,
-  internalAuth: InternalAuthActionProvider
+  internalAuth: InternalAuthActionProvider,
+  validateAcceptRefiner: ValidateAcceptRefiner,
+  clientIdRefiner: ClientIdRefiner
 )(implicit
   val materializer: Materializer,
   clock: Clock,
@@ -77,99 +76,100 @@ class MovementsController @Inject() (
     with StreamWithFile
     with ConvertError
     with MessageTypeHeaderExtractor
-    with ContentTypeRouting
     with ObjectStoreURIHelpers {
 
   def createMovement(eori: EORINumber, movementType: MovementType): Action[Source[ByteString, ?]] =
-    contentTypeRoute {
-      case Some(_) =>
-        movementType match {
-          case MovementType.Arrival   => createArrival(eori)
-          case MovementType.Departure => createDeparture(eori)
+    (internalAuth(WRITE_MOVEMENT) andThen validateAcceptRefiner andThen clientIdRefiner).async(streamFromMemory) {
+      implicit request =>
+        request.request.headers.get(HeaderNames.CONTENT_TYPE) match {
+          case Some(_) =>
+            movementType match {
+              case MovementType.Arrival   => createArrival(eori)
+              case MovementType.Departure => createDeparture(eori)
+            }
+          case None =>
+            createEmptyMovement(eori, movementType)
         }
-      case None => createEmptyMovement(eori, movementType)
     }
 
-  def isTransitional(implicit request: Request[?]): Boolean =
-    !request.headers
-      .get(Constants.APIVersionHeaderKey)
-      .contains(Constants.APIVersionFinalHeaderValue)
-
-  private def createArrival(eori: EORINumber): Action[Source[ByteString, ?]] = internalAuth(WRITE_MOVEMENT).async(streamFromMemory) {
-    implicit request =>
-      {
-        val clientId = request.headers.get(Constants.XClientIdHeader).map(ClientId(_))
-        for {
-          source      <- sourceManagementService.replicateRequestSource(request, 4)
-          arrivalData <- movementsXmlParsingService.extractArrivalData(source(1)).asPresentation
-          received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-          movementId = movementFactory.generateId()
-          size    <- sourceManagementService.calculateSize(source(2))
-          message <- messageService
-            .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, source(3), MessageStatus.Processing)
-            .asPresentation
-          movement = movementFactory.createArrival(movementId, eori, MovementType.Arrival, arrivalData, message, received, received, clientId, isTransitional)
-          _ <- repo.insertMovement(movement).asPresentation
-        } yield MovementResponse(movement._id, Some(movement.messages.head.id))
-      }.fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), response => Ok(Json.toJson(response)))
-  }
-
-  private def createDeparture(eori: EORINumber): Action[Source[ByteString, ?]] = internalAuth(WRITE_MOVEMENT).async(streamFromMemory) {
-    implicit request =>
-      {
-        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-        val clientId                   = request.headers.get(Constants.XClientIdHeader).map(ClientId(_))
-        for {
-          source          <- sourceManagementService.replicateRequestSource(request, 4)
-          declarationData <- movementsXmlParsingService.extractDeclarationData(source(1)).asPresentation
-          received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-          movementId = movementFactory.generateId()
-          size    <- sourceManagementService.calculateSize(source(2))
-          message <- messageService
-            .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, source(3), MessageStatus.Processing)
-            .asPresentation
-          movement = movementFactory.createDeparture(
-            movementId,
-            eori,
-            MovementType.Departure,
-            declarationData,
-            message,
-            received,
-            received,
-            clientId,
-            isTransitional
-          )
-          _ <- repo.insertMovement(movement).asPresentation
-        } yield MovementResponse(movement._id, Some(movement.messages.head.id))
-      }.fold[Result](
-        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        response => Ok(Json.toJson(response))
+  private def createArrival(eori: EORINumber)(implicit request: ClientIdAndVersionRequest[Source[ByteString, ?]]) = {
+    for {
+      source      <- sourceManagementService.replicateRequestSource(request, 4)
+      arrivalData <- movementsXmlParsingService.extractArrivalData(source(1)).asPresentation
+      received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+      movementId = movementFactory.generateId()
+      size    <- sourceManagementService.calculateSize(source(2))
+      message <- messageService
+        .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, source(3), MessageStatus.Processing)
+        .asPresentation
+      movement = movementFactory.createArrival(
+        movementId,
+        eori,
+        MovementType.Arrival,
+        arrivalData,
+        message,
+        received,
+        received,
+        request.clientId,
+        request.request.versionHeader
       )
-  }
+      _ <- repo.insertMovement(movement).asPresentation
+    } yield MovementResponse(movement._id, Some(movement.messages.head.id))
+  }.fold[Result](baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)), response => Ok(Json.toJson(response)))
 
-  private def createEmptyMovement(eori: EORINumber, movementType: MovementType): Action[AnyContent] = internalAuth(WRITE_MOVEMENT).async(parse.anyContent) {
-    implicit request =>
-      val received    = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
-      val messageType = movementType match {
-        case MovementType.Arrival   => MessageType.ArrivalNotification
-        case MovementType.Departure => MessageType.DeclarationData
-      }
-      val clientId = request.headers.get(Constants.XClientIdHeader).map(ClientId(_))
-      val message  = messageService.createEmptyMessage(Some(messageType), received)
-      val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received, clientId, isTransitional)
-
-      (for {
-        _ <- repo.insertMovement(movement).asPresentation
-      } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
-        baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-        response => Ok(Json.toJson(response))
+  private def createDeparture(eori: EORINumber)(implicit request: ClientIdAndVersionRequest[Source[ByteString, ?]]) = {
+    implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+    for {
+      source          <- sourceManagementService.replicateRequestSource(request, 4)
+      declarationData <- movementsXmlParsingService.extractDeclarationData(source(1)).asPresentation
+      received   = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+      movementId = movementFactory.generateId()
+      size    <- sourceManagementService.calculateSize(source(2))
+      message <- messageService
+        .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, source(3), MessageStatus.Processing)
+        .asPresentation
+      movement = movementFactory.createDeparture(
+        movementId,
+        eori,
+        MovementType.Departure,
+        declarationData,
+        message,
+        received,
+        received,
+        request.clientId,
+        request.request.versionHeader
       )
+      _ <- repo.insertMovement(movement).asPresentation
+    } yield MovementResponse(movement._id, Some(movement.messages.head.id))
+  }.fold[Result](
+    baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+    response => Ok(Json.toJson(response))
+  )
+
+  private def createEmptyMovement(eori: EORINumber, movementType: MovementType)(implicit request: ClientIdAndVersionRequest[Source[ByteString, ?]]) = {
+    val received    = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
+    val messageType = movementType match {
+      case MovementType.Arrival   => MessageType.ArrivalNotification
+      case MovementType.Departure => MessageType.DeclarationData
+    }
+    val message  = messageService.createEmptyMessage(Some(messageType), received)
+    val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received, request.clientId, request.request.versionHeader)
+
+    (for {
+      _ <- repo.insertMovement(movement).asPresentation
+    } yield MovementResponse(movement._id, Some(movement.messages.head.id))).fold[Result](
+      baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+      response => Ok(Json.toJson(response))
+    )
   }
 
   def updateMovement(movementId: MovementId, triggerId: Option[MessageId] = None): Action[Source[ByteString, ?]] =
-    contentTypeRoute {
-      case Some(_) => updateMovementWithStream(movementId, triggerId)
-      case None    => attachEmptyMessage(movementId)
+    internalAuth(WRITE_MESSAGE).async(streamFromMemory) {
+      implicit request =>
+        request.headers.get(HeaderNames.CONTENT_TYPE) match {
+          case Some(_) => updateMovementWithStream(movementId, triggerId)
+          case None    => attachEmptyMessage(movementId)
+        }
     }
 
   // PATCH methods for updating a specific message
@@ -247,32 +247,30 @@ class MovementsController @Inject() (
     }
   }
 
-  private def updateMovementWithStream(movementId: MovementId, triggerId: Option[MessageId]): Action[Source[ByteString, ?]] =
-    internalAuth(WRITE_MESSAGE).async(streamFromMemory) {
-      implicit request =>
-        {
-          implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-          for {
-            messageType      <- extract(request.headers).asPresentation
-            source           <- sourceManagementService.replicateRequestSource(request, 4)
-            messageData      <- messagesXmlParsingService.extractMessageData(source(1), messageType).asPresentation
-            size             <- sourceManagementService.calculateSize(source(2))
-            messageIdAndType <- repo.getMessageIdsAndType(movementId).asPresentation
-            messageRegenData = MessageRegenData(messageType, source(3), messageData, size, messageIdAndType)
-            messageRegenNotification <- messageRegen(movementId, triggerId, messageRegenData)
-            movementWithEori         <- repo.getMovementEori(movementId).asPresentation
-          } yield UpdateMovementResponse(
-            messageRegenNotification.messageId,
-            movementWithEori.enrollmentEORINumber,
-            movementWithEori.clientId,
-            movementWithEori.isTransitional,
-            messageRegenNotification.isInserted
-          )
-        }.fold[Result](
-          baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
-          result => Ok(Json.toJson(result))
-        )
-    }
+  private def updateMovementWithStream(movementId: MovementId, triggerId: Option[MessageId])(implicit
+    request: Request[Source[ByteString, ?]]
+  ) = {
+    implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+    (for {
+      messageType      <- extract(request.headers).asPresentation
+      source           <- sourceManagementService.replicateRequestSource(request, 4)
+      messageData      <- messagesXmlParsingService.extractMessageData(source(1), messageType).asPresentation
+      size             <- sourceManagementService.calculateSize(source(2))
+      messageIdAndType <- repo.getMessageIdsAndType(movementId).asPresentation
+      messageRegenData = MessageRegenData(messageType, source(3), messageData, size, messageIdAndType)
+      messageRegenNotification <- messageRegen(movementId, triggerId, messageRegenData)
+      movementWithEori         <- repo.getMovementEori(movementId).asPresentation
+    } yield UpdateMovementResponse(
+      messageRegenNotification.messageId,
+      movementWithEori.enrollmentEORINumber,
+      movementWithEori.clientId,
+      messageRegenNotification.isInserted,
+      movementWithEori.apiVersion
+    )).fold[Result](
+      baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
+      result => Ok(Json.toJson(result))
+    )
+  }
 
   private def unmatchedMessageId(messageRegenData: MessageRegenData, triggerId: MessageId): Boolean =
     !messageRegenData.messageResponse.exists(_.id == triggerId)
@@ -446,7 +444,7 @@ class MovementsController @Inject() (
       }
     }
 
-  private def attachEmptyMessage(movementId: MovementId): Action[AnyContent] = internalAuth(WRITE_MESSAGE).async {
+  private def attachEmptyMessage(movementId: MovementId) = {
     val received = OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC)
 
     val message = messageService.createEmptyMessage(
@@ -456,7 +454,7 @@ class MovementsController @Inject() (
     (for {
       _                <- repo.attachMessage(movementId, message, None, received).asPresentation
       movementWithEori <- repo.getMovementEori(movementId).asPresentation
-    } yield UpdateMovementResponse(message.id, movementWithEori.enrollmentEORINumber, movementWithEori.clientId, movementWithEori.isTransitional, true))
+    } yield UpdateMovementResponse(message.id, movementWithEori.enrollmentEORINumber, movementWithEori.clientId, true, movementWithEori.apiVersion))
       .fold[Result](
         baseError => Status(baseError.code.statusCode)(Json.toJson(baseError)),
         result => Ok(Json.toJson(result))

@@ -27,7 +27,7 @@ object MongoMovementEori {
       "_id"                  -> 1,
       "enrollmentEORINumber" -> 1,
       "clientId"             -> 1,
-      "isTransitional"       -> 1
+      "apiVersion"           -> 1
     )
 }
 
@@ -35,7 +35,7 @@ case class MongoMovementEori(
   _id: MovementId,
   enrollmentEORINumber: EORINumber,
   clientId: Option[ClientId],
-  isTransitional: Option[Boolean]
+  apiVersion: Option[APIVersionHeader]
 ) {
 
   @transient lazy val movementWithEori: MovementWithEori =
@@ -43,7 +43,7 @@ case class MongoMovementEori(
       _id,
       enrollmentEORINumber,
       clientId,
-      isTransitional.getOrElse(true)
+      apiVersion.getOrElse(APIVersionHeader.V2_1)
     )
 
 }

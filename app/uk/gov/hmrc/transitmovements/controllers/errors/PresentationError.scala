@@ -40,6 +40,9 @@ object PresentationError extends CommonFormats with Logging {
     StandardError(message, ErrorCode.BadRequest)
   }
 
+  def notAcceptableError(message: String): PresentationError =
+    StandardError(message, ErrorCode.NotAcceptable)
+
   def unsupportedMediaTypeError(message: String): PresentationError =
     StandardError(message, ErrorCode.UnsupportedMediaType)
 

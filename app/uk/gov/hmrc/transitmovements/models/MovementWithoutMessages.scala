@@ -28,7 +28,8 @@ case class MovementWithoutMessages(
   movementReferenceNumber: Option[MovementReferenceNumber], // optional pending MRN allocation
   localReferenceNumber: Option[LocalReferenceNumber],
   created: OffsetDateTime,
-  updated: OffsetDateTime
+  updated: OffsetDateTime,
+  apiVersion: APIVersionHeader
 )
 
 object MovementWithoutMessages {
@@ -42,6 +43,7 @@ object MovementWithoutMessages {
       movement.movementReferenceNumber,
       movement.localReferenceNumber,
       movement.created,
-      movement.updated
+      movement.updated,
+      movement.apiVersion
     )
 }
