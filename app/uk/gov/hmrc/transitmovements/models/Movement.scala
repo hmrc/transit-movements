@@ -17,7 +17,6 @@
 package uk.gov.hmrc.transitmovements.models
 
 import java.time.OffsetDateTime
-//
 case class Movement(
   _id: MovementId,
   movementType: MovementType,
