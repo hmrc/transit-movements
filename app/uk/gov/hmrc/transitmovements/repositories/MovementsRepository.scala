@@ -156,7 +156,15 @@ class MovementsRepositoryImpl @Inject() (
         IndexModel(Indexes.ascending("updated"), IndexOptions().expireAfter(appConfig.documentTtl, TimeUnit.SECONDS)),
         IndexModel(Indexes.ascending("localReferenceNumber"), IndexOptions().background(true)),
         IndexModel(Indexes.ascending("movementReferenceNumber"), IndexOptions().background(true)),
-        IndexModel(Indexes.ascending("enrollmentEORINumber"), IndexOptions().unique(false).background(true))
+        IndexModel(Indexes.ascending("enrollmentEORINumber"), IndexOptions().unique(false).background(true)),
+        IndexModel(
+          Indexes.compoundIndex(
+            Indexes.ascending("enrollmentEORINumber"),
+            Indexes.ascending("movementType"),
+            Indexes.descending("updated")
+          ),
+          IndexOptions().background(true)
+        )
       ),
       extraCodecs = Seq(
         Codecs.playFormatCodec(mongoFormats.movementFormat),
