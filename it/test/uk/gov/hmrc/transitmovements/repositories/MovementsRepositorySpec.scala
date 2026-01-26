@@ -1401,7 +1401,7 @@ class MovementsRepositorySpec
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(EORINumber("1234AB")),
         movementType = MovementType.Departure,
-        updated = instant.minusMinutes(3),
+        updated = instant.minusMinutes(4),
         movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5")),
         localReferenceNumber = Some(LocalReferenceNumber("3CnsTh79I7hyOy6"))
       )
@@ -1460,7 +1460,7 @@ class MovementsRepositorySpec
         enrollmentEORINumber = eoriGB,
         movementEORINumber = Some(movementEORI),
         movementType = MovementType.Arrival,
-        updated = instant.minusMinutes(3),
+        updated = instant.minusMinutes(4),
         movementReferenceNumber = Some(MovementReferenceNumber("27WF9X1FQ9RCKN0TM5"))
       )
 
