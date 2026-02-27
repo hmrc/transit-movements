@@ -161,9 +161,17 @@ class MovementsRepositoryImpl @Inject() (
           Indexes.compoundIndex(
             Indexes.ascending("enrollmentEORINumber"),
             Indexes.ascending("movementType"),
+            Indexes.ascending("updated")
+          ),
+          IndexOptions().name("eori_movementType_updated_asc").background(true)
+        ),
+        IndexModel(
+          Indexes.compoundIndex(
+            Indexes.ascending("enrollmentEORINumber"),
+            Indexes.ascending("movementType"),
             Indexes.descending("updated")
           ),
-          IndexOptions().background(true)
+          IndexOptions().name("eori_movementType_updated_des").background(true)
         )
       ),
       extraCodecs = Seq(
