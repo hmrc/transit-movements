@@ -161,17 +161,28 @@ class MovementsRepositoryImpl @Inject() (
           Indexes.compoundIndex(
             Indexes.ascending("enrollmentEORINumber"),
             Indexes.ascending("movementType"),
+            Indexes.ascending("movementReferenceNumber"),
             Indexes.ascending("updated")
           ),
-          IndexOptions().name("eori_movementType_updated_asc").background(true)
+          IndexOptions().background(true)
         ),
         IndexModel(
           Indexes.compoundIndex(
             Indexes.ascending("enrollmentEORINumber"),
             Indexes.ascending("movementType"),
-            Indexes.descending("updated")
+            Indexes.ascending("localReferenceNumber"),
+            Indexes.ascending("updated")
           ),
-          IndexOptions().name("eori_movementType_updated_des").background(true)
+          IndexOptions().background(true)
+        ),
+        IndexModel(
+          Indexes.compoundIndex(
+            Indexes.ascending("enrollmentEORINumber"),
+            Indexes.ascending("movementType"),
+            Indexes.ascending("movementEORINumber"),
+            Indexes.ascending("updated")
+          ),
+          IndexOptions().background(true)
         )
       ),
       extraCodecs = Seq(
@@ -301,16 +312,16 @@ class MovementsRepositoryImpl @Inject() (
     val aggregates =
       filterAggregates ++ Seq(
         Aggregates.sort(descending("received")),
-        Aggregates.skip(from),
-        Aggregates.limit(countNumber),
         Aggregates.project(MongoMessageMetadata.simpleMetadataProjection)
       )
 
-    for {
-      perPageMessages <- filterPerPage[MongoMessageMetadata](aggregates)
-      totalCount      <- countItems(filterAggregates)
-    } yield MongoPaginatedMessages(TotalCount(totalCount), perPageMessages)
+    filterPerPage[MongoMessageMetadata](aggregates).map {
+      perPageMessages =>
+        val slicedPerPageMessages: Vector[MongoMessageMetadata] =
+          perPageMessages.slice(from, from + countNumber)
 
+        MongoPaginatedMessages(TotalCount(perPageMessages.length), slicedPerPageMessages)
+    }
   }
 
   def getMessageIdsAndType(
@@ -424,18 +435,19 @@ class MovementsRepositoryImpl @Inject() (
     val filterAggregates  = Seq(Aggregates.filter(selector))
     val aggregates        = filterAggregates ++ Seq(
       Aggregates.sort(descending("updated")),
-      Aggregates.skip(from),
-      Aggregates.limit(itemCount),
       Aggregates.project(MongoMovementSummary.withoutMessagesProjection)
     )
 
-    for {
-      perPageMovements <- filterPerPage[MongoMovementSummary](aggregates)
-      totalCount       <- countItems(filterAggregates)
-    } yield MongoPaginatedMovements(TotalCount(totalCount), perPageMovements)
+    filterPerPage[MongoMovementSummary](aggregates).map {
+      perPageMovements =>
+        val slicedPerPageMovements: Vector[MongoMovementSummary] =
+          perPageMovements.slice(from, from + itemCount)
 
+        MongoPaginatedMovements(TotalCount(perPageMovements.length), slicedPerPageMovements)
+    }
   }
 
+  // TODO CTCP6-slow-query-fix: remove method since it's no longer used
   private def countItems(totalDocument: Seq[Bson]): EitherT[Future, MongoError, Long] =
     mongoRetry(Try(collection.aggregate[BsonDocument](totalDocument ++ Seq(Aggregates.count()))) match {
       case Success(obs) =>
