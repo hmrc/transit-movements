@@ -30,6 +30,7 @@ import play.api.mvc.*
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
+import uk.gov.hmrc.transitmovements.config.AppConfig
 import uk.gov.hmrc.transitmovements.config.Constants
 import uk.gov.hmrc.transitmovements.config.Constants.Predicates.*
 import uk.gov.hmrc.transitmovements.controllers.actions.*
@@ -38,6 +39,7 @@ import uk.gov.hmrc.transitmovements.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovements.controllers.errors.MessageTypeExtractError
 import uk.gov.hmrc.transitmovements.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovements.models.*
+import uk.gov.hmrc.transitmovements.models.APIVersionHeader.V3_0
 import uk.gov.hmrc.transitmovements.models.requests.UpdateMessageMetadata
 import uk.gov.hmrc.transitmovements.models.requests.UpdateStatus
 import uk.gov.hmrc.transitmovements.models.responses.MovementResponse
@@ -65,7 +67,8 @@ class MovementsController @Inject() (
   objectStoreService: ObjectStoreService,
   internalAuth: InternalAuthActionProvider,
   validateAcceptRefiner: ValidateAcceptRefiner,
-  clientIdRefiner: ClientIdRefiner
+  clientIdRefiner: ClientIdRefiner,
+  appConfig: AppConfig
 )(implicit
   val materializer: Materializer,
   clock: Clock,
@@ -102,7 +105,8 @@ class MovementsController @Inject() (
       message <- messageService
         .create(movementId, MessageType.ArrivalNotification, arrivalData.generationDate, received, None, size, source(3), MessageStatus.Processing)
         .asPresentation
-      movement = movementFactory.createArrival(
+      versionHeader = if appConfig.forceVersion3 then V3_0 else request.request.versionHeader
+      movement      = movementFactory.createArrival(
         movementId,
         eori,
         MovementType.Arrival,
@@ -111,7 +115,7 @@ class MovementsController @Inject() (
         received,
         received,
         request.clientId,
-        request.request.versionHeader
+        versionHeader
       )
       _ <- repo.insertMovement(movement).asPresentation
     } yield MovementResponse(movement._id, Some(movement.messages.head.id))
@@ -128,7 +132,8 @@ class MovementsController @Inject() (
       message <- messageService
         .create(movementId, MessageType.DeclarationData, declarationData.generationDate, received, None, size, source(3), MessageStatus.Processing)
         .asPresentation
-      movement = movementFactory.createDeparture(
+      versionHeader = if appConfig.forceVersion3 then V3_0 else request.request.versionHeader
+      movement      = movementFactory.createDeparture(
         movementId,
         eori,
         MovementType.Departure,
@@ -137,7 +142,7 @@ class MovementsController @Inject() (
         received,
         received,
         request.clientId,
-        request.request.versionHeader
+        versionHeader
       )
       _ <- repo.insertMovement(movement).asPresentation
     } yield MovementResponse(movement._id, Some(movement.messages.head.id))
@@ -152,8 +157,9 @@ class MovementsController @Inject() (
       case MovementType.Arrival   => MessageType.ArrivalNotification
       case MovementType.Departure => MessageType.DeclarationData
     }
-    val message  = messageService.createEmptyMessage(Some(messageType), received)
-    val movement = movementFactory.createEmptyMovement(eori, movementType, message, received, received, request.clientId, request.request.versionHeader)
+    val message       = messageService.createEmptyMessage(Some(messageType), received)
+    val versionHeader = if appConfig.forceVersion3 then V3_0 else request.request.versionHeader
+    val movement      = movementFactory.createEmptyMovement(eori, movementType, message, received, received, request.clientId, versionHeader)
 
     (for {
       _ <- repo.insertMovement(movement).asPresentation
