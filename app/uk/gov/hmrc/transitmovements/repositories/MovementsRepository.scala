@@ -262,8 +262,14 @@ class MovementsRepositoryImpl @Inject() (
         obs
           .headOption()
           .map {
-            case Some(opt) => Right(opt.copy(apiVersion = opt.apiVersion.fold(APIVersionHeader.V2_1.some)(_.some)))
-            case None      => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+            case Some(opt) =>
+              val VersionHeader =
+                if (appConfig.forceVersion3)
+                  APIVersionHeader.V3_0
+                else
+                  opt.apiVersion.getOrElse(APIVersionHeader.V2_1)
+              Right(opt.copy(apiVersion = Some(VersionHeader)))
+            case None => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
       case Failure(ex) =>
         Future.successful(Left(UnexpectedError(Some(ex))))

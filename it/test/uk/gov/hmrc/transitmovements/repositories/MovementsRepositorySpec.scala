@@ -18,6 +18,7 @@ package test.uk.gov.hmrc.transitmovements.repositories
 
 import cats.implicits.catsSyntaxOptionId
 import org.mockito.Mockito
+import org.mockito.Mockito.when
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Aggregates
 import org.mongodb.scala.SingleObservableFuture
@@ -244,13 +245,29 @@ class MovementsRepositorySpec
     result.toOption.isEmpty should be(true)
   }
 
-  "getMovementEori" should "return V2_1 MovementWithEori if movement is V2_1" in {
+  "getMovementEori" should "return V2_1 MovementWithEori if movement is V2_1 and forceVersion3 is false" in {
     val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = APIVersionHeader.V2_1.some)
+
+    when(appConfig.forceVersion3).thenReturn(false)
 
     await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementEori(movement._id).value)
     result.toOption.get should be(expectedMovementWithEori(movement))
+  }
+
+  "getMovementEori" should "override apiVersion to V3_0 when forceVersion3 is true" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = APIVersionHeader.V2_1.some)
+
+    when(appConfig.forceVersion3).thenReturn(true)
+
+    await(repository.collection.insertOne(movement).toFuture())
+
+    val result = await(repository.getMovementEori(movement._id).value)
+
+    val expected = expectedMovementWithEori(movement).copy(apiVersion = APIVersionHeader.V3_0.some)
+
+    result.toOption.get shouldBe expected
   }
 
   "getMovementEori" should "return V3_0 MovementWithEori if movement is V3_0" in {
@@ -262,13 +279,26 @@ class MovementsRepositorySpec
     result.toOption.get should be(expectedMovementWithEori(movement))
   }
 
-  "getMovementEori" should "return V2_1 MovementWithEori if apiVersion doesn't exist" in {
+  "getMovementEori" should "return V2_1 MovementWithEori if apiVersion doesn't exist and forceVersion3 is false" in {
     val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = None)
+
+    when(appConfig.forceVersion3).thenReturn(false)
 
     await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementEori(movement._id).value)
     result.toOption.get should be(expectedMovementWithEori(movement.copy(apiVersion = APIVersionHeader.V2_1.some)))
+  }
+
+  "getMovementEori" should "return V3_0 MovementWithEori if apiVersion doesn't exist and forceVersion3 is true" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = None)
+
+    when(appConfig.forceVersion3).thenReturn(true)
+
+    await(repository.collection.insertOne(movement).toFuture())
+
+    val result = await(repository.getMovementEori(movement._id).value)
+    result.toOption.get should be(expectedMovementWithEori(movement.copy(apiVersion = APIVersionHeader.V3_0.some)))
   }
 
   "getMovementEori" should "return none if the movement doesn't exist" in {
