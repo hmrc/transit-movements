@@ -235,8 +235,14 @@ class MovementsRepositoryImpl @Inject() (
         obs
           .headOption()
           .map {
-            case Some(opt) => Right(opt)
-            case None      => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+            case Some(opt) =>
+              val VersionHeader =
+                if (appConfig.forceVersion3)
+                  Some(APIVersionHeader.V3_0)
+                else
+                  opt.apiVersion
+              Right(opt.copy(apiVersion = VersionHeader))
+            case None => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
       case Failure(ex) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
@@ -438,7 +444,19 @@ class MovementsRepositoryImpl @Inject() (
     for {
       perPageMovements <- filterPerPage[MongoMovementSummary](aggregates)
       totalCount       <- countItems(filterAggregates)
-    } yield MongoPaginatedMovements(TotalCount(totalCount), perPageMovements)
+    } yield {
+      val updatedPerPageMovement = perPageMovements.map {
+        movement =>
+          val versionHeader: Option[APIVersionHeader] =
+            if (appConfig.forceVersion3)
+              Some(APIVersionHeader.V3_0)
+            else
+              movement.apiVersion
+
+          movement.copy(apiVersion = versionHeader)
+      }
+      MongoPaginatedMovements(TotalCount(totalCount), updatedPerPageMovement)
+    }
 
   }
 
