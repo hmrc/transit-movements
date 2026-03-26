@@ -18,6 +18,7 @@ package test.uk.gov.hmrc.transitmovements.repositories
 
 import cats.implicits.catsSyntaxOptionId
 import org.mockito.Mockito
+import org.mockito.Mockito.when
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Aggregates
 import org.mongodb.scala.SingleObservableFuture
@@ -226,12 +227,22 @@ class MovementsRepositorySpec
     result.toOption.get should be(expectedMovementSummary(movement))
   }
 
-  "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists with the 'V2_1' when apiVerison is not populated" in {
+  "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists with the 'V2_1' when apiVerison is not populated forceVersion3 is false" in {
     val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = None)
+    when(appConfig.forceVersion3).thenReturn(false)
     await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
     result.toOption.get shouldBe expectedMovementSummary(movement)
+  }
+
+  "getMovementWithoutMessages" should "return MovementWithoutMessages if it exists with the 'V3_0' when apiVerison is not populated and forceVersion3 is true" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = None)
+    when(appConfig.forceVersion3).thenReturn(true)
+    await(repository.collection.insertOne(movement).toFuture())
+
+    val result = await(repository.getMovementWithoutMessages(movement.enrollmentEORINumber, movement._id, movement.movementType).value)
+    result.toOption.get shouldBe expectedMovementSummary(movement.copy(apiVersion = APIVersionHeader.V3_0.some))
   }
 
   "getMovementWithoutMessages" should "return none if the movement doesn't exist" in {
@@ -244,13 +255,29 @@ class MovementsRepositorySpec
     result.toOption.isEmpty should be(true)
   }
 
-  "getMovementEori" should "return V2_1 MovementWithEori if movement is V2_1" in {
+  "getMovementEori" should "return V2_1 MovementWithEori if movement is V2_1 and forceVersion3 is false" in {
     val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = APIVersionHeader.V2_1.some)
+
+    when(appConfig.forceVersion3).thenReturn(false)
 
     await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementEori(movement._id).value)
     result.toOption.get should be(expectedMovementWithEori(movement))
+  }
+
+  "getMovementEori" should "override apiVersion to V3_0 when forceVersion3 is true" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = APIVersionHeader.V2_1.some)
+
+    when(appConfig.forceVersion3).thenReturn(true)
+
+    await(repository.collection.insertOne(movement).toFuture())
+
+    val result = await(repository.getMovementEori(movement._id).value)
+
+    val expected = expectedMovementWithEori(movement).copy(apiVersion = APIVersionHeader.V3_0.some)
+
+    result.toOption.get shouldBe expected
   }
 
   "getMovementEori" should "return V3_0 MovementWithEori if movement is V3_0" in {
@@ -262,13 +289,26 @@ class MovementsRepositorySpec
     result.toOption.get should be(expectedMovementWithEori(movement))
   }
 
-  "getMovementEori" should "return V2_1 MovementWithEori if apiVersion doesn't exist" in {
+  "getMovementEori" should "return V2_1 MovementWithEori if apiVersion doesn't exist and forceVersion3 is false" in {
     val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = None)
+
+    when(appConfig.forceVersion3).thenReturn(false)
 
     await(repository.collection.insertOne(movement).toFuture())
 
     val result = await(repository.getMovementEori(movement._id).value)
     result.toOption.get should be(expectedMovementWithEori(movement.copy(apiVersion = APIVersionHeader.V2_1.some)))
+  }
+
+  "getMovementEori" should "return V3_0 MovementWithEori if apiVersion doesn't exist and forceVersion3 is true" in {
+    val movement = arbitrary[MongoMovement].sample.value.copy(apiVersion = None)
+
+    when(appConfig.forceVersion3).thenReturn(true)
+
+    await(repository.collection.insertOne(movement).toFuture())
+
+    val result = await(repository.getMovementEori(movement._id).value)
+    result.toOption.get should be(expectedMovementWithEori(movement.copy(apiVersion = APIVersionHeader.V3_0.some)))
   }
 
   "getMovementEori" should "return none if the movement doesn't exist" in {
@@ -630,6 +670,7 @@ class MovementsRepositorySpec
   "getMovements (Departures)" should
     "return a list of departure movement responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()
+      when(appConfig.forceVersion3).thenReturn(false)
       val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, None, None, None, None).value)
 
       val paginationMovementSummary = result.toOption.get
@@ -644,9 +685,27 @@ class MovementsRepositorySpec
       )
     }
 
+  it should "return a list of departure movement responses for the supplied EORI sorted by last updated, latest first with V3_0 APIVersionHeader if forceVersion3 is true" in {
+    GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(true)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, None, None, None, None).value)
+
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
+      Vector(
+        expectedMovementSummary(GetMovementsSetup.departureGB2).copy(apiVersion = APIVersionHeader.V3_0.some),
+        expectedMovementSummary(GetMovementsSetup.departureGB1).copy(apiVersion = APIVersionHeader.V3_0.some)
+      )
+    )
+  }
+
   it should "return a list of departure movement responses for the supplied EORI if there are movements that were updated since the given time" in {
     val dateTime = instant
     GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(false)
     await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, Some(dateTime), None, None, None, None, None, None).value)
 
@@ -665,6 +724,7 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements that were received up until the given time" in {
     val dateTime = instant
     GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(false)
     await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, None, None, None, None, Some(dateTime), None).value)
 
@@ -683,6 +743,7 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements between the updated since and the received until times" in {
     val dateTime = instant
     GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(false)
     await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
     await(repository.collection.insertOne(GetMovementsSetup.departureGB7).toFuture())
     await(repository.collection.insertOne(GetMovementsSetup.departureGB10).toFuture())
@@ -721,6 +782,7 @@ class MovementsRepositorySpec
   it should "return no movement responses for the supplied EORI, if updated since is after received until" in {
     val dateTime = instant
     GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(false)
     await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
     await(repository.collection.insertOne(GetMovementsSetup.departureGB7).toFuture())
     await(repository.collection.insertOne(GetMovementsSetup.departureGB10).toFuture())
@@ -753,6 +815,7 @@ class MovementsRepositorySpec
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed movementEORI" in {
     GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(false)
     await(repository.collection.insertOne(GetMovementsSetup.departureGB4).toFuture())
     val result = await(
       repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Departure, None, Some(GetMovementsSetup.movementEORI), None, None, None, None, None).value
@@ -772,6 +835,7 @@ class MovementsRepositorySpec
 
   it should "return a list of departure movement responses for the first page" in {
 
+    when(appConfig.forceVersion3).thenReturn(false)
     GetMovementsSetup.setupPagination()
     val result =
       await(
@@ -807,6 +871,7 @@ class MovementsRepositorySpec
 
   it should "return a list of departure movement responses for the second page" in {
     GetMovementsSetup.setupPagination()
+    when(appConfig.forceVersion3).thenReturn(false)
 
     val result =
       await(
@@ -843,6 +908,7 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the third page" in {
 
     GetMovementsSetup.setupPagination()
+    when(appConfig.forceVersion3).thenReturn(false)
 
     val result =
       await(
@@ -878,6 +944,7 @@ class MovementsRepositorySpec
 
   it should "return a list of departure movement responses for the last page" in {
     GetMovementsSetup.setupPagination()
+    when(appConfig.forceVersion3).thenReturn(false)
 
     val result =
       await(
@@ -910,6 +977,7 @@ class MovementsRepositorySpec
   it should "return an empty list for an out of range page" in {
 
     GetMovementsSetup.setupPagination()
+    when(appConfig.forceVersion3).thenReturn(false)
 
     val result =
       await(
@@ -939,6 +1007,7 @@ class MovementsRepositorySpec
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that were updated since the given time and passed movementEORI" in {
     val dateTime = instant
+    when(appConfig.forceVersion3).thenReturn(false)
     GetMovementsSetup.setup()
     await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
     val result =
@@ -963,6 +1032,7 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements that were received up until the given time and match the movementEORI" in {
     val dateTime = instant
 
+    when(appConfig.forceVersion3).thenReturn(false)
     GetMovementsSetup.setup()
     await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
     await(repository.collection.insertOne(GetMovementsSetup.departureGB10).toFuture())
@@ -988,6 +1058,7 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI since the beginning if the received until and updated since fields are entered and match the movementEORI" in {
     val dateTime = instant
 
+    when(appConfig.forceVersion3).thenReturn(false)
     GetMovementsSetup.setup()
     await(repository.collection.insertOne(GetMovementsSetup.departureGB3).toFuture())
     await(repository.collection.insertOne(GetMovementsSetup.departureGB10).toFuture())
@@ -1024,6 +1095,7 @@ class MovementsRepositorySpec
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed MRN" in {
     await(repository.collection.insertOne(GetMovementsSetup.departureGB4).toFuture())
+    when(appConfig.forceVersion3).thenReturn(false)
     val result =
       await(
         repository
@@ -1055,6 +1127,7 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with partial match MRN" in {
     await(repository.collection.insertOne(GetMovementsSetup.departureGB5).toFuture())
     await(repository.collection.insertOne(GetMovementsSetup.departureGB6).toFuture())
+    when(appConfig.forceVersion3).thenReturn(false)
     val result =
       await(
         repository
@@ -1076,6 +1149,7 @@ class MovementsRepositorySpec
 
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with passed LRN" in {
     await(repository.collection.insertOne(GetMovementsSetup.departureGB4).toFuture())
+    when(appConfig.forceVersion3).thenReturn(false)
     val result =
       await(
         repository
@@ -1104,6 +1178,7 @@ class MovementsRepositorySpec
   it should "return a list of departure movement responses for the supplied EORI if there are movements that matched with partial match LRN" in {
     await(repository.collection.insertOne(GetMovementsSetup.departureGB5).toFuture())
     await(repository.collection.insertOne(GetMovementsSetup.departureGB6).toFuture())
+    when(appConfig.forceVersion3).thenReturn(false)
     val result =
       await(
         repository
@@ -1125,6 +1200,7 @@ class MovementsRepositorySpec
 
   it should "return no movement ids for an EORI that doesn't exist" in {
     GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(false)
     val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, None, None, None, None, None).value)
 
     val paginationMovementSummary = result.toOption.get
@@ -1135,6 +1211,7 @@ class MovementsRepositorySpec
 
   it should "return no movement ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
+    when(appConfig.forceVersion3).thenReturn(false)
     val result                    = await(repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, None, None, None, None, None).value)
     val paginationMovementSummary = result.toOption.get
 
@@ -1143,6 +1220,7 @@ class MovementsRepositorySpec
   }
 
   it should "return no movement ids for an MRN that doesn't exist" in {
+    when(appConfig.forceVersion3).thenReturn(false)
     GetMovementsSetup.setup()
     val result = await(
       repository.getMovements(EORINumber("FR999"), MovementType.Departure, None, None, Some(MovementReferenceNumber("invalid")), None, None, None, None).value
@@ -1157,6 +1235,7 @@ class MovementsRepositorySpec
   "getArrivals" should
     "return a list of an arrival responses for the supplied EORI sorted by last updated, latest first" in {
       GetMovementsSetup.setup()
+      when(appConfig.forceVersion3).thenReturn(false)
       val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None, None, None, None, None, None).value)
 
       val paginationMovementSummary = result.toOption.get
@@ -1171,9 +1250,27 @@ class MovementsRepositorySpec
       )
     }
 
+  it should "return a list of an arrival responses for the supplied EORI sorted by last updated, latest first with APIVersionHeader V3_0 if forceVersion3 is true" in {
+    GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(true)
+    val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, None, None, None, None, None, None, None).value)
+
+    val paginationMovementSummary = result.toOption.get
+
+    paginationMovementSummary.totalCount should be(TotalCount(2))
+
+    paginationMovementSummary.movementSummary should be(
+      Vector(
+        expectedMovementSummary(GetMovementsSetup.arrivalGB2).copy(apiVersion = APIVersionHeader.V3_0.some),
+        expectedMovementSummary(GetMovementsSetup.arrivalGB1).copy(apiVersion = APIVersionHeader.V3_0.some)
+      )
+    )
+  }
+
   it should "return a list of an arrival movement responses for the supplied EORI if there are movements that were updated since the given time" in {
     val dateTime = instant
     GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(false)
     await(repository.collection.insertOne(GetMovementsSetup.arrivalGB3).toFuture())
     val result = await(repository.getMovements(GetMovementsSetup.eoriGB, MovementType.Arrival, Some(dateTime), None, None, localReferenceNumber = None).value)
 
@@ -1191,6 +1288,7 @@ class MovementsRepositorySpec
 
   it should "return a list of an arrival movement responses for the supplied EORI if there are movements that matched with passed movementEORI" in {
     GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(false)
     await(repository.collection.insertOne(GetMovementsSetup.arrivalGB4).toFuture())
     val result = await(
       repository
@@ -1213,6 +1311,7 @@ class MovementsRepositorySpec
   it should "return a list of an arrival movement responses for the supplied EORI if there are movements that were updated since the given time and passed movementEORI" in {
     val dateTime = instant
     GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(false)
     await(repository.collection.insertOne(GetMovementsSetup.arrivalGB3).toFuture())
     val result =
       await(
@@ -1235,6 +1334,7 @@ class MovementsRepositorySpec
 
   it should "return a list of arrival movement responses for the supplied EORI if there are movements that matched with passed MRN" in {
     await(repository.collection.insertOne(GetMovementsSetup.arrivalGB3).toFuture())
+    when(appConfig.forceVersion3).thenReturn(false)
     val result =
       await(
         repository
@@ -1266,6 +1366,7 @@ class MovementsRepositorySpec
   it should "return a list of arrival movement responses for the supplied EORI if there are movements that matched with partial match MRN" in {
     await(repository.collection.insertOne(GetMovementsSetup.arrivalGB5).toFuture())
     await(repository.collection.insertOne(GetMovementsSetup.arrivalGB6).toFuture())
+    when(appConfig.forceVersion3).thenReturn(false)
     val result =
       await(
         repository
@@ -1287,6 +1388,7 @@ class MovementsRepositorySpec
 
   it should "return no arrival ids for an EORI that doesn't exist" in {
     GetMovementsSetup.setup()
+    when(appConfig.forceVersion3).thenReturn(false)
     val result = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, None, None, None, None, None).value)
 
     val paginationMovementSummary = result.toOption.get
@@ -1298,6 +1400,7 @@ class MovementsRepositorySpec
 
   it should "return no arrival ids when the db is empty" in {
     // the collection is empty at this point due to DefaultPlayMongoRepositorySupport
+    when(appConfig.forceVersion3).thenReturn(false)
     val result                    = await(repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, None, None, None, None, None).value)
     val paginationMovementSummary = result.toOption.get
 
@@ -1306,6 +1409,7 @@ class MovementsRepositorySpec
   }
 
   it should "return no movement ids for an MRN that doesn't exist" in {
+    when(appConfig.forceVersion3).thenReturn(false)
     GetMovementsSetup.setup()
     val result = await(
       repository.getMovements(EORINumber("FR999"), MovementType.Arrival, None, None, Some(MovementReferenceNumber("invalid")), None, None, None, None).value
