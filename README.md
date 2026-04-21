@@ -45,7 +45,7 @@ The following sbt tasks are available on this project
 
 ### CTC Traders API related documentation
 
-- [CTC Traders API specifications](https://developer.service.hmrc.gov.uk/api-documentation/docs/api/service/common-transit-convention-traders/2.0) lets you see a list of our endpoints.
+- [CTC Traders API specifications](https://developer.service.hmrc.gov.uk/api-documentation/docs/api/service/common-transit-convention-traders/2.1) lets you see a list of our endpoints.
 
 ### Helpful information
 
