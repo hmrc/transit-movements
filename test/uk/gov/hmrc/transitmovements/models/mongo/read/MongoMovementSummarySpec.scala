@@ -21,7 +21,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.APIVersionHeader.V2_1
+import uk.gov.hmrc.transitmovements.models.APIVersionHeader
 import uk.gov.hmrc.transitmovements.models.MovementWithoutMessages
 
 class MongoMovementSummarySpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPropertyChecks with ModelGenerators {
@@ -37,7 +37,7 @@ class MongoMovementSummarySpec extends AnyFreeSpec with Matchers with ScalaCheck
           movement.localReferenceNumber,
           movement.created,
           movement.updated,
-          movement.apiVersion.getOrElse(V2_1)
+          movement.apiVersion.getOrElse(APIVersionHeader.V3_0)
         )
     }
   }

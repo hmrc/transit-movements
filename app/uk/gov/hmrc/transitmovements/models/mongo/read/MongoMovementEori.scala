@@ -43,7 +43,7 @@ case class MongoMovementEori(
       _id,
       enrollmentEORINumber,
       clientId,
-      apiVersion.getOrElse(APIVersionHeader.V2_1)
+      apiVersion.getOrElse(APIVersionHeader.V3_0)
     )
 
 }

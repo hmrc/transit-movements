@@ -16,43 +16,37 @@
 
 package uk.gov.hmrc.transitmovements.repositories
 
-import org.apache.pekko.pattern.retry
 import cats.data.EitherT
-import cats.implicits.catsSyntaxOptionId
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.Filters.empty
-import com.mongodb.client.model.Filters.{and => mAnd}
-import com.mongodb.client.model.Filters.{eq => mEq}
-import com.mongodb.client.model.Filters.{gte => mGte}
-import com.mongodb.client.model.Filters.{lte => mLte}
-import com.mongodb.client.model.Filters.{regex => mRegex}
+import com.mongodb.client.model.Filters.and as mAnd
+import com.mongodb.client.model.Filters.eq as mEq
+import com.mongodb.client.model.Filters.gte as mGte
+import com.mongodb.client.model.Filters.lte as mLte
+import com.mongodb.client.model.Filters.regex as mRegex
 import com.mongodb.client.model.UpdateOptions
-import com.mongodb.client.model.Updates.{combine => mCombine}
-import com.mongodb.client.model.Updates.{push => mPush}
-import com.mongodb.client.model.Updates.{set => mSet}
+import com.mongodb.client.model.Updates.combine as mCombine
+import com.mongodb.client.model.Updates.push as mPush
+import com.mongodb.client.model.Updates.set as mSet
+import org.apache.pekko.pattern.retry
 import org.bson.conversions.Bson
 import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.model.*
 import org.mongodb.scala.model.Sorts.descending
-import org.mongodb.scala.model._
 import play.api.Logging
 import uk.gov.hmrc.mongo.MongoComponent
-import uk.gov.hmrc.mongo.play.json._
+import uk.gov.hmrc.mongo.play.json.*
 import uk.gov.hmrc.transitmovements.config.AppConfig
-import uk.gov.hmrc.transitmovements.models._
+import uk.gov.hmrc.transitmovements.models.*
 import uk.gov.hmrc.transitmovements.models.formats.CommonFormats
 import uk.gov.hmrc.transitmovements.models.formats.MongoFormats
-import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadata
-import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMessageMetadataAndBody
-import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementEori
-import uk.gov.hmrc.transitmovements.models.mongo.read.MongoMovementSummary
-import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMessages
-import uk.gov.hmrc.transitmovements.models.mongo.read.MongoPaginatedMovements
+import uk.gov.hmrc.transitmovements.models.mongo.read.*
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessage
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMessageUpdateData
 import uk.gov.hmrc.transitmovements.models.mongo.write.MongoMovement
 import uk.gov.hmrc.transitmovements.repositories.MovementsRepositoryImpl.EPOCH_TIME
 import uk.gov.hmrc.transitmovements.services.errors.MongoError
-import uk.gov.hmrc.transitmovements.services.errors.MongoError._
+import uk.gov.hmrc.transitmovements.services.errors.MongoError.*
 
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
@@ -61,7 +55,7 @@ import java.util.Collections
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
-import scala.concurrent._
+import scala.concurrent.*
 import scala.reflect.ClassTag
 import scala.util.Failure
 import scala.util.Success
@@ -236,13 +230,9 @@ class MovementsRepositoryImpl @Inject() (
           .headOption()
           .map {
             case Some(opt) =>
-              val VersionHeader =
-                if (appConfig.forceVersion3)
-                  Some(APIVersionHeader.V3_0)
-                else
-                  opt.apiVersion
-              Right(opt.copy(apiVersion = VersionHeader))
-            case None => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+              Right(opt.copy(apiVersion = Some(APIVersionHeader.V3_0)))
+            case None =>
+              Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
       case Failure(ex) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
@@ -269,13 +259,9 @@ class MovementsRepositoryImpl @Inject() (
           .headOption()
           .map {
             case Some(opt) =>
-              val VersionHeader =
-                if (appConfig.forceVersion3)
-                  APIVersionHeader.V3_0
-                else
-                  opt.apiVersion.getOrElse(APIVersionHeader.V2_1)
-              Right(opt.copy(apiVersion = Some(VersionHeader)))
-            case None => Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
+              Right(opt.copy(apiVersion = Some(APIVersionHeader.V3_0)))
+            case None =>
+              Left(DocumentNotFound(s"No movement found with the given id: ${movementId.value}"))
           }
       case Failure(ex) =>
         Future.successful(Left(UnexpectedError(Some(ex))))
@@ -446,14 +432,7 @@ class MovementsRepositoryImpl @Inject() (
       totalCount       <- countItems(filterAggregates)
     } yield {
       val updatedPerPageMovement = perPageMovements.map {
-        movement =>
-          val versionHeader: Option[APIVersionHeader] =
-            if (appConfig.forceVersion3)
-              Some(APIVersionHeader.V3_0)
-            else
-              movement.apiVersion
-
-          movement.copy(apiVersion = versionHeader)
+        movement => movement.copy(apiVersion = Some(APIVersionHeader.V3_0))
       }
       MongoPaginatedMovements(TotalCount(totalCount), updatedPerPageMovement)
     }
