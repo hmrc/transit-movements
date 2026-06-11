@@ -62,7 +62,7 @@ case class MongoMovementSummary(
       localReferenceNumber,
       created,
       updated,
-      apiVersion.getOrElse(APIVersionHeader.V2_1)
+      apiVersion.getOrElse(APIVersionHeader.V3_0)
     )
 
 }

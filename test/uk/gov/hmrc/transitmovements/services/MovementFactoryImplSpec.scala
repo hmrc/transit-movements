@@ -25,18 +25,8 @@ import uk.gov.hmrc.transitmovements.base.SpecBase
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovements.generators.BaseGenerators
 import uk.gov.hmrc.transitmovements.generators.ModelGenerators
-import uk.gov.hmrc.transitmovements.models.APIVersionHeader.V2_1
+import uk.gov.hmrc.transitmovements.models.*
 import uk.gov.hmrc.transitmovements.models.values.ShortUUID
-import uk.gov.hmrc.transitmovements.models.ArrivalData
-import uk.gov.hmrc.transitmovements.models.EORINumber
-import uk.gov.hmrc.transitmovements.models.LocalReferenceNumber
-import uk.gov.hmrc.transitmovements.models.MovementId
-import uk.gov.hmrc.transitmovements.models.MovementReferenceNumber
-import uk.gov.hmrc.transitmovements.models.ClientId
-import uk.gov.hmrc.transitmovements.models.DeclarationData
-import uk.gov.hmrc.transitmovements.models.Message
-import uk.gov.hmrc.transitmovements.models.MessageSender
-import uk.gov.hmrc.transitmovements.models.MovementType
 
 import java.security.SecureRandom
 import java.time.Clock
@@ -79,7 +69,7 @@ class MovementFactoryImplSpec
             instant,
             instant,
             clientId,
-            V2_1
+            APIVersionHeader.V3_0
           )
 
         departure.messages.length mustBe 1
@@ -113,7 +103,7 @@ class MovementFactoryImplSpec
             instant,
             instant,
             clientId,
-            V2_1
+            APIVersionHeader.V3_0
           )
 
         arrival.messages.length mustBe 1
@@ -137,7 +127,15 @@ class MovementFactoryImplSpec
     ) {
       (movementType, enrollmentEori, message, clientId) =>
         val movement =
-          sut.createEmptyMovement(enrollmentEori, movementType, message, instant, instant, clientId, V2_1)
+          sut.createEmptyMovement(
+            enrollmentEori,
+            movementType,
+            message,
+            instant,
+            instant,
+            clientId,
+            APIVersionHeader.V3_0
+          )
 
         movement.movementType mustBe movementType
         movement.messages.length mustBe 1

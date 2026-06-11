@@ -35,6 +35,4 @@ class AppConfig @Inject() (
   lazy val encryptionEnabled: Boolean      = config.get[Boolean]("encryption.enabled")
   lazy val encryptionKey: String           = config.get[String]("encryption.key")
   lazy val encryptionTolerantRead: Boolean = config.get[Boolean]("encryption.tolerant-read")
-
-  lazy val forceVersion3: Boolean = config.get[Boolean]("feature-flags.forceVersion3")
 }
