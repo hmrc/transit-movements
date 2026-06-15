@@ -25,16 +25,22 @@ enum APIVersionHeader(val value: String) {
 object APIVersionHeader {
 
   implicit val jsonFormat: Format[APIVersionHeader] = new Format[APIVersionHeader] {
-    override def writes(o: APIVersionHeader): JsValue             = JsString(o.value)
+    override def writes(o: APIVersionHeader): JsValue = JsString(o.value)
+
     override def reads(json: JsValue): JsResult[APIVersionHeader] =
       json
         .validate[String]
-        .flatMap(
-          APIVersionHeader
-            .fromString(_)
-            .map(JsSuccess(_))
-            .getOrElse(JsError("Invalid API version"))
-        )
+        .flatMap {
+          apiVersionString =>
+            if (apiVersionString == "2.1") {
+              JsSuccess(V3_0) // Required until the 60 day TTL has expired
+            } else {
+              APIVersionHeader
+                .fromString(apiVersionString)
+                .map(JsSuccess(_))
+                .getOrElse(JsError("Invalid API version"))
+            }
+        }
   }
 
   def fromString(value: String): Option[APIVersionHeader] =
